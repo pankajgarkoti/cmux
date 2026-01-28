@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Logging utilities for cmux orchestrator
 
-CMUX_STATUS_LOG="${CMUX_STATUS_LOG:-.multiclaude/status.log}"
-CMUX_IMPL_LOG="${CMUX_IMPL_LOG:-.multiclaude/implementation.log}"
+CMUX_STATUS_LOG="${CMUX_STATUS_LOG:-.cmux/status.log}"
+CMUX_IMPL_LOG="${CMUX_IMPL_LOG:-.cmux/implementation.log}"
 
 # Ensure log directory exists
 _ensure_log_dir() {

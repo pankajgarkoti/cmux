@@ -7,11 +7,11 @@ source "${SCRIPT_DIR}/lib/tmux.sh"
 source "${SCRIPT_DIR}/lib/logging.sh"
 
 CMUX_SESSION="${CMUX_SESSION:-cmux}"
-CMUX_MAILBOX="${CMUX_MAILBOX:-.multiclaude/mailbox}"
+CMUX_MAILBOX="${CMUX_MAILBOX:-.cmux/mailbox}"
 CMUX_PORT="${CMUX_PORT:-8000}"
 
 POLL_INTERVAL=2
-PROCESSED_MARKER=".multiclaude/.router_position"
+PROCESSED_MARKER=".cmux/.router_position"
 
 get_last_position() {
     if [[ -f "$PROCESSED_MARKER" ]]; then
