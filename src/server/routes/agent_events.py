@@ -1,9 +1,12 @@
 from fastapi import APIRouter
 from collections import deque
+from datetime import datetime, timezone
 from typing import Any
 import uuid
 
-from ..models.agent_event import AgentEvent, AgentEventResponse
+from ..models.agent_event import AgentEvent, AgentEventResponse, AgentEventType
+from ..models.message import Message, MessageType
+from ..services.mailbox import mailbox_service
 from ..websocket.manager import ws_manager
 from ..config import settings
 
@@ -48,8 +51,23 @@ async def receive_agent_event(event: AgentEvent):
     }
     buffer.append(event_data)
 
-    # Broadcast to WebSocket clients
+    # Broadcast agent_event to WebSocket clients
     await ws_manager.broadcast("agent_event", event_data)
+
+    # For Stop events with response_content, create a message and broadcast it
+    if event.event_type == AgentEventType.STOP and event.response_content:
+        msg = Message(
+            id=str(uuid.uuid4()),
+            timestamp=datetime.now(timezone.utc),
+            from_agent=display_agent_id,
+            to_agent="user",
+            type=MessageType.RESPONSE,
+            content=event.response_content,
+        )
+        # Store in mailbox service for retrieval via /api/messages
+        mailbox_service.store_message(msg)
+        # Broadcast to frontend so it appears in the chat
+        await ws_manager.broadcast("new_message", msg.model_dump(mode="json"))
 
     return AgentEventResponse(
         success=True,
