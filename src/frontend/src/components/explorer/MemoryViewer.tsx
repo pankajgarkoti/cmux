@@ -35,15 +35,17 @@ export function MemoryViewer({ file, onClose }: MemoryViewerProps) {
   const isJournalEntry = file.path.includes('/journal/');
 
   return (
-    <div className="flex-1 flex flex-col border-l overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between flex-shrink-0">
+      <div className="px-4 py-3 border-b bg-muted/30 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           <span className="text-sm font-medium truncate">{file.name}</span>
+          <span className="text-xs text-muted-foreground truncate">{file.path}</span>
         </div>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClose}>
-          <X className="h-4 w-4" />
+        <Button variant="outline" size="sm" className="h-7 px-2" onClick={onClose}>
+          <X className="h-4 w-4 mr-1" />
+          Close
         </Button>
       </div>
 

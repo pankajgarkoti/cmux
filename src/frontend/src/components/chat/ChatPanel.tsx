@@ -3,13 +3,16 @@ import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useMessages } from '@/hooks/useMessages';
 import { useAgentStore } from '@/stores/agentStore';
+import { useViewerStore } from '@/stores/viewerStore';
 import { useAgents } from '@/hooks/useAgents';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { WorkerConfirmModal } from './WorkerConfirmModal';
+import { MemoryViewer } from '@/components/explorer/MemoryViewer';
 
 export function ChatPanel() {
   const { selectedAgentId } = useAgentStore();
+  const { selectedFile, clearSelectedFile } = useViewerStore();
   const { data: messagesData } = useMessages();
   const { data: agentsData } = useAgents();
 
@@ -60,6 +63,15 @@ export function ChatPanel() {
   const handleSuggestionClick = (text: string) => {
     handleSend(text);
   };
+
+  // If a file is selected, show the file viewer instead of chat
+  if (selectedFile) {
+    return (
+      <div className="h-full flex flex-col">
+        <MemoryViewer file={selectedFile} onClose={clearSelectedFile} />
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">

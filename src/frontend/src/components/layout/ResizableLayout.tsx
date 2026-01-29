@@ -11,8 +11,18 @@ interface ResizableLayoutProps {
   right: React.ReactNode;
 }
 
+const COLLAPSED_SIZE = 3; // percentage when collapsed
+
 export function ResizableLayout({ left, center, right }: ResizableLayoutProps) {
-  const { leftPanelSize, rightPanelSize, setLeftPanelSize, setRightPanelSize } = useLayoutStore();
+  const {
+    leftPanelSize,
+    rightPanelSize,
+    activityPanelCollapsed,
+    setLeftPanelSize,
+    setRightPanelSize
+  } = useLayoutStore();
+
+  const effectiveRightSize = activityPanelCollapsed ? COLLAPSED_SIZE : rightPanelSize;
 
   return (
     <ResizablePanelGroup
@@ -24,7 +34,8 @@ export function ResizableLayout({ left, center, right }: ResizableLayoutProps) {
         if (leftSize !== undefined && leftSize !== leftPanelSize) {
           setLeftPanelSize(leftSize);
         }
-        if (rightSize !== undefined && rightSize !== rightPanelSize) {
+        // Only save right panel size when not collapsed
+        if (!activityPanelCollapsed && rightSize !== undefined && rightSize !== rightPanelSize) {
           setRightPanelSize(rightSize);
         }
       }}
@@ -46,20 +57,20 @@ export function ResizableLayout({ left, center, right }: ResizableLayoutProps) {
       {/* Center Panel - Command Center */}
       <ResizablePanel
         id="center-panel"
-        defaultSize={`${100 - leftPanelSize - rightPanelSize}%`}
+        defaultSize={`${100 - leftPanelSize - effectiveRightSize}%`}
         minSize="30%"
       >
         {center}
       </ResizablePanel>
 
-      <ResizableHandle withHandle />
+      <ResizableHandle withHandle={!activityPanelCollapsed} />
 
       {/* Right Panel - Activity Feed */}
       <ResizablePanel
         id="right-panel"
-        defaultSize={`${rightPanelSize}%`}
-        minSize="15%"
-        maxSize="40%"
+        defaultSize={`${effectiveRightSize}%`}
+        minSize={activityPanelCollapsed ? `${COLLAPSED_SIZE}%` : "15%"}
+        maxSize={activityPanelCollapsed ? `${COLLAPSED_SIZE}%` : "40%"}
         className="bg-sidebar-background"
       >
         {right}
