@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type Ref } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Send, Loader2 } from 'lucide-react';
@@ -8,11 +8,21 @@ interface ChatInputProps {
   onSend: (message: string) => void;
   isPending?: boolean;
   placeholder?: string;
+  inputRef?: Ref<HTMLTextAreaElement>;
 }
 
-export function ChatInput({ onSend, isPending, placeholder }: ChatInputProps) {
+export function ChatInput({ onSend, isPending, placeholder, inputRef }: ChatInputProps) {
   const [message, setMessage] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const internalRef = useRef<HTMLTextAreaElement>(null);
+
+  // Use effect to sync internal ref with external ref
+  useEffect(() => {
+    if (inputRef && typeof inputRef === 'object' && 'current' in inputRef && internalRef.current) {
+      (inputRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = internalRef.current;
+    }
+  }, [inputRef]);
+
+  const textareaRef = internalRef;
 
   // Auto-resize textarea
   useEffect(() => {

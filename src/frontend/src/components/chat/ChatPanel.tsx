@@ -1,12 +1,15 @@
-import { useState, useCallback } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useState, useCallback, useRef } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useMessages } from '@/hooks/useMessages';
 import { useAgentStore } from '@/stores/agentStore';
 import { useViewerStore } from '@/stores/viewerStore';
 import { useAgents } from '@/hooks/useAgents';
+import { useChatKeyboard } from '@/hooks/useChatKeyboard';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
+import { ChatHeader } from './ChatHeader';
+import { AgentActivityIndicator } from './AgentActivityIndicator';
 import { WorkerConfirmModal } from './WorkerConfirmModal';
 import { MemoryViewer } from '@/components/explorer/MemoryViewer';
 
@@ -15,10 +18,14 @@ export function ChatPanel() {
   const { selectedFile, clearSelectedFile } = useViewerStore();
   const { data: messagesData } = useMessages();
   const { data: agentsData } = useAgents();
+  const queryClient = useQueryClient();
 
   // Worker confirmation modal state
   const [showWorkerConfirm, setShowWorkerConfirm] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+
+  // Input ref for keyboard shortcuts
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Filter messages for selected agent or show all if none selected
   const allMessages = messagesData?.messages || [];
@@ -64,6 +71,27 @@ export function ChatPanel() {
     handleSend(text);
   };
 
+  const handleClearChat = useCallback(() => {
+    // For now, just invalidate the messages query to refresh
+    // In a full implementation, this could call an API to clear messages
+    queryClient.invalidateQueries({ queryKey: ['messages'] });
+  }, [queryClient]);
+
+  // Keyboard shortcuts
+  useChatKeyboard({
+    inputRef,
+    onSend: () => {
+      // The ChatInput component handles its own Enter key,
+      // but Cmd+Enter from anywhere should trigger send
+      const textarea = inputRef.current;
+      if (textarea && textarea.value.trim()) {
+        handleSend(textarea.value.trim());
+        textarea.value = '';
+      }
+    },
+    enabled: !selectedFile,
+  });
+
   // If a file is selected, show the file viewer instead of chat
   if (selectedFile) {
     return (
@@ -75,25 +103,29 @@ export function ChatPanel() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="px-4 pt-4 pb-2 border-b">
-        <h2 className="text-lg font-semibold">Command Center</h2>
-        <p className="text-xs text-muted-foreground">
-          {selectedAgentId
-            ? `Chatting with ${selectedAgentId}${isWorker ? ' (Worker)' : ''}`
-            : 'Send tasks to the supervisor agent'}
-        </p>
-      </div>
+      {/* Enhanced Header */}
+      <ChatHeader
+        agentId={selectedAgentId}
+        agent={selectedAgent}
+        isWorker={isWorker}
+        onClearChat={handleClearChat}
+      />
 
       {/* Chat Content */}
       <ChatMessages
         messages={messages}
         onSuggestionClick={handleSuggestionClick}
       />
+
+      {/* Activity Indicator - shows when agent is working */}
+      <AgentActivityIndicator agentId={targetAgent} />
+
+      {/* Input */}
       <ChatInput
         onSend={handleSend}
         isPending={sendMutation.isPending}
         placeholder={`Message ${targetAgent}...`}
+        inputRef={inputRef}
       />
       {sendMutation.isError && (
         <p className="px-4 pb-2 text-sm text-destructive">

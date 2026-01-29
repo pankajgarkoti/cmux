@@ -6,6 +6,7 @@ import { Explorer } from './components/explorer/Explorer';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { ActivityTimeline } from './components/activity/ActivityTimeline';
 import { StatusBar } from './components/status/StatusBar';
+import { TooltipProvider } from './components/ui/tooltip';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useAgentEvents } from './hooks/useAgentEvents';
 import { useThemeStore } from './stores/themeStore';
@@ -49,7 +50,9 @@ function Dashboard() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Dashboard />
+      <TooltipProvider>
+        <Dashboard />
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }
