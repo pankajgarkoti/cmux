@@ -4,8 +4,6 @@ import {
   ResizableHandle,
 } from '@/components/ui/resizable';
 import { useLayoutStore } from '@/stores/layoutStore';
-import { Button } from '@/components/ui/button';
-import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 
 interface ResizableLayoutProps {
   left: React.ReactNode;
@@ -14,63 +12,44 @@ interface ResizableLayoutProps {
 }
 
 export function ResizableLayout({ left, center, right }: ResizableLayoutProps) {
-  const {
-    leftPanelSize,
-    rightPanelSize,
-    rightPanelCollapsed,
-    setLeftPanelSize,
-    setRightPanelSize,
-    toggleRightPanel,
-  } = useLayoutStore();
+  const { leftPanelSize, rightPanelSize, setLeftPanelSize, setRightPanelSize } = useLayoutStore();
 
   return (
     <ResizablePanelGroup
       orientation="horizontal"
       className="h-full"
+      onLayoutChanged={(layout) => {
+        const leftSize = layout['left-panel'];
+        const rightSize = layout['right-panel'];
+        if (leftSize !== undefined && leftSize !== leftPanelSize) {
+          setLeftPanelSize(leftSize);
+        }
+        if (rightSize !== undefined && rightSize !== rightPanelSize) {
+          setRightPanelSize(rightSize);
+        }
+      }}
     >
       {/* Left Panel - Explorer */}
       <ResizablePanel
         id="left-panel"
-        defaultSize={leftPanelSize}
-        minSize={10}
-        maxSize={25}
+        defaultSize={`${leftPanelSize}%`}
+        minSize="10%"
+        maxSize="25%"
         className="bg-sidebar-background"
         style={{ overflow: 'visible' }}
-        onResize={(size) => {
-          const numSize = size.asPercentage;
-          if (numSize !== leftPanelSize) {
-            setLeftPanelSize(numSize);
-          }
-        }}
       >
         {left}
       </ResizablePanel>
 
       <ResizableHandle withHandle />
 
-      {/* Center Panel - Command Center / File Viewer */}
+      {/* Center Panel - Command Center */}
       <ResizablePanel
         id="center-panel"
-        defaultSize={100 - leftPanelSize - (rightPanelCollapsed ? 0 : rightPanelSize)}
-        minSize={30}
+        defaultSize={`${100 - leftPanelSize - rightPanelSize}%`}
+        minSize="30%"
       >
-        <div className="relative h-full">
-          {center}
-          {/* Activity panel toggle button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-3 right-3 h-7 w-7 z-10"
-            onClick={toggleRightPanel}
-            title={rightPanelCollapsed ? 'Show activity panel' : 'Hide activity panel'}
-          >
-            {rightPanelCollapsed ? (
-              <PanelRightOpen className="h-4 w-4" />
-            ) : (
-              <PanelRightClose className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
+        {center}
       </ResizablePanel>
 
       <ResizableHandle withHandle />
@@ -78,18 +57,10 @@ export function ResizableLayout({ left, center, right }: ResizableLayoutProps) {
       {/* Right Panel - Activity Feed */}
       <ResizablePanel
         id="right-panel"
-        defaultSize={rightPanelCollapsed ? 0 : rightPanelSize}
-        minSize={0}
-        maxSize={40}
-        collapsible
-        collapsedSize={0}
+        defaultSize={`${rightPanelSize}%`}
+        minSize="15%"
+        maxSize="40%"
         className="bg-sidebar-background"
-        onResize={(size) => {
-          const numSize = size.asPercentage;
-          if (numSize !== rightPanelSize) {
-            setRightPanelSize(numSize);
-          }
-        }}
       >
         {right}
       </ResizablePanel>

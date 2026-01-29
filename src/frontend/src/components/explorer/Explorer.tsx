@@ -30,9 +30,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useAgents } from '@/hooks/useAgents';
 import { useAgentStore } from '@/stores/agentStore';
-import { useViewerStore } from '@/stores/viewerStore';
 import { useFilesystem, buildFileTree } from '@/hooks/useFilesystem';
 import { FileTree, type FileTreeItem } from './FileTree';
+import { MemoryViewer } from './MemoryViewer';
 import { api } from '@/lib/api';
 import type { Agent, AgentStatus } from '@/types/agent';
 import type { SessionStatus } from '@/types/session';
@@ -58,12 +58,12 @@ export function Explorer() {
   const [agentsOpen, setAgentsOpen] = useState(true);
   const [mailboxOpen, setMailboxOpen] = useState(true);
   const [memoryOpen, setMemoryOpen] = useState(true);
+  const [selectedFile, setSelectedFile] = useState<FileTreeItem | null>(null);
   const [createSessionOpen, setCreateSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
   const [newSessionTask, setNewSessionTask] = useState('');
 
   const { selectedAgentId, selectAgent } = useAgentStore();
-  const { selectedFile, setSelectedFile } = useViewerStore();
   const { data: agentsData, isLoading: agentsLoading, error: agentsError } = useAgents();
   const { data: filesystemData, isLoading: fsLoading, refetch: refetchFs } = useFilesystem();
   const queryClient = useQueryClient();
@@ -146,13 +146,13 @@ export function Explorer() {
 
   const handleFileSelect = (item: FileTreeItem) => {
     if (item.type === 'file') {
-      setSelectedFile({ name: item.name, path: item.path, type: item.type });
+      setSelectedFile(item);
     }
   };
 
   return (
     <div className="h-full flex flex-col">
-      <ScrollArea className="flex-1 h-full">
+      <ScrollArea className="flex-1">
         <div className="p-2">
           {/* AGENTS Section */}
           <Dialog open={createSessionOpen} onOpenChange={setCreateSessionOpen}>
@@ -338,6 +338,11 @@ export function Explorer() {
           </Collapsible>
         </div>
       </ScrollArea>
+
+      {/* Memory Viewer (when file selected) */}
+      {selectedFile && (
+        <MemoryViewer file={selectedFile} onClose={() => setSelectedFile(null)} />
+      )}
     </div>
   );
 }
