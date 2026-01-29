@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 from .config import settings
-from .routes import webhooks, agents, messages, agent_events, journal
+from .routes import webhooks, agents, messages, agent_events, journal, filesystem
 from .websocket.manager import ws_manager
 
 logging.basicConfig(level=getattr(logging, settings.log_level))
@@ -44,6 +44,7 @@ app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
 app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
 app.include_router(agent_events.router, prefix="/api/agent-events", tags=["agent-events"])
 app.include_router(journal.router, prefix="/api/journal", tags=["journal"])
+app.include_router(filesystem.router, prefix="/api/filesystem", tags=["filesystem"])
 
 # Static files (frontend) - only mount if directory exists
 frontend_dir = Path("src/frontend/dist")

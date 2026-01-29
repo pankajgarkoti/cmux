@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     port: int = 8000
     log_level: str = "INFO"
     tmux_session: str = "cmux"
+    cmux_dir: Path = Path(".cmux")
     mailbox_path: Path = Path(".cmux/mailbox")
     recovery_wait_seconds: int = 30
     compact_interval_minutes: int = 15

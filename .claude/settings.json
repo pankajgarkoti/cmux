@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/notify-output.sh",
+            "command": "$(git rev-parse --show-toplevel)/.claude/hooks/notify-output.sh",
             "timeout": 10
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/notify-complete.sh",
+            "command": "$(git rev-parse --show-toplevel)/.claude/hooks/notify-complete.sh",
             "timeout": 10
           }
         ]

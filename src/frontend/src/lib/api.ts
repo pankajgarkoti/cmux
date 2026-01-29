@@ -2,6 +2,7 @@ import type { AgentListResponse, Agent } from '../types/agent';
 import type { MessageListResponse } from '../types/message';
 import type { AgentEventsResponse } from '../types/agent_event';
 import type { JournalDayResponse, JournalDatesResponse, JournalSearchResponse } from '../types/journal';
+import type { FilesystemResponse } from '../types/filesystem';
 import { API_BASE } from './constants';
 
 export const api = {
@@ -91,5 +92,19 @@ export const api = {
     });
     if (!res.ok) throw new Error('Failed to add journal entry');
     return res.json();
+  },
+
+  async getFilesystem(path?: string): Promise<FilesystemResponse> {
+    const params = path ? `?path=${encodeURIComponent(path)}` : '';
+    const res = await fetch(`${API_BASE}/api/filesystem${params}`);
+    if (!res.ok) throw new Error('Failed to fetch filesystem');
+    return res.json();
+  },
+
+  async getFileContent(path: string): Promise<string> {
+    const res = await fetch(`${API_BASE}/api/filesystem/content?path=${encodeURIComponent(path)}`);
+    if (!res.ok) throw new Error('Failed to fetch file content');
+    const data = await res.json();
+    return data.content;
   },
 };

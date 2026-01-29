@@ -1,0 +1,74 @@
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { cn } from '@/lib/utils';
+
+interface MarkdownContentProps {
+  content: string;
+  className?: string;
+}
+
+export function MarkdownContent({ content, className }: MarkdownContentProps) {
+  return (
+    <div className={cn('prose prose-sm dark:prose-invert max-w-none', className)}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          // Style code blocks
+          pre: ({ children, ...props }) => (
+            <pre
+              className="bg-muted/50 rounded-md p-3 overflow-x-auto text-xs"
+              {...props}
+            >
+              {children}
+            </pre>
+          ),
+          code: ({ children, className, ...props }) => {
+            const isInline = !className;
+            return isInline ? (
+              <code
+                className="bg-muted/50 rounded px-1 py-0.5 text-xs font-mono"
+                {...props}
+              >
+                {children}
+              </code>
+            ) : (
+              <code className="text-xs font-mono" {...props}>
+                {children}
+              </code>
+            );
+          },
+          // Style links
+          a: ({ children, ...props }) => (
+            <a
+              className="text-primary underline underline-offset-2 hover:text-primary/80"
+              target="_blank"
+              rel="noopener noreferrer"
+              {...props}
+            >
+              {children}
+            </a>
+          ),
+          // Style lists
+          ul: ({ children, ...props }) => (
+            <ul className="list-disc pl-4 space-y-1" {...props}>
+              {children}
+            </ul>
+          ),
+          ol: ({ children, ...props }) => (
+            <ol className="list-decimal pl-4 space-y-1" {...props}>
+              {children}
+            </ol>
+          ),
+          // Style paragraphs
+          p: ({ children, ...props }) => (
+            <p className="mb-2 last:mb-0" {...props}>
+              {children}
+            </p>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
