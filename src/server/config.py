@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     mailbox_path: Path = Path(".cmux/mailbox")
     recovery_wait_seconds: int = 30
     compact_interval_minutes: int = 15
+    event_buffer_size: int = 100
+    journal_path: Path = Path(".cmux/journal")
 
     model_config = {
         "env_prefix": "CMUX_",

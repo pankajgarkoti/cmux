@@ -1,5 +1,7 @@
 import type { AgentListResponse, Agent } from '../types/agent';
 import type { MessageListResponse } from '../types/message';
+import type { AgentEventsResponse } from '../types/agent_event';
+import type { JournalDayResponse, JournalDatesResponse, JournalSearchResponse } from '../types/journal';
 import { API_BASE } from './constants';
 
 export const api = {
@@ -38,11 +40,56 @@ export const api = {
     if (!res.ok) throw new Error('Failed to compact agent');
   },
 
+  async getAgentTerminal(agentId: string, lines = 50): Promise<{ agent_id: string; output: string; lines: number }> {
+    const res = await fetch(`${API_BASE}/api/agents/${agentId}/terminal?lines=${lines}`);
+    if (!res.ok) throw new Error('Failed to get terminal output');
+    return res.json();
+  },
+
   async getMessages(limit = 50, offset = 0): Promise<MessageListResponse> {
     const res = await fetch(
       `${API_BASE}/api/messages?limit=${limit}&offset=${offset}`
     );
     if (!res.ok) throw new Error('Failed to fetch messages');
+    return res.json();
+  },
+
+  async getAgentEvents(sessionId?: string, limit = 50): Promise<AgentEventsResponse> {
+    const params = new URLSearchParams();
+    if (sessionId) params.set('session_id', sessionId);
+    params.set('limit', String(limit));
+    const res = await fetch(`${API_BASE}/api/agent-events?${params}`);
+    if (!res.ok) throw new Error('Failed to fetch agent events');
+    return res.json();
+  },
+
+  async getJournal(date?: string): Promise<JournalDayResponse> {
+    const params = date ? `?date=${date}` : '';
+    const res = await fetch(`${API_BASE}/api/journal${params}`);
+    if (!res.ok) throw new Error('Failed to fetch journal');
+    return res.json();
+  },
+
+  async getJournalDates(): Promise<JournalDatesResponse> {
+    const res = await fetch(`${API_BASE}/api/journal/dates`);
+    if (!res.ok) throw new Error('Failed to fetch journal dates');
+    return res.json();
+  },
+
+  async searchJournal(query: string, limit = 20): Promise<JournalSearchResponse> {
+    const params = new URLSearchParams({ q: query, limit: String(limit) });
+    const res = await fetch(`${API_BASE}/api/journal/search?${params}`);
+    if (!res.ok) throw new Error('Failed to search journal');
+    return res.json();
+  },
+
+  async addJournalEntry(entry: { title: string; content: string }): Promise<{ success: boolean }> {
+    const res = await fetch(`${API_BASE}/api/journal/entry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry),
+    });
+    if (!res.ok) throw new Error('Failed to add journal entry');
     return res.json();
   },
 };

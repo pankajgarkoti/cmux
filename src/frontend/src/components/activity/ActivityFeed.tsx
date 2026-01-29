@@ -1,36 +1,27 @@
 import { useActivity } from '@/hooks/useActivity';
-import { useAgentStore } from '@/stores/agentStore';
 import { ActivityItem } from './ActivityItem';
 import { ScrollArea } from '../ui/scroll-area';
-import { Badge } from '../ui/badge';
 
 export function ActivityFeed() {
-  const { activities, isFiltered } = useActivity();
-  const { selectedAgentId, selectAgent } = useAgentStore();
+  const { activities } = useActivity();
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="p-4 border-b flex items-center justify-between">
+    <div className="flex-1 flex flex-col overflow-hidden h-full">
+      <div className="p-4 border-b">
         <h2 className="font-semibold text-lg">Activity</h2>
-        {isFiltered && selectedAgentId && (
-          <Badge
-            variant="outline"
-            className="cursor-pointer"
-            onClick={() => selectAgent(null)}
-          >
-            Filtering: {selectedAgentId} ✕
-          </Badge>
-        )}
+        <p className="text-sm text-muted-foreground">
+          {activities.length} events
+        </p>
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="p-4 space-y-3">
+        <div className="p-3 space-y-2">
           {activities.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
-              No activity yet
+            <p className="text-center text-muted-foreground py-8 text-sm">
+              No activity yet. Events will appear here as agents work.
             </p>
           ) : (
-            activities.map((activity) => (
+            activities.slice(0, 50).map((activity) => (
               <ActivityItem key={activity.id} activity={activity} />
             ))
           )}

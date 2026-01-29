@@ -2,6 +2,7 @@ import asyncio
 import aiofiles
 from datetime import datetime, timezone
 from typing import List, Optional
+from collections import deque
 import json
 import uuid
 
@@ -13,6 +14,8 @@ class MailboxService:
     def __init__(self):
         self.mailbox_path = settings.mailbox_path
         self._lock = asyncio.Lock()
+        # In-memory message store for dashboard display (most recent messages)
+        self._messages: deque[Message] = deque(maxlen=200)
 
     async def _ensure_mailbox(self):
         """Ensure mailbox file exists."""
@@ -68,20 +71,26 @@ id: {message_id}
 
         return message_id
 
+    def store_message(self, message: Message):
+        """Store a message in memory for dashboard display."""
+        self._messages.append(message)
+
     async def get_messages(
         self,
         limit: int = 50,
         offset: int = 0,
         agent_id: Optional[str] = None
     ) -> List[Message]:
-        """Read messages from mailbox (for dashboard display)."""
-        await self._ensure_mailbox()
+        """Read messages from in-memory store for dashboard display."""
+        messages = list(self._messages)
 
-        # This is a simplified implementation
-        # Production would use a proper database
-        messages: List[Message] = []
-        # Parse mailbox file and return messages
-        # Implementation depends on specific parsing needs
+        # Filter by agent if specified
+        if agent_id:
+            messages = [m for m in messages
+                       if m.from_agent == agent_id or m.to_agent == agent_id]
+
+        # Return in reverse order (newest first) with pagination
+        messages = list(reversed(messages))
         return messages[offset:offset + limit]
 
 

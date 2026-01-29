@@ -24,7 +24,8 @@ tmux_window_exists() {
 tmux_create_window() {
     local session="$1"
     local name="$2"
-    tmux new-window -t "$session" -n "$name"
+    # Use session: syntax to append window without specifying index
+    tmux new-window -t "${session}:" -n "$name"
 }
 
 # Send keys to a tmux window
@@ -33,7 +34,9 @@ tmux_send_keys() {
     local window="$2"
     shift 2
     local keys="$*"
-    tmux send-keys -t "${session}:${window}" "$keys" Enter
+    # Send text literally, then send Enter as separate command
+    tmux send-keys -t "${session}:${window}" -l "$keys"
+    tmux send-keys -t "${session}:${window}" Enter
 }
 
 # Send interrupt (Ctrl+C) to a tmux window

@@ -1,9 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Layout } from './components/layout/Layout';
 import { AgentList } from './components/agents/AgentList';
+import { CommandCenter } from './components/command/CommandCenter';
 import { ActivityFeed } from './components/activity/ActivityFeed';
-import { MessageInput } from './components/messages/MessageInput';
-import { MessageList } from './components/messages/MessageList';
 import { StatusBar } from './components/status/StatusBar';
 import { useWebSocket } from './hooks/useWebSocket';
 
@@ -22,24 +21,22 @@ function Dashboard() {
   return (
     <Layout>
       <div className="grid grid-cols-12 gap-4 h-full">
-        {/* Agent List - Left Sidebar */}
-        <div className="col-span-3 border-r">
+        {/* Left - Agents */}
+        <div className="col-span-2 border-r overflow-hidden">
           <AgentList />
         </div>
 
-        {/* Main Content - Activity Feed */}
-        <div className="col-span-6 flex flex-col">
-          <ActivityFeed />
-          <MessageInput />
+        {/* Center - Command Center (main interaction) */}
+        <div className="col-span-7 flex flex-col overflow-hidden">
+          <CommandCenter />
         </div>
 
-        {/* Right Panel - Messages */}
-        <div className="col-span-3 border-l">
-          <MessageList />
+        {/* Right - Activity Stream */}
+        <div className="col-span-3 border-l overflow-hidden">
+          <ActivityFeed />
         </div>
       </div>
 
-      {/* Status Bar */}
       <StatusBar />
     </Layout>
   );

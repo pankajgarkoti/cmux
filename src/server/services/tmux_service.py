@@ -27,8 +27,12 @@ class TmuxService:
 
     async def send_input(self, window: str, text: str):
         """Send text input to a tmux window."""
+        # Send text literally, then Enter separately
         await self._run_command([
-            "tmux", "send-keys", "-t", f"{self.session}:{window}", text, "Enter"
+            "tmux", "send-keys", "-t", f"{self.session}:{window}", "-l", text
+        ])
+        await self._run_command([
+            "tmux", "send-keys", "-t", f"{self.session}:{window}", "Enter"
         ])
 
     async def send_interrupt(self, window: str):

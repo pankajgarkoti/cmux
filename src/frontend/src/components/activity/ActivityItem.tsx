@@ -1,20 +1,10 @@
 import { cn } from '@/lib/utils';
-import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
 import type { Activity } from '@/types/activity';
 
 interface ActivityItemProps {
   activity: Activity;
 }
-
-const typeIcons: Record<Activity['type'], string> = {
-  tool_call: '🔧',
-  message_sent: '📤',
-  message_received: '📥',
-  status_change: '🔄',
-  webhook_received: '🌐',
-  user_message: '👤',
-};
 
 const typeColors: Record<Activity['type'], string> = {
   tool_call: 'border-l-blue-500',
@@ -29,56 +19,43 @@ export function ActivityItem({ activity }: ActivityItemProps) {
   const time = new Date(activity.timestamp).toLocaleTimeString();
 
   return (
-    <Card
-      className={cn(
-        'p-3 border-l-4',
-        typeColors[activity.type]
-      )}
-    >
-      <div className="flex items-center justify-between mb-2">
+    <div className={cn(
+      'p-2 border-l-2 bg-card rounded text-xs',
+      typeColors[activity.type]
+    )}>
+      <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
-          <span>{typeIcons[activity.type]}</span>
-          <Badge variant="outline">{activity.agent_id}</Badge>
+          <Badge variant="outline" className="text-[10px] h-5">
+            {activity.agent_id}
+          </Badge>
+          <span className="text-muted-foreground capitalize">
+            {activity.type.replace('_', ' ')}
+          </span>
         </div>
-        <span className="text-xs text-muted-foreground">{time}</span>
+        <span className="text-muted-foreground">{time}</span>
       </div>
-
-      <div className="text-sm">
-        {renderActivityContent(activity)}
+      <div className="text-muted-foreground truncate">
+        {getActivitySummary(activity)}
       </div>
-    </Card>
+    </div>
   );
 }
 
-function renderActivityContent(activity: Activity): React.ReactNode {
+function getActivitySummary(activity: Activity): string {
   switch (activity.type) {
     case 'tool_call':
-      return (
-        <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">
-          {JSON.stringify(activity.data, null, 2)}
-        </pre>
-      );
-
+      return activity.data?.tool_name
+        ? `Tool: ${activity.data.tool_name}`
+        : 'Tool executed';
     case 'user_message':
-      return (
-        <p className="whitespace-pre-wrap">{activity.data.content as string}</p>
-      );
-
+      return String(activity.data?.content || 'Message sent').slice(0, 100);
+    case 'message_sent':
+      return String(activity.data?.content || 'Message').slice(0, 100);
     case 'webhook_received':
-      return (
-        <p>
-          Webhook from <strong>{activity.data.source as string}</strong>
-        </p>
-      );
-
+      return `From: ${activity.data?.source || 'external'}`;
     case 'status_change':
-      return (
-        <p>
-          Status changed to <Badge>{activity.data.status as string}</Badge>
-        </p>
-      );
-
+      return `Status: ${activity.data?.status || 'changed'}`;
     default:
-      return <p>{JSON.stringify(activity.data)}</p>;
+      return activity.type;
   }
 }

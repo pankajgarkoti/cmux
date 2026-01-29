@@ -31,11 +31,17 @@ cmd_start() {
         log_status "PENDING" "tmux session created"
     fi
 
-    # Start supervisor window
+    # Start supervisor window with CMUX agent environment
     if ! tmux_window_exists "$CMUX_SESSION" "supervisor"; then
         tmux_create_window "$CMUX_SESSION" "supervisor"
-        tmux_send_keys "$CMUX_SESSION" "supervisor" "cd ${CMUX_PROJECT_ROOT} && claude"
+        # Start Claude with CMUX_AGENT=true to enable hooks, and --dangerously-skip-permissions for autonomous operation
+        tmux_send_keys "$CMUX_SESSION" "supervisor" "export CMUX_AGENT=true CMUX_AGENT_NAME=supervisor && cd ${CMUX_PROJECT_ROOT} && claude --dangerously-skip-permissions"
         log_status "PENDING" "supervisor agent started"
+
+        # Wait for Claude to initialize, then send role instructions
+        sleep 8
+        tmux_send_keys "$CMUX_SESSION" "supervisor" "Read docs/SUPERVISOR_ROLE.md to understand your role as the CMUX supervisor agent. This file contains your instructions for managing workers, using the journal system, and coordinating tasks."
+        log_status "IN_PROGRESS" "supervisor agent received role instructions"
     fi
 
     # Start FastAPI server in background
