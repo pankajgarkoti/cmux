@@ -14,6 +14,54 @@ The architecture enables safe self-modification through:
 
 Agents modify the codebase, the health monitor validates changes work, and failures trigger automatic recovery.
 
+## Supervisor Task Completion Checklist
+
+> **MANDATORY**: The supervisor agent MUST complete this checklist after EVERY task. Failure to follow this checklist violates the supervisor SOP and results in lost work history.
+
+### After Every Code Change
+
+- [ ] **Stage and commit changes** with a descriptive message
+  ```bash
+  git add <files>
+  git commit -m "$(cat <<'EOF'
+  <type>: <description>
+
+  Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+  EOF
+  )"
+  ```
+- [ ] **Create journal entry** via API call documenting the work:
+  ```bash
+  curl -X POST http://localhost:8000/api/journal/entry \
+    -H "Content-Type: application/json" \
+    -d '{
+      "title": "<task title>",
+      "content": "## What was done\n<description>\n\n## Why\n<rationale>\n\n## Key decisions\n<decisions>\n\n## Issues encountered\n<issues or none>",
+      "tags": ["<relevant>", "<tags>"]
+    }'
+  ```
+
+### After Complex Tasks (when applicable)
+
+- [ ] **Run tests** if code changes affect Python: `uv run pytest`
+- [ ] **Run typecheck** if code changes affect frontend: `cd src/frontend && npm run typecheck`
+- [ ] **Verify system health**: `curl http://localhost:8000/api/webhooks/health`
+
+### Before Marking Task Complete
+
+- [ ] **Confirm commit exists**: `git log -1 --oneline`
+- [ ] **Confirm journal entry**: Check response from journal POST was successful
+- [ ] **Report to user**: Provide commit hash and brief summary of changes made
+
+### Quick Reference
+
+| Step | Command | Purpose |
+|------|---------|---------|
+| 1. Commit | `git add . && git commit` | Persist changes |
+| 2. Journal | `POST /api/journal/entry` | Document work |
+| 3. Verify | `git log -1` | Confirm commit |
+| 4. Report | Tell user | Close the loop |
+
 ## Development Commands
 
 ### Python Backend
