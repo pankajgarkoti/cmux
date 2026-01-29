@@ -14,7 +14,6 @@ CMUX_HOST="${CMUX_HOST:-0.0.0.0}"
 CMUX_MAILBOX="${CMUX_MAILBOX:-.cmux/mailbox}"
 CMUX_STATUS_LOG="${CMUX_STATUS_LOG:-.cmux/status.log}"
 CMUX_RECOVERY_WAIT="${CMUX_RECOVERY_WAIT:-30}"
-CMUX_COMPACT_INTERVAL="${CMUX_COMPACT_INTERVAL:-15}"
 CMUX_PROJECT_ROOT="${CMUX_PROJECT_ROOT:-$(pwd)}"
 
 # Commands
@@ -47,10 +46,12 @@ cmd_start() {
     # Start FastAPI server in background
     start_server
 
-    # Start background processes
-    start_health_monitor &
+    # Start health monitor INSIDE the tmux monitor window
+    tmux_send_keys "$CMUX_SESSION" "monitor" "cd ${CMUX_PROJECT_ROOT} && ${SCRIPT_DIR}/health.sh"
+    log_status "IN_PROGRESS" "health monitor started in tmux"
+
+    # Start router daemon in background
     start_router &
-    start_compact_scheduler &
 
     log_status "IN_PROGRESS" "cmux system started"
     log_info "cmux system started successfully"
@@ -61,19 +62,23 @@ cmd_start() {
 cmd_stop() {
     log_info "Stopping cmux system..."
 
-    # Stop background processes
-    pkill -f "cmux-health" 2>/dev/null || true
+    # Stop router daemon (runs as background process)
     pkill -f "cmux-router" 2>/dev/null || true
-    pkill -f "cmux-compact" 2>/dev/null || true
 
     # Stop FastAPI server
     stop_server
 
-    # Kill tmux session
+    # Kill main tmux session (this also stops health monitor running inside it)
     if tmux_session_exists "$CMUX_SESSION"; then
         tmux kill-session -t "$CMUX_SESSION"
         log_status "COMPLETE" "tmux session killed"
     fi
+
+    # Kill any spawned sessions
+    for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep "^cmux-" || true); do
+        tmux kill-session -t "$sess" 2>/dev/null || true
+        log_info "Killed spawned session: $sess"
+    done
 
     log_status "COMPLETE" "cmux system stopped"
     log_info "cmux system stopped"
@@ -109,9 +114,19 @@ cmd_status() {
 
     # Background processes
     echo "Background processes:"
-    pgrep -f "cmux-health" >/dev/null && echo "  - health monitor: RUNNING" || echo "  - health monitor: STOPPED"
+    # Health monitor runs inside tmux monitor window
+    if tmux_session_exists "$CMUX_SESSION" && tmux_window_exists "$CMUX_SESSION" "monitor"; then
+        local monitor_cmd
+        monitor_cmd=$(tmux list-panes -t "$CMUX_SESSION:monitor" -F '#{pane_current_command}' 2>/dev/null | head -1)
+        if [[ "$monitor_cmd" == "bash" || "$monitor_cmd" == "health.sh" ]]; then
+            echo "  - health monitor: RUNNING (in tmux)"
+        else
+            echo "  - health monitor: STOPPED (window exists but script not running)"
+        fi
+    else
+        echo "  - health monitor: STOPPED"
+    fi
     pgrep -f "cmux-router" >/dev/null && echo "  - message router: RUNNING" || echo "  - message router: STOPPED"
-    pgrep -f "cmux-compact" >/dev/null && echo "  - compact scheduler: RUNNING" || echo "  - compact scheduler: STOPPED"
 }
 
 cmd_logs() {
@@ -169,16 +184,8 @@ is_server_running() {
 }
 
 # Background process starters
-start_health_monitor() {
-    exec -a "cmux-health" "${SCRIPT_DIR}/health.sh"
-}
-
 start_router() {
     exec -a "cmux-router" "${SCRIPT_DIR}/router.sh"
-}
-
-start_compact_scheduler() {
-    exec -a "cmux-compact" "${SCRIPT_DIR}/compact.sh"
 }
 
 # Main entry point

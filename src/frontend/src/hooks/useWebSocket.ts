@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useConnectionStore } from '../stores/connectionStore';
 import { useActivityStore } from '../stores/activityStore';
 import { useAgentEventStore } from '../stores/agentEventStore';
+import { useSessionStore } from '../stores/sessionStore';
 import { WS_URL, RECONNECT_DELAY } from '../lib/constants';
 import type { Activity } from '../types/activity';
 import type { AgentEvent } from '../types/agent_event';
@@ -15,6 +16,7 @@ export function useWebSocket() {
   const { setConnected, setReconnecting } = useConnectionStore();
   const { addActivity } = useActivityStore();
   const { addEvent } = useAgentEventStore();
+  const { addSession, removeSession, updateSession } = useSessionStore();
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -49,6 +51,22 @@ export function useWebSocket() {
         // Handle new messages for chat UI
         if (data.event === 'new_message' || data.event === 'user_message') {
           queryClient.invalidateQueries({ queryKey: ['messages'] });
+        }
+
+        // Handle session events
+        if (data.event === 'session_created') {
+          addSession(data.data.session);
+          queryClient.invalidateQueries({ queryKey: ['sessions'] });
+        }
+
+        if (data.event === 'session_terminated') {
+          removeSession(data.data.session_id);
+          queryClient.invalidateQueries({ queryKey: ['sessions'] });
+        }
+
+        if (data.event === 'session_status_changed') {
+          updateSession(data.data.session_id, { status: data.data.status });
+          queryClient.invalidateQueries({ queryKey: ['sessions'] });
         }
 
         // Add to general activity feed
@@ -108,6 +126,10 @@ function mapEventToActivityType(event: string): Activity['type'] {
       return 'status_change';
     case 'agent_event':
       return 'tool_call';
+    case 'session_created':
+    case 'session_terminated':
+    case 'session_status_changed':
+      return 'status_change';
     default:
       return 'tool_call';
   }

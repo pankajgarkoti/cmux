@@ -3,6 +3,7 @@ import type { MessageListResponse } from '../types/message';
 import type { AgentEventsResponse } from '../types/agent_event';
 import type { JournalDayResponse, JournalDatesResponse, JournalSearchResponse } from '../types/journal';
 import type { FilesystemResponse } from '../types/filesystem';
+import type { SessionListResponse, Session, SessionCreateRequest } from '../types/session';
 import { API_BASE } from './constants';
 
 export const api = {
@@ -106,5 +107,68 @@ export const api = {
     if (!res.ok) throw new Error('Failed to fetch file content');
     const data = await res.json();
     return data.content;
+  },
+
+  // Session API
+  async getSessions(): Promise<SessionListResponse> {
+    const res = await fetch(`${API_BASE}/api/sessions`);
+    if (!res.ok) throw new Error('Failed to fetch sessions');
+    return res.json();
+  },
+
+  async getSession(id: string): Promise<Session> {
+    const res = await fetch(`${API_BASE}/api/sessions/${id}`);
+    if (!res.ok) throw new Error('Failed to fetch session');
+    return res.json();
+  },
+
+  async createSession(data: SessionCreateRequest): Promise<Session> {
+    const res = await fetch(`${API_BASE}/api/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to create session');
+    return res.json();
+  },
+
+  async terminateSession(id: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/sessions/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      if (res.status === 403) throw new Error('Cannot terminate main session');
+      throw new Error('Failed to terminate session');
+    }
+  },
+
+  async pauseSession(id: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/sessions/${id}/pause`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to pause session');
+  },
+
+  async resumeSession(id: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/sessions/${id}/resume`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to resume session');
+  },
+
+  async clearSession(id: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/sessions/${id}/clear`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to clear session');
+  },
+
+  async sendMessageToSession(id: string, content: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/sessions/${id}/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+    if (!res.ok) throw new Error('Failed to send message to session');
   },
 };

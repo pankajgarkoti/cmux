@@ -3,11 +3,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
+source "${SCRIPT_DIR}/lib/tmux.sh"
 source "${SCRIPT_DIR}/lib/logging.sh"
 
 CMUX_PORT="${CMUX_PORT:-8000}"
+CMUX_SESSION="${CMUX_SESSION:-cmux}"
 CMUX_RECOVERY_WAIT="${CMUX_RECOVERY_WAIT:-30}"
 CMUX_PROJECT_ROOT="${CMUX_PROJECT_ROOT:-$(pwd)}"
+
+# Healthy commit tracking
+HEALTHY_COMMIT_FILE=".cmux/.last_healthy_commit"
 
 CHECK_INTERVAL=10
 MAX_FAILURES=3
@@ -21,10 +26,104 @@ check_server_health() {
     fi
 }
 
-get_last_working_commit() {
-    # Find last commit where server was known to work
-    # This could be stored in a marker file or use git bisect logic
-    git log --oneline -20 | head -1 | cut -d' ' -f1
+# Mark current commit as healthy
+mark_healthy() {
+    local commit
+    commit=$(git rev-parse HEAD 2>/dev/null || echo "")
+    if [[ -n "$commit" ]]; then
+        echo "$commit" > "$HEALTHY_COMMIT_FILE"
+        log_info "Marked commit $commit as healthy"
+    fi
+}
+
+# Get last known healthy commit
+get_last_healthy_commit() {
+    if [[ -f "$HEALTHY_COMMIT_FILE" ]]; then
+        cat "$HEALTHY_COMMIT_FILE"
+    else
+        # Fallback: use previous commit
+        git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD
+    fi
+}
+
+# Journal the failure context before rollback
+pre_rollback_journal() {
+    local error_log="$1"
+    local git_status
+    local last_commit
+    local target_commit
+
+    git_status=$(git status --short 2>/dev/null || echo "Unable to get git status")
+    last_commit=$(git log -1 --oneline 2>/dev/null || echo "Unable to get last commit")
+    target_commit=$(get_last_healthy_commit)
+
+    # Try to post to journal API (may fail if server is down)
+    curl -sf -X POST "http://localhost:${CMUX_PORT}/api/journal/entry" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"title\": \"Auto-Rollback Triggered\",
+            \"content\": \"## Health Check Failure\\n\\nHealth check failed after 3 consecutive retries. Auto-rollback initiated.\\n\\n### Error Context\\n\\\`\\\`\\\`\\n${error_log}\\n\\\`\\\`\\\`\\n\\n### Git Status\\n\\\`\\\`\\\`\\n${git_status}\\n\\\`\\\`\\\`\\n\\n### Last Commit\\n${last_commit}\\n\\n### Rolling Back To\\n${target_commit}\"
+        }" 2>/dev/null || true
+
+    # Also write to local file as backup
+    local journal_dir=".cmux/journal/$(date +%Y-%m-%d)"
+    mkdir -p "$journal_dir"
+    cat > "${journal_dir}/rollback-$(date +%H%M%S).md" << EOF
+# Auto-Rollback Triggered
+
+**Time:** $(date -Iseconds)
+
+## Health Check Failure
+
+Health check failed after 3 consecutive retries. Auto-rollback initiated.
+
+### Error Context
+\`\`\`
+${error_log}
+\`\`\`
+
+### Git Status
+\`\`\`
+${git_status}
+\`\`\`
+
+### Last Commit
+${last_commit}
+
+### Rolling Back To
+${target_commit}
+EOF
+
+    log_info "Rollback context journaled"
+}
+
+# Notify supervisor of rollback via mailbox and tmux
+notify_supervisor_of_rollback() {
+    local error_context="$1"
+    local target_commit="$2"
+
+    local message="SYSTEM ALERT: Auto-rollback occurred. The server failed health checks after 3 retries and was rolled back to commit ${target_commit}. Error context: ${error_context}. Please check the journal at .cmux/journal/$(date +%Y-%m-%d)/ for full details and investigate what caused the failure. Your changes were stashed and can be recovered with 'git stash list'."
+
+    # Send via mailbox
+    cat >> .cmux/mailbox << EOF
+--- MESSAGE ---
+timestamp: $(date -Iseconds)
+from: system:health
+to: supervisor
+type: error
+id: rollback-$(date +%s)
+---
+${message}
+---
+EOF
+
+    # Also send directly to tmux for immediate attention
+    if tmux_window_exists "$CMUX_SESSION" "supervisor"; then
+        # Use tmux_send_keys function for proper two-step send
+        tmux_send_keys "$CMUX_SESSION" "supervisor" "$message"
+    fi
+
+    log_info "Supervisor notified of rollback"
 }
 
 rollback_and_restart() {
@@ -33,7 +132,7 @@ rollback_and_restart() {
 
     cd "$CMUX_PROJECT_ROOT"
 
-    # Stash any changes
+    # Stash any changes (preserves work for later recovery)
     git stash push -m "cmux-auto-rollback-$(date +%s)" 2>/dev/null || true
 
     # Reset to target commit
@@ -48,7 +147,7 @@ rollback_and_restart() {
     # Rebuild frontend
     (cd src/frontend && npm install && npm run build)
 
-    # Restart server
+    # Restart server only (keep tmux sessions alive!)
     stop_server
     start_server
 
@@ -76,6 +175,10 @@ start_server() {
 attempt_recovery() {
     log_status "IN_PROGRESS" "Attempting server recovery..."
 
+    # Capture recent server log for context
+    local error_log
+    error_log=$(tail -50 /tmp/cmux-server.log 2>/dev/null || echo "No server log available")
+
     # First, try simple restart
     stop_server
     sleep 2
@@ -85,16 +188,41 @@ attempt_recovery() {
 
     if check_server_health; then
         log_status "COMPLETE" "Server recovered with simple restart"
+        mark_healthy
         return 0
     fi
 
-    # If restart didn't work, try rolling back commits
+    # If restart didn't work, journal the failure and try rollback
     log_status "IN_PROGRESS" "Simple restart failed, attempting git rollback..."
+
+    # Journal the failure context
+    pre_rollback_journal "$error_log"
+
+    # Get the last known healthy commit
+    local target_commit
+    target_commit=$(get_last_healthy_commit)
+
+    # Rollback to healthy commit
+    log_info "Rolling back to last healthy commit: $target_commit"
+    rollback_and_restart "$target_commit"
+
+    sleep "$CMUX_RECOVERY_WAIT"
+
+    if check_server_health; then
+        log_status "COMPLETE" "Server recovered after rollback to $target_commit"
+        # Notify supervisor
+        notify_supervisor_of_rollback "$error_log" "$target_commit"
+        return 0
+    fi
+
+    # If that didn't work, try rolling back further
+    log_status "IN_PROGRESS" "Healthy commit rollback failed, trying previous commits..."
 
     local commits
     commits=$(git log --oneline -10 | tail -n +2)
 
     while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
         local commit_hash
         commit_hash=$(echo "$line" | cut -d' ' -f1)
 
@@ -105,19 +233,28 @@ attempt_recovery() {
 
         if check_server_health; then
             log_status "COMPLETE" "Server recovered after rollback to $commit_hash"
+            notify_supervisor_of_rollback "$error_log" "$commit_hash"
             return 0
         fi
     done <<< "$commits"
 
     log_status "FAILED" "Recovery failed - manual intervention required"
+    notify_supervisor_of_rollback "All rollback attempts failed. Manual intervention required." "NONE"
     return 1
 }
 
 main() {
     log_info "Health monitor started"
 
+    # Ensure directories exist
+    mkdir -p "$(dirname "$HEALTHY_COMMIT_FILE")"
+
     while true; do
         if check_server_health; then
+            if ((failure_count > 0)); then
+                # Just recovered from a failure, mark as healthy
+                mark_healthy
+            fi
             failure_count=0
         else
             ((failure_count++))

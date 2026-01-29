@@ -6,6 +6,7 @@ import { ChatPanel } from './components/chat/ChatPanel';
 import { ActivityTimeline } from './components/activity/ActivityTimeline';
 import { StatusBar } from './components/status/StatusBar';
 import { useWebSocket } from './hooks/useWebSocket';
+import { useAgentEvents } from './hooks/useAgentEvents';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,6 +19,7 @@ const queryClient = new QueryClient({
 
 function Dashboard() {
   useWebSocket();
+  useAgentEvents(); // Load historical events on app start
 
   return (
     <Layout>

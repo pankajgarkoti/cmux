@@ -9,9 +9,24 @@ source "${SCRIPT_DIR}/lib/logging.sh"
 CMUX_SESSION="${CMUX_SESSION:-cmux}"
 CMUX_MAILBOX="${CMUX_MAILBOX:-.cmux/mailbox}"
 CMUX_PORT="${CMUX_PORT:-8000}"
+CMUX_ROUTER_LOG="${CMUX_ROUTER_LOG:-.cmux/router.log}"
 
 POLL_INTERVAL=2
 PROCESSED_MARKER=".cmux/.router_position"
+
+# Log a routing event
+log_route() {
+    local status="$1"
+    local from="$2"
+    local to="$3"
+    local details="${4:-}"
+    echo "$(date -Iseconds) | $status | $from → $to | $details" >> "$CMUX_ROUTER_LOG"
+}
+
+# Get list of all cmux sessions
+get_cmux_sessions() {
+    tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -E '^cmux(-|$)' || true
+}
 
 get_last_position() {
     if [[ -f "$PROCESSED_MARKER" ]]; then
@@ -46,21 +61,41 @@ parse_message() {
 route_to_agent() {
     local to="$1"
     local content="$2"
+    local from="${3:-unknown}"
 
     if [[ "$to" == "user" ]]; then
         # Route to FastAPI server endpoint for user display
-        curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/user" \
+        if curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/user" \
             -H "Content-Type: application/json" \
             -d "{\"content\": $(echo "$content" | jq -Rs .), \"from_agent\": \"supervisor\"}" \
-            >/dev/null 2>&1 || true
-        log_info "Routed message to user via API"
-    elif tmux_window_exists "$CMUX_SESSION" "$to"; then
-        # Route to tmux window
-        tmux_send_keys "$CMUX_SESSION" "$to" "$content"
-        log_info "Routed message to agent: $to"
-    else
-        log_status "BLOCKED" "Cannot route to unknown agent: $to"
+            >/dev/null 2>&1; then
+            log_route "DELIVERED" "$from" "user" "via API"
+            log_info "Routed message to user via API"
+        else
+            log_route "FAILED" "$from" "user" "API error"
+        fi
+        return 0
     fi
+
+    # Check all cmux sessions for the target agent
+    local sessions
+    sessions=$(get_cmux_sessions)
+
+    while IFS= read -r session; do
+        [[ -z "$session" ]] && continue
+
+        if tmux_window_exists "$session" "$to"; then
+            tmux_send_keys "$session" "$to" "$content"
+            log_route "DELIVERED" "$from" "$to" "session=$session"
+            log_info "Routed message to agent: $to in session: $session"
+            return 0
+        fi
+    done <<< "$sessions"
+
+    # Agent not found in any session
+    log_route "FAILED" "$from" "$to" "agent not found"
+    log_status "BLOCKED" "Cannot route to unknown agent: $to"
+    return 1
 }
 
 process_mailbox() {
@@ -95,7 +130,9 @@ process_mailbox() {
                 to=$(echo "$parsed" | cut -d'|' -f2)
 
                 if [[ -n "$to" ]]; then
-                    route_to_agent "$to" "$current_message"
+                    local from_agent
+                    from_agent=$(echo "$parsed" | cut -d'|' -f1)
+                    route_to_agent "$to" "$current_message" "$from_agent"
                 fi
             fi
             current_message=""
@@ -109,10 +146,11 @@ process_mailbox() {
     if [[ -n "$current_message" ]]; then
         local parsed
         parsed=$(parse_message "$current_message")
-        local to
+        local to from_agent
         to=$(echo "$parsed" | cut -d'|' -f2)
+        from_agent=$(echo "$parsed" | cut -d'|' -f1)
         if [[ -n "$to" ]]; then
-            route_to_agent "$to" "$current_message"
+            route_to_agent "$to" "$current_message" "$from_agent"
         fi
     fi
 
@@ -122,8 +160,12 @@ process_mailbox() {
 main() {
     log_info "Message router started"
 
-    # Ensure marker directory exists
+    # Ensure directories exist
     mkdir -p "$(dirname "$PROCESSED_MARKER")"
+    mkdir -p "$(dirname "$CMUX_ROUTER_LOG")"
+
+    # Log startup
+    log_route "STARTUP" "router" "all" "Router daemon started"
 
     while true; do
         process_mailbox

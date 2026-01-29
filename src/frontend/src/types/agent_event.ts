@@ -4,6 +4,7 @@ export interface AgentEvent {
   id: string;
   event_type: AgentEventType;
   session_id: string;
+  agent_id?: string;
   tool_name?: string;
   tool_input?: unknown;
   tool_output?: unknown;

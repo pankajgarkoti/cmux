@@ -2,6 +2,17 @@
 
 A self-improving multi-agent AI orchestration system that manages and coordinates Claude AI agents running in parallel. CMUX provides a unified dashboard for monitoring, controlling, and communicating with multiple AI agents working collaboratively.
 
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[Quick Start](./docs/QUICKSTART.md)** | Get running in 5 minutes |
+| **[User Guide](./docs/USER_GUIDE.md)** | Complete guide to using CMUX |
+| **[Concepts](./docs/CONCEPTS.md)** | Deep dive into how CMUX works |
+| **[Self-Improvement](./docs/SELF_IMPROVEMENT_GUIDE.md)** | Guidelines for modifying CMUX |
+
+See [docs/README.md](./docs/README.md) for the full documentation index.
+
 ## Features
 
 - **Multi-Agent Orchestration** - Supervisor agent delegates tasks to worker agents running in isolated tmux windows

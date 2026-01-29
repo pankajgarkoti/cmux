@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { ChevronRight, Bot, FolderOpen, RefreshCw, Inbox, Crown } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { ChevronRight, Bot, FolderOpen, RefreshCw, Inbox, Crown, Layers, Trash2, Pause, Play, Plus, MoreHorizontal, AlertCircle } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -10,12 +11,38 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useAgents } from '@/hooks/useAgents';
 import { useAgentStore } from '@/stores/agentStore';
 import { useFilesystem, buildFileTree } from '@/hooks/useFilesystem';
 import { FileTree, type FileTreeItem } from './FileTree';
 import { MemoryViewer } from './MemoryViewer';
+import { api } from '@/lib/api';
 import type { Agent, AgentStatus } from '@/types/agent';
+import type { SessionStatus } from '@/types/session';
+
+interface SessionGroup {
+  session: string;
+  isMain: boolean;
+  agents: Agent[];
+  status?: SessionStatus;
+}
 
 const statusColors: Record<AgentStatus, string> = {
   PENDING: 'bg-gray-400',
@@ -32,17 +59,68 @@ export function Explorer() {
   const [mailboxOpen, setMailboxOpen] = useState(true);
   const [memoryOpen, setMemoryOpen] = useState(true);
   const [selectedFile, setSelectedFile] = useState<FileTreeItem | null>(null);
+  const [createSessionOpen, setCreateSessionOpen] = useState(false);
+  const [newSessionName, setNewSessionName] = useState('');
+  const [newSessionTask, setNewSessionTask] = useState('');
 
   const { selectedAgentId, selectAgent } = useAgentStore();
   const { data: agentsData, isLoading: agentsLoading, error: agentsError } = useAgents();
   const { data: filesystemData, isLoading: fsLoading, refetch: refetchFs } = useFilesystem();
+  const queryClient = useQueryClient();
+
+  const createSessionMutation = useMutation({
+    mutationFn: (data: { name: string; task_description: string }) => api.createSession(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      setCreateSessionOpen(false);
+      setNewSessionName('');
+      setNewSessionTask('');
+    },
+  });
 
   const agents = agentsData?.agents || [];
-  const sortedAgents = [...agents].sort((a, b) => {
-    if (a.type === 'supervisor') return -1;
-    if (b.type === 'supervisor') return 1;
-    return a.name.localeCompare(b.name);
-  });
+
+  // Group agents by session
+  const sessionGroups = useMemo((): SessionGroup[] => {
+    const groups = new Map<string, Agent[]>();
+
+    for (const agent of agents) {
+      const session = agent.session || 'cmux';
+      if (!groups.has(session)) {
+        groups.set(session, []);
+      }
+      groups.get(session)!.push(agent);
+    }
+
+    // Sort agents within each group (supervisors first, then by name)
+    for (const [, groupAgents] of groups) {
+      groupAgents.sort((a, b) => {
+        if (a.type === 'supervisor' && b.type !== 'supervisor') return -1;
+        if (b.type === 'supervisor' && a.type !== 'supervisor') return 1;
+        return a.name.localeCompare(b.name);
+      });
+    }
+
+    // Convert to array, with main session first
+    const result: SessionGroup[] = [];
+    const mainSession = groups.get('cmux');
+    if (mainSession) {
+      result.push({ session: 'cmux', isMain: true, agents: mainSession });
+      groups.delete('cmux');
+    }
+
+    // Add other sessions sorted by name
+    const otherSessions = Array.from(groups.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([session, groupAgents]) => ({
+        session,
+        isMain: false,
+        agents: groupAgents,
+      }));
+
+    return [...result, ...otherSessions];
+  }, [agents]);
 
   // Build file tree and separate mailbox
   const allItems: FileTreeItem[] = filesystemData?.items
@@ -77,22 +155,34 @@ export function Explorer() {
       <ScrollArea className="flex-1">
         <div className="p-2">
           {/* AGENTS Section */}
-          <Collapsible open={agentsOpen} onOpenChange={setAgentsOpen}>
-            <CollapsibleTrigger asChild>
-              <button className="w-full flex items-center gap-1 px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/70 hover:text-sidebar-foreground">
-                <ChevronRight
-                  className={cn(
-                    'h-3.5 w-3.5 transition-transform',
-                    agentsOpen && 'rotate-90'
-                  )}
-                />
-                <Bot className="h-3.5 w-3.5" />
-                <span>Agents</span>
-                <span className="ml-auto text-[10px] font-normal text-muted-foreground">
-                  {agents.length}
-                </span>
-              </button>
-            </CollapsibleTrigger>
+          <Dialog open={createSessionOpen} onOpenChange={setCreateSessionOpen}>
+            <Collapsible open={agentsOpen} onOpenChange={setAgentsOpen}>
+              <div className="flex items-center">
+                <CollapsibleTrigger asChild>
+                  <button className="flex-1 flex items-center gap-1 px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/70 hover:text-sidebar-foreground">
+                    <ChevronRight
+                      className={cn(
+                        'h-3.5 w-3.5 transition-transform',
+                        agentsOpen && 'rotate-90'
+                      )}
+                    />
+                    <Bot className="h-3.5 w-3.5" />
+                    <span>Agents</span>
+                    <span className="ml-auto text-[10px] font-normal text-muted-foreground">
+                      {agents.length}
+                    </span>
+                  </button>
+                </CollapsibleTrigger>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 mr-1"
+                  onClick={() => setCreateSessionOpen(true)}
+                  title="Create new session"
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
             <CollapsibleContent className="mt-1">
               {agentsLoading ? (
                 <div className="space-y-2 px-2">
@@ -101,22 +191,74 @@ export function Explorer() {
                 </div>
               ) : agentsError ? (
                 <p className="px-2 text-xs text-destructive">Failed to load agents</p>
-              ) : sortedAgents.length === 0 ? (
+              ) : sessionGroups.length === 0 ? (
                 <p className="px-2 text-xs text-muted-foreground">No agents running</p>
               ) : (
-                <div className="space-y-0.5">
-                  {sortedAgents.map((agent) => (
-                    <AgentItem
-                      key={agent.id}
-                      agent={agent}
-                      isSelected={selectedAgentId === agent.id}
-                      onClick={() => selectAgent(agent.id)}
+                <div className="space-y-2">
+                  {sessionGroups.map((group) => (
+                    <SessionAgentGroup
+                      key={group.session}
+                      group={group}
+                      selectedAgentId={selectedAgentId}
+                      onSelectAgent={selectAgent}
                     />
                   ))}
                 </div>
               )}
             </CollapsibleContent>
-          </Collapsible>
+            </Collapsible>
+
+            {/* Create Session Dialog */}
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Session</DialogTitle>
+                <DialogDescription>
+                  Create a new orchestration session with its own supervisor agent.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Session Name</label>
+                  <Input
+                    placeholder="feature-auth"
+                    value={newSessionName}
+                    onChange={(e) => setNewSessionName(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Will be prefixed with "cmux-"
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Task Description</label>
+                  <Textarea
+                    placeholder="Implement user authentication with JWT..."
+                    value={newSessionTask}
+                    onChange={(e) => setNewSessionTask(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateSessionOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => createSessionMutation.mutate({
+                    name: newSessionName,
+                    task_description: newSessionTask,
+                  })}
+                  disabled={createSessionMutation.isPending || !newSessionName || !newSessionTask}
+                >
+                  {createSessionMutation.isPending ? 'Creating...' : 'Create Session'}
+                </Button>
+              </DialogFooter>
+              {createSessionMutation.isError && (
+                <p className="text-sm text-red-500 mt-2">
+                  {createSessionMutation.error?.message || 'Failed to create session'}
+                </p>
+              )}
+            </DialogContent>
+          </Dialog>
 
           {/* MAILBOX Section */}
           {mailboxItem && (
@@ -202,6 +344,173 @@ export function Explorer() {
         <MemoryViewer file={selectedFile} onClose={() => setSelectedFile(null)} />
       )}
     </div>
+  );
+}
+
+function SessionAgentGroup({
+  group,
+  selectedAgentId,
+  onSelectAgent,
+}: {
+  group: SessionGroup;
+  selectedAgentId: string | null;
+  onSelectAgent: (id: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(true);
+  const [confirmTerminate, setConfirmTerminate] = useState(false);
+  const queryClient = useQueryClient();
+
+  const terminateMutation = useMutation({
+    mutationFn: () => api.terminateSession(group.session),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      setConfirmTerminate(false);
+    },
+  });
+
+  const pauseMutation = useMutation({
+    mutationFn: () => api.pauseSession(group.session),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sessions'] }),
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: () => api.resumeSession(group.session),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sessions'] }),
+  });
+
+  const isPaused = group.status === 'PAUSED';
+  const isLoading = terminateMutation.isPending || pauseMutation.isPending || resumeMutation.isPending;
+
+  // For main session, show agents directly without grouping header
+  if (group.isMain) {
+    return (
+      <div className="space-y-0.5">
+        <div className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground">
+          <Crown className="h-3 w-3 text-amber-500" />
+          <span>Main Session</span>
+        </div>
+        {group.agents.map((agent) => (
+          <AgentItem
+            key={agent.id}
+            agent={agent}
+            isSelected={selectedAgentId === agent.id}
+            onClick={() => onSelectAgent(agent.id)}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  // For spawned sessions, show collapsible group with actions
+  return (
+    <Dialog open={confirmTerminate} onOpenChange={setConfirmTerminate}>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <div className="flex items-center group">
+          <CollapsibleTrigger asChild>
+            <button className="flex-1 flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground">
+              <ChevronRight
+                className={cn(
+                  'h-3 w-3 transition-transform',
+                  isOpen && 'rotate-90'
+                )}
+              />
+              <Layers className="h-3 w-3" />
+              <span className="truncate">{group.session.replace('cmux-', '')}</span>
+              {isPaused && (
+                <Badge variant="outline" className="text-[9px] h-3.5 px-1 ml-1 border-yellow-500/50 text-yellow-600">
+                  PAUSED
+                </Badge>
+              )}
+              <span className="ml-auto text-[10px]">{group.agents.length}</span>
+            </button>
+          </CollapsibleTrigger>
+
+          {/* Session actions dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                disabled={isLoading}
+              >
+                <MoreHorizontal className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              {isPaused ? (
+                <DropdownMenuItem
+                  onClick={() => resumeMutation.mutate()}
+                  disabled={resumeMutation.isPending}
+                >
+                  <Play className="h-3.5 w-3.5 mr-2 text-green-500" />
+                  Resume
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  onClick={() => pauseMutation.mutate()}
+                  disabled={pauseMutation.isPending}
+                >
+                  <Pause className="h-3.5 w-3.5 mr-2 text-yellow-500" />
+                  Pause
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setConfirmTerminate(true)}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                Terminate
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <CollapsibleContent className="ml-2 space-y-0.5">
+          {group.agents.map((agent) => (
+            <AgentItem
+              key={agent.id}
+              agent={agent}
+              isSelected={selectedAgentId === agent.id}
+              onClick={() => onSelectAgent(agent.id)}
+            />
+          ))}
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Terminate confirmation dialog */}
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-red-500" />
+            Terminate Session
+          </DialogTitle>
+          <DialogDescription>
+            Are you sure you want to terminate <strong>{group.session}</strong>?
+            This will gracefully stop all {group.agents.length} agent(s) in this session.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setConfirmTerminate(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => terminateMutation.mutate()}
+            disabled={terminateMutation.isPending}
+          >
+            {terminateMutation.isPending ? 'Terminating...' : 'Terminate'}
+          </Button>
+        </DialogFooter>
+        {terminateMutation.isError && (
+          <p className="text-sm text-red-500 mt-2">
+            {terminateMutation.error?.message || 'Failed to terminate session'}
+          </p>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -25,6 +25,7 @@ class Agent(BaseModel):
     type: AgentType
     status: AgentStatus = AgentStatus.IDLE
     tmux_window: str
+    session: str = "cmux"  # tmux session this agent belongs to
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_activity: Optional[datetime] = None
     current_task: Optional[str] = None

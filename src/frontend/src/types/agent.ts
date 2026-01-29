@@ -15,6 +15,7 @@ export interface Agent {
   type: AgentType;
   status: AgentStatus;
   tmux_window: string;
+  session: string;
   created_at: string;
   last_activity: string | null;
   current_task: string | null;
