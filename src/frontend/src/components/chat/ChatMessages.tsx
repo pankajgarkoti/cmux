@@ -23,11 +23,11 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when messages change (new messages or agent switch)
   useEffect(() => {
     // Use requestAnimationFrame to ensure DOM is updated
     requestAnimationFrame(() => {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      bottomRef.current?.scrollIntoView({ behavior: 'instant' });
     });
   }, [messages.length]);
 
