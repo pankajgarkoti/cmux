@@ -1,4 +1,4 @@
-import type { AgentListResponse, Agent } from '../types/agent';
+import type { AgentListResponse, Agent, ArchivedAgentSummary, ArchivedAgent } from '../types/agent';
 import type { MessageListResponse } from '../types/message';
 import type { AgentEventsResponse } from '../types/agent_event';
 import type { JournalDayResponse, JournalDatesResponse, JournalSearchResponse } from '../types/journal';
@@ -170,5 +170,26 @@ export const api = {
       body: JSON.stringify({ content }),
     });
     if (!res.ok) throw new Error('Failed to send message to session');
+  },
+
+  // Archived agents API
+  async getArchivedAgents(): Promise<ArchivedAgentSummary[]> {
+    const res = await fetch(`${API_BASE}/api/agents/archived`);
+    if (!res.ok) throw new Error('Failed to fetch archived agents');
+    return res.json();
+  },
+
+  async getArchivedAgent(archiveId: string): Promise<ArchivedAgent> {
+    const res = await fetch(`${API_BASE}/api/agents/archived/${archiveId}`);
+    if (!res.ok) throw new Error('Failed to fetch archived agent');
+    return res.json();
+  },
+
+  async archiveAgent(agentId: string): Promise<{ archive_id: string }> {
+    const res = await fetch(`${API_BASE}/api/agents/${agentId}/archive`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to archive agent');
+    return res.json();
   },
 };

@@ -11,10 +11,11 @@ import { ChatInput } from './ChatInput';
 import { ChatHeader } from './ChatHeader';
 import { AgentActivityIndicator } from './AgentActivityIndicator';
 import { WorkerConfirmModal } from './WorkerConfirmModal';
+import { ArchivedAgentView } from './ArchivedAgentView';
 import { MemoryViewer } from '@/components/explorer/MemoryViewer';
 
 export function ChatPanel() {
-  const { selectedAgentId } = useAgentStore();
+  const { selectedAgentId, viewingArchivedId } = useAgentStore();
   const { selectedFile } = useViewerStore();
   const { data: messagesData } = useMessages();
   const { data: agentsData } = useAgents();
@@ -99,6 +100,11 @@ export function ChatPanel() {
         <MemoryViewer file={selectedFile} />
       </div>
     );
+  }
+
+  // If viewing an archived agent, show the archive view
+  if (viewingArchivedId) {
+    return <ArchivedAgentView archiveId={viewingArchivedId} />;
   }
 
   return (

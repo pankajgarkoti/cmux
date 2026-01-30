@@ -8,14 +8,29 @@ import uuid
 
 from ..config import settings
 from ..models.message import Message, MessageType
+from .conversation_store import conversation_store
 
 
 class MailboxService:
     def __init__(self):
         self.mailbox_path = settings.mailbox_path
         self._lock = asyncio.Lock()
-        # In-memory message store for dashboard display (most recent messages)
+        # In-memory message store for fast access (most recent messages)
+        # SQLite provides durability across restarts
         self._messages: deque[Message] = deque(maxlen=200)
+        # Load recent messages from SQLite on startup
+        self._load_persisted_messages()
+
+    def _load_persisted_messages(self):
+        """Load recent messages from SQLite on startup."""
+        try:
+            messages = conversation_store.get_messages(limit=200)
+            # Messages come in reverse order (newest first), reverse to get oldest first
+            for msg in reversed(messages):
+                self._messages.append(msg)
+        except Exception:
+            # Database might not exist yet on first run
+            pass
 
     async def _ensure_mailbox(self):
         """Ensure mailbox file exists."""
@@ -72,8 +87,10 @@ id: {message_id}
         return message_id
 
     def store_message(self, message: Message):
-        """Store a message in memory for dashboard display."""
+        """Store a message in memory and persist to SQLite."""
         self._messages.append(message)
+        # Write-through to SQLite for persistence
+        conversation_store.store_message(message)
 
     async def get_messages(
         self,

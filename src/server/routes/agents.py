@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from datetime import datetime, timezone
+from typing import List
 import asyncio
 import json
 import logging
@@ -11,6 +12,11 @@ from ..services.agent_manager import agent_manager
 from ..services.tmux_service import tmux_service
 from ..services.mailbox import mailbox_service
 from ..services.message_formatter import format_dashboard_message
+from ..services.conversation_store import (
+    conversation_store,
+    ArchivedAgent,
+    ArchivedAgentSummary,
+)
 from ..websocket.manager import ws_manager
 
 logger = logging.getLogger(__name__)
@@ -99,6 +105,60 @@ async def get_agent_terminal(agent_id: str, lines: int = 50):
 
     output = await tmux_service.capture_pane(agent.tmux_window, lines)
     return {"agent_id": agent_id, "output": output, "lines": lines}
+
+
+@router.post("/{agent_id}/archive")
+async def archive_agent(agent_id: str, lines: int = 2000):
+    """Archive an agent's conversation and terminal output before killing.
+
+    Captures terminal scrollback and stores it along with agent metadata
+    in the archive database. Should be called before killing a worker.
+    """
+    agent = await agent_manager.get_agent(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # Capture terminal output before archiving
+    terminal_output = await tmux_service.capture_pane(agent.tmux_window, lines)
+
+    # Archive the agent
+    archive_id = conversation_store.archive_agent(
+        agent_id=agent_id,
+        agent_name=agent.name,
+        agent_type=agent.type,
+        terminal_output=terminal_output,
+    )
+
+    # Broadcast archive event for frontend to update
+    await ws_manager.broadcast("agent_archived", {
+        "archive_id": archive_id,
+        "agent_id": agent_id,
+        "agent_name": agent.name,
+        "agent_type": agent.type,
+        "archived_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    return {
+        "success": True,
+        "archive_id": archive_id,
+        "agent_id": agent_id,
+        "agent_name": agent.name,
+    }
+
+
+@router.get("/archived", response_model=List[ArchivedAgentSummary])
+async def list_archived_agents():
+    """List all archived agents."""
+    return conversation_store.get_archived_agents()
+
+
+@router.get("/archived/{archive_id}", response_model=ArchivedAgent)
+async def get_archived_agent(archive_id: str):
+    """Get a specific archived agent with terminal output."""
+    archive = conversation_store.get_archive(archive_id)
+    if not archive:
+        raise HTTPException(status_code=404, detail="Archive not found")
+    return archive
 
 
 @router.websocket("/ws")

@@ -1,0 +1,234 @@
+#!/usr/bin/env bash
+#═══════════════════════════════════════════════════════════════════════════════
+# workers - Manage worker agents from the supervisor
+#
+# Usage:
+#   workers spawn <name> <task>    - Create and start a new worker
+#   workers kill <name>            - Terminate a worker
+#   workers list                   - List all workers
+#   workers send <name> <message>  - Send message to a worker
+#   workers status <name>          - Get worker terminal output
+#═══════════════════════════════════════════════════════════════════════════════
+
+set -euo pipefail
+
+CMUX_SESSION="${CMUX_SESSION:-cmux}"
+CMUX_PROJECT_ROOT="${CMUX_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+STARTUP_DELAY=8
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+#───────────────────────────────────────────────────────────────────────────────
+# Helpers
+#───────────────────────────────────────────────────────────────────────────────
+
+die() { echo -e "${RED}error:${NC} $1" >&2; exit 1; }
+info() { echo -e "${CYAN}▶${NC} $1"; }
+ok() { echo -e "${GREEN}✓${NC} $1"; }
+warn() { echo -e "${YELLOW}!${NC} $1"; }
+
+window_exists() {
+    tmux list-windows -t "$CMUX_SESSION" -F '#{window_name}' 2>/dev/null | grep -qx "$1"
+}
+
+is_supervisor() {
+    [[ "$1" == "supervisor" ]] || [[ "$1" == supervisor-* ]]
+}
+
+#───────────────────────────────────────────────────────────────────────────────
+# Commands
+#───────────────────────────────────────────────────────────────────────────────
+
+cmd_spawn() {
+    local name="${1:-}"
+    local task="${2:-}"
+
+    [[ -z "$name" ]] && die "usage: workers spawn <name> <task>"
+    [[ -z "$task" ]] && die "usage: workers spawn <name> <task>"
+
+    # Sanitize name
+    name=$(echo "$name" | tr ' ' '-' | tr -cd 'a-zA-Z0-9-_')
+
+    if window_exists "$name"; then
+        die "worker '$name' already exists"
+    fi
+
+    info "Creating worker: $name"
+
+    # Create tmux window
+    tmux new-window -t "${CMUX_SESSION}:" -n "$name"
+
+    # Lock window name
+    tmux set-option -t "${CMUX_SESSION}:${name}" allow-rename off 2>/dev/null || true
+
+    # Start Claude with environment variables (two-step pattern for reliability)
+    info "Starting Claude agent..."
+    tmux send-keys -t "${CMUX_SESSION}:${name}" -l \
+        "export CMUX_AGENT=true CMUX_AGENT_NAME=${name} CMUX_SESSION=${CMUX_SESSION} && cd ${CMUX_PROJECT_ROOT} && claude --dangerously-skip-permissions"
+    tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
+
+    # Wait for Claude to initialize
+    info "Waiting ${STARTUP_DELAY}s for Claude to initialize..."
+    sleep "$STARTUP_DELAY"
+
+    # Send the task
+    info "Sending task to worker..."
+    tmux send-keys -t "${CMUX_SESSION}:${name}" -l "$task"
+    tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
+
+    ok "Worker '$name' spawned and task assigned"
+    echo ""
+    echo "Task: $task"
+    echo "Window: ${CMUX_SESSION}:${name}"
+}
+
+cmd_kill() {
+    local name="${1:-}"
+
+    [[ -z "$name" ]] && die "usage: workers kill <name>"
+
+    if is_supervisor "$name"; then
+        die "cannot kill supervisor agents"
+    fi
+
+    if ! window_exists "$name"; then
+        die "worker '$name' not found"
+    fi
+
+    info "Terminating worker: $name"
+
+    # Archive the worker's conversation before killing
+    info "Archiving conversation..."
+    if curl -sX POST "http://localhost:8000/api/agents/${name}/archive" > /dev/null 2>&1; then
+        ok "Conversation archived"
+    else
+        warn "Failed to archive conversation (server may be down)"
+    fi
+
+    # Send Ctrl+C first to gracefully stop Claude
+    tmux send-keys -t "${CMUX_SESSION}:${name}" C-c
+    sleep 1
+
+    # Kill the window
+    tmux kill-window -t "${CMUX_SESSION}:${name}"
+
+    ok "Worker '$name' terminated"
+}
+
+cmd_list() {
+    local windows
+    windows=$(tmux list-windows -t "$CMUX_SESSION" -F '#{window_name}' 2>/dev/null || true)
+
+    if [[ -z "$windows" ]]; then
+        warn "No tmux session found"
+        return 1
+    fi
+
+    echo "Workers in session '$CMUX_SESSION':"
+    echo ""
+
+    local count=0
+    while IFS= read -r window; do
+        # Skip system windows
+        [[ "$window" == "monitor" ]] && continue
+
+        if is_supervisor "$window"; then
+            echo -e "  ${CYAN}●${NC} $window (supervisor)"
+        else
+            echo -e "  ${GREEN}●${NC} $window"
+            ((count++))
+        fi
+    done <<< "$windows"
+
+    echo ""
+    echo "Total workers: $count"
+}
+
+cmd_send() {
+    local name="${1:-}"
+    local message="${2:-}"
+
+    [[ -z "$name" ]] && die "usage: workers send <name> <message>"
+    [[ -z "$message" ]] && die "usage: workers send <name> <message>"
+
+    if ! window_exists "$name"; then
+        die "worker '$name' not found"
+    fi
+
+    info "Sending message to: $name"
+
+    # Send message using literal flag then Enter
+    tmux send-keys -t "${CMUX_SESSION}:${name}" -l "$message"
+    tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
+
+    ok "Message sent to '$name'"
+}
+
+cmd_status() {
+    local name="${1:-}"
+    local lines="${2:-30}"
+
+    [[ -z "$name" ]] && die "usage: workers status <name> [lines]"
+
+    if ! window_exists "$name"; then
+        die "worker '$name' not found"
+    fi
+
+    echo "=== Terminal output for '$name' (last $lines lines) ==="
+    echo ""
+    tmux capture-pane -t "${CMUX_SESSION}:${name}" -p -S "-${lines}"
+}
+
+cmd_help() {
+    cat << 'EOF'
+workers - Manage worker agents
+
+USAGE:
+    workers <command> [arguments]
+
+COMMANDS:
+    spawn <name> <task>      Create a new worker and assign a task
+    kill <name>              Terminate a worker (not supervisors)
+    list                     List all workers in the session
+    send <name> <message>    Send a message to a worker
+    status <name> [lines]    Show recent terminal output (default: 30 lines)
+    help                     Show this help message
+
+EXAMPLES:
+    workers spawn auth-worker "Implement JWT authentication in src/auth/"
+    workers send auth-worker "Also add refresh token support"
+    workers status auth-worker 50
+    workers kill auth-worker
+    workers list
+
+ENVIRONMENT:
+    CMUX_SESSION       tmux session name (default: cmux)
+    CMUX_PROJECT_ROOT  project root directory (default: git root or pwd)
+EOF
+}
+
+#───────────────────────────────────────────────────────────────────────────────
+# Main
+#───────────────────────────────────────────────────────────────────────────────
+
+main() {
+    local cmd="${1:-help}"
+    shift || true
+
+    case "$cmd" in
+        spawn)  cmd_spawn "$@" ;;
+        kill)   cmd_kill "$@" ;;
+        list)   cmd_list "$@" ;;
+        send)   cmd_send "$@" ;;
+        status) cmd_status "$@" ;;
+        help|--help|-h) cmd_help ;;
+        *)      die "unknown command: $cmd (try 'workers help')" ;;
+    esac
+}
+
+main "$@"

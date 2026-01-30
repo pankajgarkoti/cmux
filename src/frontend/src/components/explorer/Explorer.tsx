@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
-import { ChevronRight, Bot, FolderOpen, RefreshCw, Inbox, Crown, Layers, Trash2, Pause, Play, Plus, MoreHorizontal, AlertCircle, Users } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useMemo, useEffect } from 'react';
+import { ChevronRight, Bot, FolderOpen, RefreshCw, Inbox, Crown, Layers, Trash2, Pause, Play, Plus, MoreHorizontal, AlertCircle, Users, Archive } from 'lucide-react';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -56,17 +56,31 @@ const statusColors: Record<AgentStatus, string> = {
 
 export function Explorer() {
   const [agentsOpen, setAgentsOpen] = useState(true);
+  const [archivedOpen, setArchivedOpen] = useState(false);
   const [mailboxOpen, setMailboxOpen] = useState(true);
   const [memoryOpen, setMemoryOpen] = useState(true);
   const [createSessionOpen, setCreateSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
   const [newSessionTask, setNewSessionTask] = useState('');
 
-  const { selectedAgentId, selectAgent } = useAgentStore();
+  const { selectedAgentId, selectAgent, archivedAgents, setArchivedAgents, viewingArchivedId, viewArchive } = useAgentStore();
   const { selectedFile, setSelectedFile } = useViewerStore();
   const { data: agentsData, isLoading: agentsLoading, error: agentsError } = useAgents();
   const { data: filesystemData, isLoading: fsLoading, refetch: refetchFs } = useFilesystem();
   const queryClient = useQueryClient();
+
+  // Fetch archived agents
+  const { data: archivedData } = useQuery({
+    queryKey: ['archivedAgents'],
+    queryFn: () => api.getArchivedAgents(),
+  });
+
+  // Sync archived agents to store
+  useEffect(() => {
+    if (archivedData) {
+      setArchivedAgents(archivedData);
+    }
+  }, [archivedData, setArchivedAgents]);
 
   const createSessionMutation = useMutation({
     mutationFn: (data: { name: string; task_description: string }) => api.createSession(data),
@@ -281,6 +295,49 @@ export function Explorer() {
               )}
             </DialogContent>
           </Dialog>
+
+          {/* ARCHIVED WORKERS Section */}
+          {archivedAgents.length > 0 && (
+            <Collapsible open={archivedOpen} onOpenChange={setArchivedOpen} className="mt-4">
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center gap-1 px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/70 hover:text-sidebar-foreground">
+                  <ChevronRight
+                    className={cn(
+                      'h-3.5 w-3.5 transition-transform',
+                      archivedOpen && 'rotate-90'
+                    )}
+                  />
+                  <Archive className="h-3.5 w-3.5" />
+                  <span>Archived</span>
+                  <span className="ml-auto text-[10px] font-normal text-muted-foreground">
+                    {archivedAgents.length}
+                  </span>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-1 space-y-0.5">
+                {archivedAgents.map((archived) => (
+                  <button
+                    key={archived.id}
+                    onClick={() => viewArchive(archived.id)}
+                    className={cn(
+                      'w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors text-left',
+                      'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                      viewingArchivedId === archived.id && 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    )}
+                  >
+                    <Archive className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    <span className="truncate flex-1">{archived.agent_name}</span>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] h-4 px-1 border-gray-400/50 text-gray-500"
+                    >
+                      ARC
+                    </Badge>
+                  </button>
+                ))}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
           {/* MAILBOX Section */}
           {mailboxItem && (

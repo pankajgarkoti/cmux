@@ -4,6 +4,7 @@ import { useConnectionStore } from '../stores/connectionStore';
 import { useActivityStore } from '../stores/activityStore';
 import { useAgentEventStore } from '../stores/agentEventStore';
 import { useSessionStore } from '../stores/sessionStore';
+import { useAgentStore } from '../stores/agentStore';
 import { WS_URL, RECONNECT_DELAY_BASE, RECONNECT_DELAY_MAX } from '../lib/constants';
 import type { Activity } from '../types/activity';
 import type { AgentEvent } from '../types/agent_event';
@@ -18,6 +19,7 @@ export function useWebSocket() {
   const { addActivity } = useActivityStore();
   const { addEvent } = useAgentEventStore();
   const { addSession, removeSession, updateSession } = useSessionStore();
+  const { addArchivedAgent, viewArchive, selectedAgentId } = useAgentStore();
 
   // Calculate delay with exponential backoff
   const getReconnectDelay = useCallback(() => {
@@ -94,6 +96,26 @@ export function useWebSocket() {
           queryClient.invalidateQueries({ queryKey: ['sessions'] });
         }
 
+        // Handle agent archived event
+        if (data.event === 'agent_archived') {
+          const archived = {
+            id: data.data.archive_id,
+            agent_id: data.data.agent_id,
+            agent_name: data.data.agent_name,
+            agent_type: data.data.agent_type,
+            archived_at: data.data.archived_at,
+          };
+          addArchivedAgent(archived);
+
+          // If the archived agent was currently selected, switch to archived view
+          if (selectedAgentId === data.data.agent_id) {
+            viewArchive(data.data.archive_id);
+          }
+
+          // Refresh agents list since one was archived (and will be killed)
+          queryClient.invalidateQueries({ queryKey: ['agents'] });
+        }
+
         // Add to general activity feed
         addActivity({
           id: crypto.randomUUID(),
@@ -128,7 +150,7 @@ export function useWebSocket() {
     };
 
     wsRef.current = ws;
-  }, [setConnected, setReconnecting, addActivity, addEvent, queryClient, getReconnectDelay, sendPong, addSession, removeSession, updateSession]);
+  }, [setConnected, setReconnecting, addActivity, addEvent, queryClient, getReconnectDelay, sendPong, addSession, removeSession, updateSession, addArchivedAgent, viewArchive, selectedAgentId]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
