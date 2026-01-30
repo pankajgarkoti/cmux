@@ -71,16 +71,12 @@ export function AgentActivityIndicator({
     <div
       className={cn(
         'flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground',
-        'border-t bg-muted/30 animate-in fade-in slide-in-from-bottom-2 duration-200',
+        'border-t bg-muted/30',
         className
       )}
     >
-      <div className="relative">
-        <Loader2 className="h-4 w-4 animate-spin text-primary" />
-        <span className="absolute inset-0 h-4 w-4 animate-ping opacity-20 rounded-full bg-primary" />
-      </div>
+      <Loader2 className="h-4 w-4 animate-spin text-primary" />
       <span className="font-medium text-foreground/80">{description}</span>
-      <span className="animate-pulse">...</span>
     </div>
   );
 }
