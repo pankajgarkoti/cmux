@@ -5,6 +5,7 @@ from typing import List, Optional
 from ..config import settings
 from ..models.session import Session, SessionStatus
 from .tmux_service import tmux_service
+from .message_formatter import format_dashboard_message, format_system_message, MessageType
 
 
 class SessionManager:
@@ -187,12 +188,12 @@ class SessionManager:
         if not session:
             return False
 
-        # Send pause message to supervisor
-        await tmux_service.send_input(
-            session.supervisor_agent,
-            "SYSTEM: Session paused. Stop processing new tasks until resumed.",
-            session_id
+        # Send formatted pause message to supervisor
+        message = format_system_message(
+            "Session paused. Stop processing new tasks until resumed.",
+            MessageType.STATUS
         )
+        await tmux_service.send_input(session.supervisor_agent, message, session_id)
 
         session.status = SessionStatus.PAUSED
         return True
@@ -203,12 +204,12 @@ class SessionManager:
         if not session:
             return False
 
-        # Send resume message to supervisor
-        await tmux_service.send_input(
-            session.supervisor_agent,
-            "SYSTEM: Session resumed. You may continue processing tasks.",
-            session_id
+        # Send formatted resume message to supervisor
+        message = format_system_message(
+            "Session resumed. You may continue processing tasks.",
+            MessageType.STATUS
         )
+        await tmux_service.send_input(session.supervisor_agent, message, session_id)
 
         session.status = SessionStatus.ACTIVE
         return True
@@ -232,11 +233,9 @@ class SessionManager:
         if not session:
             return False
 
-        await tmux_service.send_input(
-            session.supervisor_agent,
-            message,
-            session_id
-        )
+        # Format message so supervisor knows it's from dashboard
+        formatted_message = format_dashboard_message(message)
+        await tmux_service.send_input(session.supervisor_agent, formatted_message, session_id)
         return True
 
     async def list_session_agents(self, session_id: str) -> List[str]:

@@ -10,6 +10,7 @@ from ..models.message import Message, MessageType
 from ..services.agent_manager import agent_manager
 from ..services.tmux_service import tmux_service
 from ..services.mailbox import mailbox_service
+from ..services.message_formatter import format_dashboard_message
 from ..websocket.manager import ws_manager
 
 logger = logging.getLogger(__name__)
@@ -54,7 +55,9 @@ async def send_message_to_agent(agent_id: str, message: AgentMessage):
     )
     mailbox_service.store_message(msg)
 
-    await tmux_service.send_input(agent.tmux_window, message.content)
+    # Format message with source context so agent knows where it came from
+    formatted_message = format_dashboard_message(message.content)
+    await tmux_service.send_input(agent.tmux_window, formatted_message)
     await ws_manager.broadcast("message_sent", {
         "agent_id": agent_id,
         "content": message.content[:100]
