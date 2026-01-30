@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronRight, Bot, FolderOpen, RefreshCw, Inbox, Crown, Layers, Trash2, Pause, Play, Plus, MoreHorizontal, AlertCircle } from 'lucide-react';
+import { ChevronRight, Bot, FolderOpen, RefreshCw, Inbox, Crown, Layers, Trash2, Pause, Play, Plus, MoreHorizontal, AlertCircle, Users } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -184,6 +184,28 @@ export function Explorer() {
                 </Button>
               </div>
             <CollapsibleContent className="mt-1">
+              {/* All Agents - returns to overview showing all messages */}
+              <button
+                onClick={() => selectAgent(null)}
+                className={cn(
+                  'w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors text-left mb-2',
+                  'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                  selectedAgentId === null && 'bg-sidebar-accent text-sidebar-accent-foreground'
+                )}
+              >
+                <Users className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                <span className="truncate flex-1">All Agents</span>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'text-[10px] h-4 px-1',
+                    selectedAgentId === null ? 'border-blue-500/50 text-blue-600' : 'border-muted'
+                  )}
+                >
+                  ALL
+                </Badge>
+              </button>
+
               {agentsLoading ? (
                 <div className="space-y-2 px-2">
                   <Skeleton className="h-7 w-full" />
