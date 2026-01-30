@@ -2,18 +2,16 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FileText, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { FileText } from 'lucide-react';
 import type { FileTreeItem } from './FileTree';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 interface MemoryViewerProps {
   file: FileTreeItem | null;
-  onClose: () => void;
 }
 
-export function MemoryViewer({ file, onClose }: MemoryViewerProps) {
+export function MemoryViewer({ file }: MemoryViewerProps) {
   const { data: content, isLoading } = useQuery({
     queryKey: ['file-content', file?.path],
     queryFn: () => api.getFileContent(file!.path),
@@ -37,16 +35,10 @@ export function MemoryViewer({ file, onClose }: MemoryViewerProps) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 border-b bg-muted/30 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-          <span className="text-sm font-medium truncate">{file.name}</span>
-          <span className="text-xs text-muted-foreground truncate">{file.path}</span>
-        </div>
-        <Button variant="outline" size="sm" className="h-7 px-2" onClick={onClose}>
-          <X className="h-4 w-4 mr-1" />
-          Close
-        </Button>
+      <div className="px-4 py-3 border-b bg-muted/30 flex items-center gap-2 flex-shrink-0">
+        <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        <span className="text-sm font-medium truncate">{file.name}</span>
+        <span className="text-xs text-muted-foreground truncate">{file.path}</span>
       </div>
 
       {/* Content */}

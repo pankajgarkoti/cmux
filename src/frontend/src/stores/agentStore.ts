@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Agent } from '../types/agent';
+import { useViewerStore } from './viewerStore';
 
 interface AgentState {
   agents: Agent[];
@@ -22,5 +23,9 @@ export const useAgentStore = create<AgentState>((set) => ({
       ),
     })),
 
-  selectAgent: (id) => set({ selectedAgentId: id }),
+  selectAgent: (id) => {
+    // Clear file selection when switching to an agent
+    useViewerStore.getState().clearSelectedFile();
+    set({ selectedAgentId: id });
+  },
 }));

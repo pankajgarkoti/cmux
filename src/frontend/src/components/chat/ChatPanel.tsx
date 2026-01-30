@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useMessages } from '@/hooks/useMessages';
@@ -15,7 +15,7 @@ import { MemoryViewer } from '@/components/explorer/MemoryViewer';
 
 export function ChatPanel() {
   const { selectedAgentId } = useAgentStore();
-  const { selectedFile, clearSelectedFile } = useViewerStore();
+  const { selectedFile } = useViewerStore();
   const { data: messagesData } = useMessages();
   const { data: agentsData } = useAgents();
   const queryClient = useQueryClient();
@@ -77,13 +77,6 @@ export function ChatPanel() {
     queryClient.invalidateQueries({ queryKey: ['messages'] });
   }, [queryClient]);
 
-  // Auto-close file viewer when an agent is selected
-  useEffect(() => {
-    if (selectedAgentId && selectedFile) {
-      clearSelectedFile();
-    }
-  }, [selectedAgentId, selectedFile, clearSelectedFile]);
-
   // Keyboard shortcuts
   useChatKeyboard({
     inputRef,
@@ -103,7 +96,7 @@ export function ChatPanel() {
   if (selectedFile) {
     return (
       <div className="h-full flex flex-col">
-        <MemoryViewer file={selectedFile} onClose={clearSelectedFile} />
+        <MemoryViewer file={selectedFile} />
       </div>
     );
   }
