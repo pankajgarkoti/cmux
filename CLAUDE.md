@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 CMUX is a **self-improving** multi-agent AI orchestration system. The core goal: once the base system is running, it can safely add features to itself through coordinated Claude agents.
 
 The architecture enables safe self-modification through:
+
 - **Isolated execution** - Worker agents run in separate tmux windows, containing blast radius
 - **Automatic rollback** - Health daemon detects failures and rolls back to last working git commit
 - **Supervisor coordination** - Single supervisor delegates tasks, reviews changes before integration
@@ -21,6 +22,7 @@ Agents modify the codebase, the health monitor validates changes work, and failu
 ### After Every Code Change
 
 - [ ] **Stage and commit changes** with a descriptive message
+
   ```bash
   git add <files>
   git commit -m "$(cat <<'EOF'
@@ -30,6 +32,7 @@ Agents modify the codebase, the health monitor validates changes work, and failu
   EOF
   )"
   ```
+
 - [ ] **Create journal entry** via API call documenting the work:
   ```bash
   curl -X POST http://localhost:8000/api/journal/entry \
@@ -45,6 +48,7 @@ Agents modify the codebase, the health monitor validates changes work, and failu
 
 - [ ] **Run tests** if code changes affect Python: `uv run pytest`
 - [ ] **Run typecheck** if code changes affect frontend: `cd src/frontend && npm run typecheck`
+- [ ] **Build frontend** if code changes affect frontend: `cd src/frontend && npm run build`
 - [ ] **Verify system health**: `curl http://localhost:8000/api/webhooks/health`
 
 ### Before Marking Task Complete
@@ -55,16 +59,17 @@ Agents modify the codebase, the health monitor validates changes work, and failu
 
 ### Quick Reference
 
-| Step | Command | Purpose |
-|------|---------|---------|
-| 1. Commit | `git add . && git commit` | Persist changes |
-| 2. Journal | `POST /api/journal/entry` | Document work |
-| 3. Verify | `git log -1` | Confirm commit |
-| 4. Report | Tell user | Close the loop |
+| Step       | Command                   | Purpose         |
+| ---------- | ------------------------- | --------------- |
+| 1. Commit  | `git add . && git commit` | Persist changes |
+| 2. Journal | `POST /api/journal/entry` | Document work   |
+| 3. Verify  | `git log -1`              | Confirm commit  |
+| 4. Report  | Tell user                 | Close the loop  |
 
 ## Development Commands
 
 ### Python Backend
+
 ```bash
 uv sync                                    # Install dependencies
 uv sync --extra dev                        # Install with dev dependencies
@@ -75,6 +80,7 @@ uv run uvicorn src.server.main:app --reload --host 0.0.0.0 --port 8000  # Dev se
 ```
 
 ### Frontend
+
 ```bash
 cd src/frontend
 npm install                   # Install dependencies
@@ -85,6 +91,7 @@ npm run typecheck             # TypeScript check
 ```
 
 ### System Orchestration
+
 ```bash
 ./src/orchestrator/cmux.sh start    # Start full system (server + supervisor + daemons)
 ./src/orchestrator/cmux.sh stop     # Stop everything
@@ -96,6 +103,7 @@ tmux attach -t cmux                 # Attach to tmux session
 ## Architecture
 
 ### System Flow
+
 ```
 Webhooks/User → Mailbox (.cmux/mailbox) → Router daemon → Supervisor agent
                                                               ↓
@@ -109,6 +117,7 @@ Webhooks/User → Mailbox (.cmux/mailbox) → Router daemon → Supervisor agent
 ### Key Components
 
 **Backend (src/server/):**
+
 - `main.py` - FastAPI app with CORS, static files, route mounting
 - `services/agent_manager.py` - Agent lifecycle, maps tmux windows to agents
 - `services/mailbox.py` - File-based message queue with async locking
@@ -117,6 +126,7 @@ Webhooks/User → Mailbox (.cmux/mailbox) → Router daemon → Supervisor agent
 - `websocket/manager.py` - WebSocket connection pool and broadcast
 
 **Frontend (src/frontend/src/):**
+
 - `stores/` - Zustand state (agentStore, activityStore, connectionStore, layoutStore)
 - `hooks/useWebSocket.ts` - WebSocket with auto-reconnect
 - `components/explorer/` - File browser and agent tree
@@ -125,6 +135,7 @@ Webhooks/User → Mailbox (.cmux/mailbox) → Router daemon → Supervisor agent
 - `lib/api.ts` - API client functions
 
 **Orchestration (src/orchestrator/):**
+
 - `cmux.sh` - Main entry point, tmux session management
 - `health.sh` - Health monitoring with git rollback recovery
 - `router.sh` - Polls mailbox, routes messages to agents
@@ -141,6 +152,7 @@ Agent events (from Claude Code hooks): `PostToolUse`, `Stop` - tracked in `route
 ### Runtime Data
 
 `.cmux/` directory (gitignored):
+
 - `mailbox` - Message queue file
 - `status.log` - System status log
 - `journal/YYYY-MM-DD/` - Daily journals with artifacts
@@ -148,6 +160,7 @@ Agent events (from Claude Code hooks): `PostToolUse`, `Stop` - tracked in `route
 ## API Structure
 
 REST endpoints under `/api/`:
+
 - `/agents` - CRUD, messaging, terminal capture
 - `/agents/ws` - WebSocket for real-time updates
 - `/messages` - History and user message display
@@ -162,6 +175,7 @@ WebSocket events: `agent_event`, `new_message`, `webhook_received`, `message_sen
 ## Testing
 
 Tests use pytest-asyncio with `asyncio_mode = "auto"`. Test files in `tests/`:
+
 - `test_agents.py` - Agent endpoint tests
 - `test_messages.py` - Message handling
 - `test_webhooks.py` - Webhook receiver
@@ -172,6 +186,7 @@ Use `httpx.AsyncClient` with `ASGITransport` for async endpoint tests.
 ## Environment Variables
 
 Key settings (in `src/server/config.py`):
+
 - `CMUX_HOST` / `CMUX_PORT` - Server bind (default: 0.0.0.0:8000)
 - `CMUX_SESSION` - tmux session name (default: cmux)
 - `CMUX_MAILBOX` - Message queue path (default: .cmux/mailbox)
