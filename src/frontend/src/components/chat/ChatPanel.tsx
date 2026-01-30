@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useMessages } from '@/hooks/useMessages';
@@ -76,6 +76,13 @@ export function ChatPanel() {
     // In a full implementation, this could call an API to clear messages
     queryClient.invalidateQueries({ queryKey: ['messages'] });
   }, [queryClient]);
+
+  // Auto-close file viewer when an agent is selected
+  useEffect(() => {
+    if (selectedAgentId && selectedFile) {
+      clearSelectedFile();
+    }
+  }, [selectedAgentId, selectedFile, clearSelectedFile]);
 
   // Keyboard shortcuts
   useChatKeyboard({
