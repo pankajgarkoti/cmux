@@ -17,8 +17,10 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting cmux server...")
+    ws_manager.start_ping_task()
     yield
     # Shutdown
+    await ws_manager.stop_ping_task()
     await ws_manager.disconnect_all()
     logger.info("Shutting down cmux server...")
 

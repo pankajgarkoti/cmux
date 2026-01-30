@@ -36,26 +36,26 @@ curl -X POST http://localhost:8000/api/journal/entry \
 
 ### 2. Create Workers for Tasks
 
+Use the `/workers` skill to manage workers. This handles all tmux complexity for you.
+
 ```bash
-# Create a worker for a specific task
-tmux new-window -t cmux-{feature-name} -n "worker-{task-name}"
-tmux send-keys -t "cmux-{feature-name}:worker-{task-name}" "export CMUX_AGENT=true CMUX_AGENT_NAME=worker-{task-name} && cd $(pwd) && claude --dangerously-skip-permissions" Enter
+# Spawn a worker for a specific task
+./tools/workers spawn "worker-{task-name}" "Read docs/WORKER_ROLE.md, then: [Clear, specific instructions]"
 
-# Wait for initialization
-sleep 8
-
-# Assign the task
-tmux send-keys -t "cmux-{feature-name}:worker-{task-name}" "Your task: [Clear, specific instructions]" Enter
+# Or just describe what you need and /workers will auto-load
 ```
 
 ### 3. Monitor Progress
 
 ```bash
-# Check worker output
-tmux capture-pane -t "cmux-{feature-name}:worker-{task-name}" -p -S -50
+# Check worker status
+./tools/workers status "worker-{task-name}"
 
 # List all workers
-tmux list-windows -t "cmux-{feature-name}"
+./tools/workers list
+
+# Send follow-up message to worker
+./tools/workers send "worker-{task-name}" "How is progress?"
 ```
 
 ### 4. Review and Integrate
@@ -181,13 +181,16 @@ Let me know by outputting "TASK COMPLETE: [summary]"
 When session work is complete:
 
 ```bash
-# Gracefully exit workers
-for win in $(tmux list-windows -t cmux-{feature-name} -F '#W' | grep '^worker-'); do
-  tmux send-keys -t "cmux-{feature-name}:$win" "/exit" Enter
-done
+# List and gracefully exit workers
+./tools/workers list
 
-# Wait for cleanup
-sleep 3
+# Kill specific worker
+./tools/workers kill "worker-{task-name}"
+
+# Or kill all workers (they will receive /exit first)
+for worker in $(./tools/workers list --quiet); do
+  ./tools/workers kill "$worker"
+done
 
 # Notify main supervisor you're done
 # Main supervisor will terminate this session

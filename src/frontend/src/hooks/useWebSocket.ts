@@ -4,19 +4,36 @@ import { useConnectionStore } from '../stores/connectionStore';
 import { useActivityStore } from '../stores/activityStore';
 import { useAgentEventStore } from '../stores/agentEventStore';
 import { useSessionStore } from '../stores/sessionStore';
-import { WS_URL, RECONNECT_DELAY } from '../lib/constants';
+import { WS_URL, RECONNECT_DELAY_BASE, RECONNECT_DELAY_MAX } from '../lib/constants';
 import type { Activity } from '../types/activity';
 import type { AgentEvent } from '../types/agent_event';
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number>();
+  const reconnectAttemptRef = useRef<number>(0);
   const queryClient = useQueryClient();
 
   const { setConnected, setReconnecting } = useConnectionStore();
   const { addActivity } = useActivityStore();
   const { addEvent } = useAgentEventStore();
   const { addSession, removeSession, updateSession } = useSessionStore();
+
+  // Calculate delay with exponential backoff
+  const getReconnectDelay = useCallback(() => {
+    const delay = Math.min(
+      RECONNECT_DELAY_BASE * Math.pow(2, reconnectAttemptRef.current),
+      RECONNECT_DELAY_MAX
+    );
+    return delay;
+  }, []);
+
+  // Send pong response to server ping
+  const sendPong = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ event: 'pong' }));
+    }
+  }, []);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -27,12 +44,20 @@ export function useWebSocket() {
     ws.onopen = () => {
       setConnected(true);
       setReconnecting(false);
+      // Reset backoff counter on successful connection
+      reconnectAttemptRef.current = 0;
       console.log('WebSocket connected');
     };
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        // Handle ping from server - respond with pong
+        if (data.event === 'ping') {
+          sendPong();
+          return; // Don't process ping as activity
+        }
 
         // Handle agent events from hooks
         if (data.event === 'agent_event') {
@@ -86,10 +111,16 @@ export function useWebSocket() {
       setConnected(false);
       wsRef.current = null;
 
-      // Auto-reconnect
+      // Increment reconnect attempt counter for exponential backoff
+      reconnectAttemptRef.current += 1;
+      const delay = getReconnectDelay();
+
+      console.log(`WebSocket closed, reconnecting in ${delay}ms (attempt ${reconnectAttemptRef.current})`);
+
+      // Auto-reconnect with exponential backoff
       reconnectTimeoutRef.current = window.setTimeout(() => {
         connect();
-      }, RECONNECT_DELAY);
+      }, delay);
     };
 
     ws.onerror = (error) => {
@@ -97,12 +128,14 @@ export function useWebSocket() {
     };
 
     wsRef.current = ws;
-  }, [setConnected, setReconnecting, addActivity, addEvent, queryClient]);
+  }, [setConnected, setReconnecting, addActivity, addEvent, queryClient, getReconnectDelay, sendPong, addSession, removeSession, updateSession]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
     }
+    // Reset backoff counter when explicitly disconnecting
+    reconnectAttemptRef.current = 0;
     wsRef.current?.close();
   }, []);
 

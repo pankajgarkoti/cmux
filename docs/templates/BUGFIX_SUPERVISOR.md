@@ -57,12 +57,17 @@ git log --oneline -10 -- path/to/file.py
 
 ### 4. Create Worker if Needed
 
-For complex fixes or parallel investigation:
+For complex fixes or parallel investigation, use the `/workers` skill:
+
 ```bash
-tmux new-window -t cmux-{bug-name} -n "worker-fix"
-tmux send-keys -t "cmux-{bug-name}:worker-fix" "export CMUX_AGENT=true && cd $(pwd) && claude --dangerously-skip-permissions" Enter
-sleep 8
-tmux send-keys -t "cmux-{bug-name}:worker-fix" "Fix the bug in [file]: [specific instructions]" Enter
+# Spawn a worker for the fix
+./tools/workers spawn "worker-fix" "Read docs/WORKER_ROLE.md, then fix the bug in [file]: [specific instructions]"
+
+# Check worker progress
+./tools/workers status "worker-fix"
+
+# Send follow-up instructions
+./tools/workers send "worker-fix" "Also add a regression test"
 ```
 
 ### 5. Implement Fix
@@ -226,11 +231,16 @@ After fixing:
 
 When bug is fixed:
 ```bash
-# Clean up workers
-for win in $(tmux list-windows -t cmux-{bug-name} -F '#W' | grep '^worker-'); do
-  tmux send-keys -t "cmux-{bug-name}:$win" "/exit" Enter
+# List workers
+./tools/workers list
+
+# Kill workers gracefully
+./tools/workers kill "worker-fix"
+
+# Or kill all workers
+for worker in $(./tools/workers list --quiet); do
+  ./tools/workers kill "$worker"
 done
-sleep 3
 
 # Notify main supervisor
 # Session will be terminated by main supervisor

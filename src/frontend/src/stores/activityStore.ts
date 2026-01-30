@@ -4,39 +4,42 @@ import { MAX_ACTIVITIES } from '../lib/constants';
 
 interface ActivityState {
   activities: Activity[];
-  seenIds: Set<string>;
   addActivity: (activity: Activity) => void;
   addActivities: (activities: Activity[]) => void;
   clearActivities: () => void;
   getActivitiesByAgent: (agentId: string) => Activity[];
 }
 
+// Helper to rebuild seenIds from activities array
+// This prevents unbounded memory growth
+function buildSeenIds(activities: Activity[]): Set<string> {
+  return new Set(activities.map((a) => a.id));
+}
+
 export const useActivityStore = create<ActivityState>((set, get) => ({
   activities: [],
-  seenIds: new Set(),
 
   addActivity: (activity) =>
     set((state) => {
-      // Deduplicate by ID
-      if (state.seenIds.has(activity.id)) {
+      // Check against current activities to deduplicate
+      const existingIds = buildSeenIds(state.activities);
+      if (existingIds.has(activity.id)) {
         return state;
       }
-      const newSeenIds = new Set(state.seenIds);
-      newSeenIds.add(activity.id);
       return {
         activities: [activity, ...state.activities].slice(0, MAX_ACTIVITIES),
-        seenIds: newSeenIds,
       };
     }),
 
   addActivities: (activities) =>
     set((state) => {
-      const newSeenIds = new Set(state.seenIds);
+      // Build set from current activities
+      const existingIds = buildSeenIds(state.activities);
       const newActivities: Activity[] = [];
 
       for (const activity of activities) {
-        if (!newSeenIds.has(activity.id)) {
-          newSeenIds.add(activity.id);
+        if (!existingIds.has(activity.id)) {
+          existingIds.add(activity.id);
           newActivities.push(activity);
         }
       }
@@ -52,11 +55,10 @@ export const useActivityStore = create<ActivityState>((set, get) => ({
 
       return {
         activities: merged,
-        seenIds: newSeenIds,
       };
     }),
 
-  clearActivities: () => set({ activities: [], seenIds: new Set() }),
+  clearActivities: () => set({ activities: [] }),
 
   getActivitiesByAgent: (agentId) =>
     get().activities.filter((a) => a.agent_id === agentId),

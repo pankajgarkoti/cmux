@@ -1,87 +1,118 @@
 #!/usr/bin/env bash
+#═══════════════════════════════════════════════════════════════════════════════
+# CMUX - Self-Improving Multi-Agent Orchestrator
+#
+# Creates a tmux session where Window 0 is the control center.
+# All setup and agent launching happens visibly from Window 0.
+#
+# Session Structure:
+#   Window 0: Monitor (control center - you are here)
+#   Window 1: Supervisor Agent
+#   Window 2+: Worker Agents (created as needed)
+#═══════════════════════════════════════════════════════════════════════════════
+
 set -euo pipefail
 
-# Source common libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
-source "${SCRIPT_DIR}/lib/tmux.sh"
 source "${SCRIPT_DIR}/lib/logging.sh"
 
-# Configuration (from environment or defaults)
+# Configuration
 CMUX_SESSION="${CMUX_SESSION:-cmux}"
 CMUX_PORT="${CMUX_PORT:-8000}"
 CMUX_HOST="${CMUX_HOST:-0.0.0.0}"
-CMUX_MAILBOX="${CMUX_MAILBOX:-.cmux/mailbox}"
-CMUX_STATUS_LOG="${CMUX_STATUS_LOG:-.cmux/status.log}"
-CMUX_RECOVERY_WAIT="${CMUX_RECOVERY_WAIT:-30}"
 CMUX_PROJECT_ROOT="${CMUX_PROJECT_ROOT:-$(pwd)}"
 
+# Colors
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+#───────────────────────────────────────────────────────────────────────────────
 # Commands
+#───────────────────────────────────────────────────────────────────────────────
+
 cmd_start() {
-    log_info "Starting cmux system..."
+    # Check dependencies first
+    for cmd in tmux claude git curl uv; do
+        if ! command -v $cmd &>/dev/null; then
+            printf "${RED}Error: $cmd is required but not installed${NC}\n"
+            exit 1
+        fi
+    done
 
-    # Ensure directories exist
-    mkdir -p "$(dirname "$CMUX_MAILBOX")"
-    mkdir -p "$(dirname "$CMUX_STATUS_LOG")"
-
-    # Start tmux session if not exists
-    if ! tmux_session_exists "$CMUX_SESSION"; then
-        tmux_create_session "$CMUX_SESSION"
-        log_status "PENDING" "tmux session created"
+    # If we're inside the cmux session's monitor window, run orchestration directly
+    if [[ -n "${TMUX:-}" ]]; then
+        local current_session
+        current_session=$(tmux display-message -p '#S')
+        if [[ "$current_session" == "$CMUX_SESSION" ]]; then
+            exec "${SCRIPT_DIR}/monitor.sh"
+        fi
     fi
 
-    # Start supervisor window with CMUX agent environment
-    if ! tmux_window_exists "$CMUX_SESSION" "supervisor"; then
-        tmux_create_window "$CMUX_SESSION" "supervisor"
-        # Start Claude with CMUX_AGENT=true to enable hooks, and --dangerously-skip-permissions for autonomous operation
-        tmux_send_keys "$CMUX_SESSION" "supervisor" "export CMUX_AGENT=true CMUX_AGENT_NAME=supervisor && cd ${CMUX_PROJECT_ROOT} && claude --dangerously-skip-permissions"
-        log_status "PENDING" "supervisor agent started"
-
-        # Wait for Claude to initialize, then send role instructions
-        sleep 8
-        tmux_send_keys "$CMUX_SESSION" "supervisor" "Read docs/SUPERVISOR_ROLE.md to understand your role as the CMUX supervisor agent. This file contains your instructions for managing workers, using the journal system, and coordinating tasks."
-        log_status "IN_PROGRESS" "supervisor agent received role instructions"
+    # If session already exists, just report it
+    if tmux has-session -t "$CMUX_SESSION" 2>/dev/null; then
+        printf "${GREEN}Session '$CMUX_SESSION' already running${NC}\n"
+        printf "Run '${CYAN}cmux.sh attach${NC}' to attach\n"
+        printf "Run '${CYAN}cmux.sh status${NC}' to check status\n"
+        exit 0
     fi
 
-    # Start FastAPI server in background
-    start_server
+    printf "${CYAN}"
+    cat << "EOF"
+    ╔═══════════════════════════════════════════════════════════════════╗
+    ║                    CMUX ORCHESTRATOR                              ║
+    ╚═══════════════════════════════════════════════════════════════════╝
+EOF
+    printf "${NC}\n"
 
-    # Start health monitor INSIDE the tmux monitor window
-    tmux_send_keys "$CMUX_SESSION" "monitor" "cd ${CMUX_PROJECT_ROOT} && ${SCRIPT_DIR}/health.sh"
-    log_status "IN_PROGRESS" "health monitor started in tmux"
+    echo "Project: $(basename "$CMUX_PROJECT_ROOT")"
+    echo "Path:    $CMUX_PROJECT_ROOT"
+    echo ""
 
-    # Start router daemon in background
-    start_router &
+    # Create tmux session with window 0 as the monitor/control center
+    printf "${BOLD}Creating tmux session...${NC}\n"
 
-    log_status "IN_PROGRESS" "cmux system started"
-    log_info "cmux system started successfully"
-    log_info "Dashboard: http://${CMUX_HOST}:${CMUX_PORT}"
-    log_info "tmux session: tmux attach -t ${CMUX_SESSION}"
+    tmux new-session -d -s "$CMUX_SESSION" -n "monitor" \
+        "cd '$CMUX_PROJECT_ROOT' && '$SCRIPT_DIR/monitor.sh'"
+
+    # Lock window name to prevent renaming
+    tmux set-option -t "$CMUX_SESSION:monitor" allow-rename off
+
+    printf "${GREEN}✓${NC} Session started: ${CMUX_SESSION}\n"
+    printf "${GREEN}✓${NC} Monitor window launched\n"
+    echo ""
+    printf "Run '${CYAN}cmux.sh attach${NC}' to attach to the session\n"
+    printf "Run '${CYAN}cmux.sh status${NC}' to check status\n"
 }
 
 cmd_stop() {
     log_info "Stopping cmux system..."
 
-    # Stop router daemon (runs as background process)
-    pkill -f "cmux-router" 2>/dev/null || true
-
     # Stop FastAPI server
-    stop_server
-
-    # Kill main tmux session (this also stops health monitor running inside it)
-    if tmux_session_exists "$CMUX_SESSION"; then
-        tmux kill-session -t "$CMUX_SESSION"
-        log_status "COMPLETE" "tmux session killed"
+    local pid
+    pid=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
+    if [[ -n "$pid" ]]; then
+        kill "$pid" 2>/dev/null || true
+        printf "${GREEN}✓${NC} FastAPI server stopped\n"
     fi
 
-    # Kill any spawned sessions
+    # Kill main tmux session
+    if tmux has-session -t "$CMUX_SESSION" 2>/dev/null; then
+        tmux kill-session -t "$CMUX_SESSION"
+        printf "${GREEN}✓${NC} tmux session killed\n"
+    fi
+
+    # Kill any spawned worker sessions
     for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep "^cmux-" || true); do
         tmux kill-session -t "$sess" 2>/dev/null || true
-        log_info "Killed spawned session: $sess"
+        printf "${GREEN}✓${NC} Killed spawned session: $sess\n"
     done
 
-    log_status "COMPLETE" "cmux system stopped"
-    log_info "cmux system stopped"
+    printf "${GREEN}cmux system stopped${NC}\n"
 }
 
 cmd_restart() {
@@ -91,113 +122,90 @@ cmd_restart() {
 }
 
 cmd_status() {
-    echo "=== cmux Status ==="
+    printf "${CYAN}═══════════════════════════════════════════════════════════════${NC}\n"
+    printf "${BOLD}                    CMUX Status${NC}\n"
+    printf "${CYAN}═══════════════════════════════════════════════════════════════${NC}\n"
     echo ""
 
     # tmux session
-    if tmux_session_exists "$CMUX_SESSION"; then
-        echo "tmux session: RUNNING"
-        echo "Windows:"
-        tmux list-windows -t "$CMUX_SESSION" -F "  - #{window_name}: #{window_activity}"
+    if tmux has-session -t "$CMUX_SESSION" 2>/dev/null; then
+        printf "tmux session: ${GREEN}$CMUX_SESSION (running)${NC}\n"
+        echo ""
+        printf "${BOLD}Windows:${NC}\n"
+        tmux list-windows -t "$CMUX_SESSION" -F "  #{window_index}: #{window_name}" 2>/dev/null
     else
-        echo "tmux session: STOPPED"
+        printf "tmux session: ${RED}$CMUX_SESSION (not running)${NC}\n"
+        echo ""
+        echo "Run 'cmux.sh start' to start the system."
+        return
     fi
     echo ""
 
     # FastAPI server
-    if is_server_running; then
-        echo "FastAPI server: RUNNING (port ${CMUX_PORT})"
+    if curl -sf "http://localhost:${CMUX_PORT}/api/webhooks/health" >/dev/null 2>&1; then
+        printf "FastAPI server: ${GREEN}running (port ${CMUX_PORT})${NC}\n"
     else
-        echo "FastAPI server: STOPPED"
+        printf "FastAPI server: ${RED}stopped${NC}\n"
     fi
     echo ""
 
-    # Background processes
-    echo "Background processes:"
-    # Health monitor runs inside tmux monitor window
-    if tmux_session_exists "$CMUX_SESSION" && tmux_window_exists "$CMUX_SESSION" "monitor"; then
-        local monitor_cmd
-        monitor_cmd=$(tmux list-panes -t "$CMUX_SESSION:monitor" -F '#{pane_current_command}' 2>/dev/null | head -1)
-        if [[ "$monitor_cmd" == "bash" || "$monitor_cmd" == "health.sh" ]]; then
-            echo "  - health monitor: RUNNING (in tmux)"
-        else
-            echo "  - health monitor: STOPPED (window exists but script not running)"
-        fi
+    printf "${CYAN}═══════════════════════════════════════════════════════════════${NC}\n"
+}
+
+cmd_attach() {
+    if tmux has-session -t "$CMUX_SESSION" 2>/dev/null; then
+        exec tmux attach -t "$CMUX_SESSION"
     else
-        echo "  - health monitor: STOPPED"
+        printf "${RED}Error: No tmux session found: $CMUX_SESSION${NC}\n"
+        echo "Run 'cmux.sh start' to start the system first."
+        exit 1
     fi
-    pgrep -f "cmux-router" >/dev/null && echo "  - message router: RUNNING" || echo "  - message router: STOPPED"
 }
 
 cmd_logs() {
-    tail -f "$CMUX_STATUS_LOG"
-}
-
-# Server management
-start_server() {
-    if is_server_running; then
-        log_info "Server already running"
-        return 0
-    fi
-
-    log_info "Starting FastAPI server..."
-    cd "$CMUX_PROJECT_ROOT"
-
-    # Build frontend if needed
-    if [[ ! -d "src/frontend/dist" ]]; then
-        log_info "Building frontend..."
-        (cd src/frontend && npm install && npm run build)
-    fi
-
-    # Start server with nohup
-    nohup uv run uvicorn src.server.main:app \
-        --host "$CMUX_HOST" \
-        --port "$CMUX_PORT" \
-        > /tmp/cmux-server.log 2>&1 &
-
-    # Wait for server to be ready
-    local retries=30
-    while ! is_server_running && ((retries-- > 0)); do
-        sleep 1
-    done
-
-    if is_server_running; then
-        log_status "IN_PROGRESS" "FastAPI server started"
-        return 0
+    if [[ -f "/tmp/cmux-server.log" ]]; then
+        tail -f /tmp/cmux-server.log
     else
-        log_status "FAILED" "Failed to start FastAPI server"
-        return 1
+        echo "No server log found. Is the server running?"
+        exit 1
     fi
 }
 
-stop_server() {
-    local pid
-    pid=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
-    if [[ -n "$pid" ]]; then
-        kill "$pid" 2>/dev/null || true
-        log_status "COMPLETE" "FastAPI server stopped"
-    fi
+cmd_help() {
+    printf "${BOLD}Usage:${NC} cmux.sh <command>\n"
+    echo ""
+    printf "${BOLD}Commands:${NC}\n"
+    printf "  ${CYAN}start${NC}     Start the cmux system (creates tmux session)\n"
+    printf "  ${CYAN}stop${NC}      Stop the cmux system\n"
+    printf "  ${CYAN}restart${NC}   Restart the cmux system\n"
+    printf "  ${CYAN}status${NC}    Show system status\n"
+    printf "  ${CYAN}attach${NC}    Attach to tmux session\n"
+    printf "  ${CYAN}logs${NC}      Tail the server logs\n"
+    printf "  ${CYAN}help${NC}      Show this help\n"
+    echo ""
+    printf "${BOLD}tmux shortcuts:${NC}\n"
+    printf "  Ctrl+b n/p    Switch between windows\n"
+    printf "  Ctrl+b d      Detach from session\n"
+    printf "  Ctrl+b [      Enter scroll mode\n"
 }
 
-is_server_running() {
-    curl -sf "http://localhost:${CMUX_PORT}/api/webhooks/health" >/dev/null 2>&1
-}
+#───────────────────────────────────────────────────────────────────────────────
+# Main
+#───────────────────────────────────────────────────────────────────────────────
 
-# Background process starters
-start_router() {
-    exec -a "cmux-router" "${SCRIPT_DIR}/router.sh"
-}
-
-# Main entry point
 main() {
-    case "${1:-}" in
+    case "${1:-start}" in
         start)   cmd_start ;;
         stop)    cmd_stop ;;
         restart) cmd_restart ;;
         status)  cmd_status ;;
+        attach)  cmd_attach ;;
         logs)    cmd_logs ;;
+        help|-h|--help) cmd_help ;;
         *)
-            echo "Usage: $0 {start|stop|restart|status|logs}"
+            printf "${RED}Unknown command: %s${NC}\n" "$1"
+            echo ""
+            cmd_help
             exit 1
             ;;
     esac

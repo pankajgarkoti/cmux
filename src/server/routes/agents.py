@@ -1,5 +1,8 @@
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from datetime import datetime, timezone
+import asyncio
+import json
+import logging
 import uuid
 
 from ..models.agent import Agent, AgentList, AgentMessage
@@ -8,6 +11,11 @@ from ..services.agent_manager import agent_manager
 from ..services.tmux_service import tmux_service
 from ..services.mailbox import mailbox_service
 from ..websocket.manager import ws_manager
+
+logger = logging.getLogger(__name__)
+
+# Timeout for WebSocket receive operations (seconds)
+WS_RECEIVE_TIMEOUT = 60
 
 router = APIRouter()
 
@@ -97,7 +105,28 @@ async def websocket_endpoint(websocket: WebSocket):
     await ws_manager.connect(websocket, client_id)
     try:
         while True:
-            data = await websocket.receive_text()
-            # Handle incoming WebSocket messages if needed
+            try:
+                # Use timeout to prevent indefinitely blocking connections
+                data = await asyncio.wait_for(
+                    websocket.receive_text(),
+                    timeout=WS_RECEIVE_TIMEOUT
+                )
+                # Handle pong responses from clients
+                if data:
+                    try:
+                        msg = json.loads(data)
+                        if msg.get("event") == "pong":
+                            logger.debug(f"Received pong from {client_id}")
+                    except (json.JSONDecodeError, TypeError):
+                        # Not JSON or not a pong, ignore
+                        pass
+            except asyncio.TimeoutError:
+                # Timeout is expected - just continue the loop
+                # The ping mechanism will detect dead connections
+                continue
     except WebSocketDisconnect:
+        logger.debug(f"WebSocket disconnect for {client_id}")
+        await ws_manager.disconnect(client_id)
+    except Exception as e:
+        logger.warning(f"WebSocket error for {client_id}: {e}")
         await ws_manager.disconnect(client_id)
