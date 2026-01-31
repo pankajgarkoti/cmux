@@ -3,6 +3,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChatMessage } from './ChatMessage';
 import { MessageSquare, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import type { Message } from '@/types/message';
 
 interface ChatMessagesProps {
@@ -22,7 +23,7 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
   const bottomRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [isNearBottom, setIsNearBottom] = useState(true);
-  const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const prevMessageCountRef = useRef(messages.length);
 
   // Memoize sorted messages to prevent re-sorting on every render
@@ -44,8 +45,9 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
     const nearBottom = distanceFromBottom < SCROLL_THRESHOLD;
 
     setIsNearBottom(nearBottom);
+    // Clear unread count when user scrolls to bottom
     if (nearBottom) {
-      setHasNewMessages(false);
+      setUnreadCount(0);
     }
   }, []);
 
@@ -54,28 +56,21 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
     bottomRef.current?.scrollIntoView({
       behavior: smooth ? 'smooth' : 'instant',
     });
-    setHasNewMessages(false);
+    setUnreadCount(0);
   }, []);
 
-  // Auto-scroll when new messages arrive (only if near bottom)
+  // Track new messages - never auto-scroll, just update unread count
   useEffect(() => {
     const newMessageCount = messages.length;
-    const hadNewMessages = newMessageCount > prevMessageCountRef.current;
+    const newMessages = newMessageCount - prevMessageCountRef.current;
 
-    if (hadNewMessages) {
-      if (isNearBottom) {
-        // User is near bottom, auto-scroll smoothly
-        requestAnimationFrame(() => {
-          scrollToBottom(true);
-        });
-      } else {
-        // User is reading history, show indicator
-        setHasNewMessages(true);
-      }
+    if (newMessages > 0 && !isNearBottom) {
+      // User is reading history, increment unread count
+      setUnreadCount((prev) => prev + newMessages);
     }
 
     prevMessageCountRef.current = newMessageCount;
-  }, [messages.length, isNearBottom, scrollToBottom]);
+  }, [messages.length, isNearBottom]);
 
   // Scroll to bottom on agent switch (messages array reference changes)
   const messagesRef = useRef(messages);
@@ -88,6 +83,9 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
         messages[0]?.id !== messagesRef.current[0]?.id);
 
     if (isAgentSwitch) {
+      // Reset unread count and scroll to bottom for new agent
+      setUnreadCount(0);
+      prevMessageCountRef.current = messages.length;
       requestAnimationFrame(() => {
         scrollToBottom(false);
       });
@@ -141,17 +139,22 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
         </div>
       </ScrollArea>
 
-      {/* Scroll to bottom indicator */}
-      {hasNewMessages && !isNearBottom && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+      {/* Scroll to bottom indicator with unread count */}
+      {unreadCount > 0 && !isNearBottom && (
+        <div className="absolute bottom-4 right-4 z-10">
           <Button
             variant="secondary"
-            size="sm"
+            size="icon"
             onClick={() => scrollToBottom(true)}
-            className="shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200"
+            className="relative h-10 w-10 rounded-full shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200"
           >
-            <ArrowDown className="h-4 w-4" />
-            New messages
+            <ArrowDown className="h-5 w-5" />
+            <Badge
+              variant="destructive"
+              className="absolute -top-2 -right-2 h-5 min-w-5 px-1.5 flex items-center justify-center"
+            >
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </Badge>
           </Button>
         </div>
       )}
