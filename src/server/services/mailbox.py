@@ -44,45 +44,83 @@ class MailboxService:
         source: str,
         payload: dict
     ):
-        """Send a message to the supervisor agent via mailbox."""
+        """Send a message to the supervisor agent via mailbox.
+
+        Uses single-line format: [timestamp] from -> to: subject (body: path)
+        The payload is written to a body file for the full content.
+        """
         await self._ensure_mailbox()
 
-        message = f"""--- MESSAGE ---
-timestamp: {datetime.now(timezone.utc).isoformat()}
-from: webhook:{source}
-to: supervisor
-type: task
-id: {message_id}
----
-{json.dumps(payload, indent=2, default=str)}
-"""
+        timestamp = datetime.now(timezone.utc).isoformat()
+        from_addr = f"webhook:{source}"
+        to_addr = "cmux:supervisor"
+        subject = f"[WEBHOOK] {source}"
+
+        # Write payload to body file
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        attachments_dir = settings.cmux_dir / "journal" / date_str / "attachments"
+        attachments_dir.mkdir(parents=True, exist_ok=True)
+        body_path = attachments_dir / f"webhook-{message_id[:8]}.json"
+
+        async with aiofiles.open(body_path, "w") as f:
+            await f.write(json.dumps(payload, indent=2, default=str))
+
+        # Write single-line mailbox entry
+        body_rel = str(body_path)
+        line = f"[{timestamp}] {from_addr} -> {to_addr}: {subject} (body: {body_rel})"
+
         async with self._lock:
             async with aiofiles.open(self.mailbox_path, "a") as f:
-                await f.write(message + "\n")
+                await f.write(line + "\n")
 
-    async def send_message(
+    async def send_mailbox_message(
         self,
         from_agent: str,
         to_agent: str,
-        content: str,
-        msg_type: MessageType = MessageType.TASK
+        subject: str,
+        body: str = ""
     ) -> str:
-        """Send a message between agents."""
+        """Send a message between agents via mailbox.
+
+        Uses single-line format: [timestamp] from -> to: subject (body: path)
+        If body is provided, it's written to a file.
+        """
         await self._ensure_mailbox()
 
         message_id = str(uuid.uuid4())
-        message = f"""--- MESSAGE ---
-timestamp: {datetime.now(timezone.utc).isoformat()}
-from: {from_agent}
-to: {to_agent}
-type: {msg_type.value}
-id: {message_id}
----
-{content}
-"""
+        timestamp = datetime.now(timezone.utc).isoformat()
+
+        # Normalize addresses to session:agent format
+        if ":" not in from_agent:
+            from_addr = f"cmux:{from_agent}"
+        else:
+            from_addr = from_agent
+
+        if to_agent == "user":
+            to_addr = "user"
+        elif ":" not in to_agent:
+            to_addr = f"cmux:{to_agent}"
+        else:
+            to_addr = to_agent
+
+        # Build mailbox line
+        if body:
+            # Write body to file
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            attachments_dir = settings.cmux_dir / "journal" / date_str / "attachments"
+            attachments_dir.mkdir(parents=True, exist_ok=True)
+            body_path = attachments_dir / f"msg-{message_id[:8]}.md"
+
+            async with aiofiles.open(body_path, "w") as f:
+                await f.write(f"# {subject}\n\n{body}")
+
+            line = f"[{timestamp}] {from_addr} -> {to_addr}: {subject} (body: {body_path})"
+        else:
+            line = f"[{timestamp}] {from_addr} -> {to_addr}: {subject}"
+
         async with self._lock:
             async with aiofiles.open(self.mailbox_path, "a") as f:
-                await f.write(message + "\n")
+                await f.write(line + "\n")
 
         return message_id
 
