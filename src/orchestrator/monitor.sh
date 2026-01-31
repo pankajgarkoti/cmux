@@ -140,16 +140,28 @@ launch_supervisor() {
     # Lock window name
     tmux set-option -t "${CMUX_SESSION}:supervisor" allow-rename off 2>/dev/null || true
 
-    # Wait for Claude to initialize
-    sleep 8
+    # Wait for Claude to initialize (look for the prompt indicator)
+    log_step "Waiting for Claude to initialize..."
+    local retries=30
+    while ! tmux capture-pane -t "${CMUX_SESSION}:supervisor" -p | grep -qE "^❯|bypass permissions"; do
+        sleep 1
+        ((retries--)) || break
+        if ((retries <= 0)); then
+            log_warn "Claude startup timeout, sending instructions anyway"
+            break
+        fi
+    done
+    sleep 1  # Extra buffer after prompt appears
 
     # Disable vim mode if enabled (for reliable message delivery)
     if tmux capture-pane -t "${CMUX_SESSION}:supervisor" -p | grep -qE "\-\- (INSERT|NORMAL|VISUAL) \-\-"; then
+        log_step "Disabling vim mode..."
         tmux_send_keys "$CMUX_SESSION" "supervisor" "/vim"
         sleep 1
     fi
 
     # Send role instructions
+    log_step "Sending role instructions..."
     tmux_send_keys "$CMUX_SESSION" "supervisor" "Read docs/SUPERVISOR_ROLE.md to understand your role as the CMUX supervisor agent. This file contains your instructions for managing workers, using the journal system, and coordinating tasks."
 
     log_ok "Supervisor agent launched"
