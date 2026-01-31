@@ -337,15 +337,36 @@ Key points:
 
 - Check on workers periodically via capture-pane
 - Review session progress through journal and API
-- Clean up completed workers promptly
+- **Keep workers alive** after task completion - don't immediately kill them
 
-### 4. Error Handling
+### 4. Worker Lifecycle Policy
+
+**DO NOT immediately kill workers when they report [DONE].** Keep them alive because:
+
+1. **User interaction**: The user may want to chat with them, ask follow-up questions, or give additional tasks
+2. **Continued work**: The task may evolve or require iteration
+3. **Context preservation**: Workers retain valuable context about what they did
+
+**Only kill workers when:**
+- The user explicitly asks to close/kill them
+- The worker has been idle for a very long time with no further tasks
+- You need to free up resources for new work
+- The worker is stuck, broken, or actively unhelpful
+
+**When a worker reports [DONE]:**
+1. Acknowledge their completion
+2. Review their work
+3. Report results to the user
+4. **Leave the worker running** - inform user they can interact with it
+5. Journal the outcome
+
+### 5. Error Handling
 
 - If a worker/session fails, journal what happened
 - Decide whether to retry or escalate
 - Use the journal to inform future attempts
 
-### 5. Quality Assurance
+### 6. Quality Assurance
 
 - Review outputs before marking complete
 - Run tests for code changes
@@ -394,9 +415,10 @@ The worker is investigating the issue. I'll report back when it's resolved.
 3. Assign: "Read docs/WORKER_ROLE.md, then fix typo in src/server/config.py"
 4. Monitor worker completion (check [DONE] status)
 5. Review the worker's changes
-6. Close worker
-7. Journal: "Typo fixed in config.py"
-8. Report to user if from dashboard
+6. Journal: "Typo fixed in config.py"
+7. Report to user: "Done! The worker fixed the typo. You can interact with
+   the worker if you have follow-up questions."
+8. KEEP worker running (don't kill immediately)
 ```
 
 ### Complex Task (Session)
@@ -450,7 +472,7 @@ curl -s http://localhost:8000/api/agents | jq '.agents'
 | When `from:` is... | You should... |
 |--------------------|---------------|
 | `dashboard:user` | Acknowledge → Spawn worker/session → Report back |
-| `mailbox:<worker>` with `[DONE]` | Review output → Close worker → Journal → Report |
+| `mailbox:<worker>` with `[DONE]` | Review output → Journal → Report → **Keep worker alive** |
 | `mailbox:<worker>` with `[BLOCKED]` | Help unblock or escalate |
 | `system:monitor` | Follow system instruction |
 | `webhook:<source>` | Process as external task |
