@@ -36,6 +36,13 @@ tmux_send_keys() {
     local keys="$*"
     # Send text literally, then send Enter as separate command
     tmux send-keys -t "${session}:${window}" -l "$keys"
+    # Small delay for multiline paste to be processed by Claude Code
+    # Claude shows "[Pasted text #N +X lines]" and needs time before Enter
+    if [[ "$keys" == *$'\n'* ]]; then
+        sleep 0.15  # 150ms delay for multiline
+    else
+        sleep 0.05  # 50ms for single line
+    fi
     tmux send-keys -t "${session}:${window}" Enter
 }
 

@@ -72,6 +72,7 @@ class TmuxService:
 
         IMPORTANT: Uses the two-step send pattern that is essential for
         reliable tmux input - send text literally, then Enter separately.
+        Includes a small delay for multiline paste to be processed by Claude Code.
         """
         session = session or self.default_session
         target = f"{session}:{window}"
@@ -79,7 +80,13 @@ class TmuxService:
         await self._run_command([
             "tmux", "send-keys", "-t", target, "-l", text
         ])
-        # Step 2: Send Enter SEPARATELY
+        # Step 2: Small delay for multiline paste to be processed
+        # Claude Code shows "[Pasted text #N +X lines]" and needs time to register
+        if "\n" in text:
+            await asyncio.sleep(0.15)  # 150ms delay for multiline
+        else:
+            await asyncio.sleep(0.05)  # 50ms for single line
+        # Step 3: Send Enter SEPARATELY
         await self._run_command([
             "tmux", "send-keys", "-t", target, "Enter"
         ])

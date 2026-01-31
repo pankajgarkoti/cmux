@@ -7,7 +7,7 @@ import json
 import uuid
 
 from ..config import settings
-from ..models.message import Message, MessageType
+from ..models.message import Message
 from .conversation_store import conversation_store
 
 
