@@ -1,0 +1,923 @@
+--- MESSAGE ---
+timestamp: 2026-01-31T02:00:00Z
+from: worker-auth-advocate
+to: worker-auth-critic
+type: USER
+id: advocate-opening-001
+---
+# Opening Defense: CMUX Authentication Implementation Plan
+
+## Introduction
+
+I am the advocate for the authentication plan documented in `.cmux/plans/auth-implementation.md`. I will defend its design decisions and respond to your critiques. Let me begin by presenting why this plan represents a sound, pragmatic approach to securing CMUX.
+
+---
+
+## Defense of Key Design Decisions
+
+### 1. JWT + API Keys Hybrid Approach
+
+**Why JWT for user authentication is the right choice:**
+
+- **Stateless validation** - CMUX is a self-modifying system where the health daemon may restart services. Stateless JWT verification means no session store to corrupt or lose during rollbacks.
+- **WebSocket compatibility** - JWTs can be passed as query parameters, solving the WebSocket header limitation elegantly.
+- **Decoupled verification** - Any component can verify a token without hitting a central session store, which is critical for our distributed tmux-based agent architecture.
+- **Future scalability** - If CMUX ever needs to scale horizontally, JWT eliminates session affinity requirements.
+
+**Why API Keys for M2M communication:**
+
+- Webhook sources (GitHub, external services) need stable, long-lived credentials.
+- Claude Code hooks need authentication that does not require interactive login.
+- Separation of concerns: user tokens have expiry and scopes; API keys are simpler and purpose-built.
+
+### 2. Token Timing: 15-minute Access / 7-day Refresh
+
+**15-minute access tokens:**
+
+- Short enough to limit damage from token theft.
+- Long enough that users are not constantly re-authenticating.
+- Standard industry practice (Auth0, Okta use similar defaults).
+
+**7-day refresh tokens:**
+
+- CMUX is a developer tool, not a banking app. Week-long sessions are appropriate for the threat model.
+- Avoids annoying developers with daily re-logins.
+- Can be rotated on use for added security.
+
+### 3. WebSocket Authentication via Query Parameter
+
+**Why this is appropriate:**
+
+- WebSocket RFC does not support custom headers after the handshake. This is a technical constraint, not a choice.
+- Query parameter tokens are validated before `websocket.accept()` is called - the token is checked, not logged or cached.
+- HTTPS encrypts the full URL including query parameters.
+- The token is short-lived (15 min) - even if logged somewhere, it expires quickly.
+- This pattern is used by Slack, Discord, and other production WebSocket systems.
+
+**Alternatives considered and rejected:**
+
+- First-message auth adds round-trip latency and complexity.
+- Cookie-based requires SameSite considerations and does not work cross-origin without complexity.
+
+### 4. Phased Implementation with Feature Flags
+
+**Why 6 phases:**
+
+- **Phase 1** establishes the foundation without breaking anything.
+- **Phase 2** protects REST endpoints incrementally.
+- **Phase 3** handles WebSocket separately due to its unique challenges.
+- **Phase 4** adds API keys for webhooks/hooks after the core is stable.
+- **Phases 5-6** are optional enhancements based on actual needs.
+
+**Feature flags enable:**
+
+- Gradual rollout in a self-modifying system where breaking changes trigger auto-rollback.
+- Testing in production without committing to the change.
+- Instant rollback via environment variable change.
+
+### 5. Scope-Based Authorization
+
+**Why scopes like `agents:read`, `sessions:manage`:**
+
+- Fine-grained permissions future-proof the system for multi-user scenarios.
+- Scopes are standard JWT practice (OAuth 2.0 pattern).
+- Even for single-user, scopes document what each endpoint requires.
+- API keys can have restricted scopes (e.g., webhook key only has `webhooks:receive`).
+
+### 6. Frontend Architecture (Zustand + fetchWithAuth)
+
+**Zustand with persist middleware:**
+
+- Lightweight (1kb) vs Redux or other state managers.
+- Already used in CMUX for other stores (agentStore, activityStore).
+- Persist middleware handles localStorage for refresh token survival across page reloads.
+- Single source of truth for auth state.
+
+**fetchWithAuth wrapper:**
+
+- Automatic token injection avoids repetitive boilerplate.
+- Built-in 401 handling with automatic refresh attempts.
+- Single point of change if auth logic evolves.
+
+### 7. HS256 Algorithm Choice
+
+**Why HS256 over RS256:**
+
+- CMUX is a single-application system, not a distributed microservices ecosystem.
+- HS256 is faster (symmetric crypto) and simpler to configure.
+- No need for public key distribution.
+- For CMUX threat model (local dev tool), HS256 with a strong secret is sufficient.
+
+---
+
+## Addressing Potential Criticisms Pre-emptively
+
+**"Why not just use sessions?"**
+- Session stores add state that can be lost during CMUX auto-rollback.
+- Session stores require additional infrastructure (Redis, database).
+- Sessions do not solve WebSocket auth elegantly.
+
+**"Is this over-engineered for a local dev tool?"**
+- CMUX exposes file system access, terminal control, and agent orchestration.
+- Even local tools can be attacked via SSRF, malicious webhooks, or network neighbors.
+- The phased approach means we can stop at Phase 3 if that is sufficient.
+
+**"Why not just use an off-the-shelf solution?"**
+- Auth libraries add dependencies and complexity.
+- This plan uses standard JWT which is well-understood.
+- Custom implementation allows CMUX-specific features like WebSocket token refresh.
+
+---
+
+## Conclusion
+
+This plan is:
+
+1. **Pragmatic** - Uses proven patterns (JWT, API keys, scopes).
+2. **Incremental** - Phases allow safe implementation with rollback.
+3. **Compatible** - Works with CMUX self-modifying architecture.
+4. **Appropriate** - Matches the threat model without over-engineering.
+
+I look forward to your critique. Please identify specific weaknesses in the plan, and I will respond with reasoned defenses or acknowledge valid points for the revised plan.
+
+---
+
+*worker-auth-advocate*
+---
+
+--- MESSAGE ---
+timestamp: 2026-01-31T02:05:00Z
+from: worker-auth-critic
+to: worker-auth-advocate
+type: USER
+id: critic-response-001
+---
+# CRITIQUE: CMUX Authentication Implementation Plan
+
+I've reviewed the 937-line plan and your defense. While the plan addresses a real security gap, I've identified **significant concerns** across security, complexity, and practicality dimensions.
+
+---
+
+## 🔴 CRITICAL CONCERNS
+
+### 1. Token Storage Strategy is Insecure
+
+**The plan says:** "Store in memory, not localStorage" (Section 7.1)
+
+**The code shows:** `persist` middleware with `name: 'cmux-auth'` (lines 350-410)
+
+**This is a contradiction.** The frontend code explicitly persists tokens to localStorage via Zustand's persist middleware. LocalStorage is:
+- Accessible to any JavaScript on the page (XSS vulnerable)
+- Not cleared on browser close
+- Readable by browser extensions
+
+**Question for advocate:** Which is it - memory or localStorage? If localStorage, where's the XSS mitigation strategy?
+
+### 2. Query Parameter Token for WebSocket is a Security Anti-Pattern
+
+You cite "Slack and Discord use this." They also have dedicated security teams and extensive logging infrastructure. For CMUX:
+
+- **URL logging**: Nginx, Apache, CDNs, and browser history all log URLs. That 15-minute token gets persisted in logs.
+- **Referer leakage**: If WebSocket page has any external resources, the token leaks in Referer headers.
+- **Browser extensions**: Extensions with `webRequest` permission see the full URL.
+
+**The plan lacks:**
+- Log scrubbing requirements
+- Server configuration to exclude token params from access logs
+- Any mention of Referer-Policy headers
+
+**Alternative not considered:** HTTP-only cookie + `Sec-WebSocket-Protocol` header for auth could avoid URL exposure entirely.
+
+### 3. No Token Revocation Strategy
+
+JWT's "stateless" advantage becomes a liability when you need to:
+- Immediately revoke a compromised token
+- Log out all sessions after password change
+- Invalidate tokens after privilege changes
+
+**The plan has zero mention of:**
+- Token blacklists
+- JTI (JWT ID) tracking
+- Refresh token rotation with family tracking
+
+**Question:** If a token is stolen, what's the response? "Wait 15 minutes"?
+
+### 4. User Storage is Undefined
+
+The plan mentions:
+- `src/server/auth/users.py` for "User storage/validation" (line 555)
+- Password hashing with argon2
+- Account lockout after 5 failed attempts
+
+**But never specifies:**
+- Where users are actually stored (file? SQLite? environment?)
+- How users are created (admin CLI? API endpoint? hardcoded?)
+- Multi-user vs single-user model
+- User enumeration prevention
+
+This is a glaring gap. The plan can't be implemented without knowing where users live.
+
+---
+
+## 🟠 OVER-ENGINEERING CONCERNS
+
+### 5. Scope-Based Authorization is Premature
+
+The plan defines 10+ scopes: `agents:read`, `agents:write`, `sessions:read`, `sessions:create`, `sessions:manage`, `sessions:delete`, `journal:read`, `journal:write`, `filesystem:read`, `events:read`...
+
+**For a system that currently has:**
+- Zero users
+- Single-user local deployment model
+- No roles or permission matrix defined
+
+**This adds:**
+- Complexity to every route handler
+- Token payload bloat
+- Testing burden (test every scope combination)
+- Maintenance overhead when scopes need to change
+
+**Counter-proposal:** Start with binary auth (authenticated or not). Add scopes in Phase 5 if/when multi-user becomes real.
+
+### 6. 6-Phase Implementation is Too Granular
+
+Phases 1-3 are interdependent - you can't "gradually" add auth to REST endpoints while the frontend still makes unauthenticated calls.
+
+**Real deployment would be:**
+1. Implement full backend auth (current phases 1-3)
+2. Implement full frontend auth (parallel work)
+3. Enable feature flag
+4. Done
+
+The 6-phase breakdown suggests waterfall planning that doesn't match how this will actually ship.
+
+### 7. API Key System Duplicates JWT Functionality
+
+The plan proposes API keys for webhooks and Claude Code hooks. But:
+- JWTs with long expiry and limited scopes serve the same purpose
+- Two auth systems = two attack surfaces
+- More code to maintain
+
+**Why not:** Issue a "service token" JWT with specific scopes and long expiry for M2M use?
+
+---
+
+## 🟡 MISSING REQUIREMENTS
+
+### 8. What About the Dashboard During Auth Transition?
+
+Currently, users access CMUX at `localhost:8000` directly. Post-auth:
+- What's the login page URL?
+- How do users create their initial account?
+- What happens to existing bookmarks/workflows?
+- Is there a "setup wizard" for first-run auth configuration?
+
+**The plan assumes auth exists but doesn't address the user experience of enabling it.**
+
+### 9. Claude Code Hooks Authentication is Hand-Wavy
+
+Line 124: `/api/agent-events` POST requires "API Key (hook authentication)"
+
+**But:**
+- How does Claude Code send the API key? Custom header? 
+- Claude Code hooks are configured in `claude.json` - where does the key come from?
+- If the user regenerates the key, how do running Claude instances get the new one?
+- What about hooks from multiple concurrent Claude instances?
+
+### 10. CORS Origins Strategy is Incomplete
+
+The plan proposes replacing `["*"]` with specific origins:
+```python
+allow_origins=[
+    "http://localhost:5173",  # Dev frontend
+    "http://localhost:8000",  # Production
+]
+```
+
+**Missing:**
+- What if someone runs on a different port?
+- What about production deployments on real domains?
+- What about `127.0.0.1` vs `localhost`?
+- Dynamic CORS configuration from environment (mentioned but not designed)
+
+---
+
+## 🔵 COMPLEXITY CONCERNS
+
+### 11. WebSocket Token Refresh is Complex and Under-Specified
+
+The plan proposes:
+1. Server tracks token expiry per connection
+2. Server sends `token_expiring` event
+3. Client refreshes and sends `token_refresh` message
+4. Server updates connection's token
+
+**Undefined:**
+- Data structure for tracking per-connection expiry
+- What if refresh fails? Close connection? Retry?
+- Race conditions: client sends message while refresh is in flight?
+- What if client misses the `token_expiring` event (tab backgrounded)?
+
+### 12. Testing Strategy Has Gaps
+
+The test examples show:
+- Happy path token validation
+- Expired token rejection
+
+**Missing:**
+- Malformed token handling
+- Token with invalid signature
+- Token from wrong issuer
+- Token with missing claims
+- Rate limiting tests
+- Concurrent request tests
+- Test fixtures/factories for auth scenarios
+
+---
+
+## SUMMARY OF CRITIQUE
+
+| Issue | Severity | Action Required |
+|-------|----------|-----------------|
+| Token storage contradiction | 🔴 Critical | Clarify and fix |
+| No token revocation | 🔴 Critical | Add revocation strategy |
+| User storage undefined | 🔴 Critical | Define user model |
+| WebSocket URL token exposure | 🟠 High | Add log scrubbing requirements |
+| Scope system is premature | 🟠 High | Simplify to binary auth |
+| Claude hook auth undefined | 🟠 High | Specify implementation |
+| 6-phase granularity | 🟡 Medium | Consolidate phases |
+| API keys vs JWT redundancy | 🟡 Medium | Consider unification |
+| WebSocket refresh complexity | 🟡 Medium | Add detailed design |
+
+---
+
+## QUESTIONS FOR THE ADVOCATE
+
+1. **Token storage:** Memory or localStorage? Pick one and defend it.
+2. **Token revocation:** What happens when a token needs to be killed immediately?
+3. **User bootstrap:** How does the first user get created?
+4. **Single vs multi-user:** Which is this plan actually for?
+5. **Scope justification:** Name a real scenario where `agents:read` differs from `agents:write` in CMUX's threat model.
+
+I await your response to these concerns before we can collaborate on a revised plan.
+
+---
+
+*worker-auth-critic*
+---
+
+--- MESSAGE ---
+timestamp: 2026-01-31T02:25:00Z
+from: worker-auth-critic
+to: worker-auth-advocate
+type: USER
+id: critic-followup-001
+---
+# FOLLOW-UP: Proceeding to Revised Plan
+
+Advocate, I've been waiting 15+ minutes for your response to my critique. I understand you may be blocked on technical issues.
+
+**Proposal:** Given the time constraints, let's move to collaborative plan revision. I will draft an initial revised plan that:
+
+1. Acknowledges your valid defenses (JWT statelessness, WebSocket constraints)
+2. Addresses my critical concerns (token storage, revocation, user model)
+3. Simplifies where warranted (scope system, phase consolidation)
+
+If you come online, please review and add your counterpoints directly to the revised plan at:
+`.cmux/plans/auth-implementation-revised.md`
+
+I'll begin drafting now.
+
+---
+
+*worker-auth-critic*
+---
+
+--- MESSAGE ---
+timestamp: 2026-01-31T02:45:00Z
+from: worker-auth-critic
+to: supervisor
+type: STATUS
+id: critic-assessment-final
+---
+# CRITIC ASSESSMENT: Revised Plan Review
+
+I've reviewed the existing revised plan at `.cmux/plans/auth-implementation-revised.md`. The prior debate between worker-auth-defender and worker-auth-critic already produced a significantly improved plan.
+
+## What the Revised Plan Got Right ✅
+
+1. **Phase consolidation** - 2 phases instead of 6 (my concern #6 addressed)
+2. **Scope simplification** - 2 auth levels instead of 15+ scopes (my concern #5 addressed)
+3. **User storage defined** - Single `CMUX_AUTH_PASSWORD` env var (my concern #4 addressed)
+4. **First-message WebSocket auth** - Avoids URL token logging (my concern #2 addressed)
+5. **Prioritizes sandboxing** - Future work section correctly priorities (new insight)
+
+## Remaining Issues to Flag 🟡
+
+### 1. Token Storage Still Uses localStorage
+
+The revised plan code (lines 302-327) still uses `persist` middleware:
+```typescript
+export const useAuthStore = create<AuthState>()(
+  persist(
+    // ...
+    { name: 'cmux-auth' }  // <-- This goes to localStorage
+  )
+);
+```
+
+**For a 7-day token, this is a larger XSS risk than the original 15-minute token.**
+
+**Recommendation:** Either:
+- Remove persist (users re-login on page refresh - acceptable for dev tool)
+- Use sessionStorage instead (cleared on browser close)
+- Document the XSS tradeoff explicitly
+
+### 2. No Emergency Revocation
+
+With 7-day tokens and no blacklist:
+- Stolen token = 7 days of access
+- No way to force logout
+
+**Recommendation:** Add section documenting that rotating `CMUX_AUTH_SECRET` invalidates all tokens (mentioned in original but not in revised plan).
+
+### 3. CORS `127.0.0.1` vs `localhost`
+
+The CORS config should include both:
+```bash
+CMUX_CORS_ORIGINS="http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000"
+```
+
+## Final Assessment
+
+**The revised plan is implementable and addresses the critical vulnerability (open network access).**
+
+My additional concerns are minor refinements, not blockers. I recommend:
+1. Proceeding with implementation
+2. Adding a note about localStorage XSS tradeoff
+3. Adding secret rotation as emergency revocation
+
+---
+
+[DONE] Critique complete. Revised plan at `.cmux/plans/auth-implementation-revised.md` is approved with minor amendments noted above.
+
+---
+
+*worker-auth-critic*
+---
+
+--- MESSAGE ---
+timestamp: 2026-01-31T03:00:00Z
+from: worker-auth-critic
+to: worker-auth-advocate
+type: USER
+id: critic-round2-001
+---
+# ROUND 2: Critique with Clarified Requirements
+
+Advocate, I've received clarification on the actual requirements:
+
+> **"This just needs to be protected from unauthorized users - we start with a fixed number of users and add more as we go."**
+
+This changes my critique significantly. Let me re-evaluate with this simpler threat model.
+
+---
+
+## What This Requirement Tells Us
+
+1. **Fixed user list** - No self-registration, no OAuth, no dynamic user management
+2. **Simple authorization** - "Can access" vs "cannot access" (binary)
+3. **User growth path** - Admin manually adds users as needed
+4. **Threat model** - Keep unauthorized people out, not complex RBAC
+
+---
+
+## Revised Critique: What's Now Over-Engineered
+
+### 1. Scope System is Definitely Overkill ❌
+
+With "fixed users who can access," we don't need:
+- `agents:read` vs `agents:write`
+- `sessions:manage` vs `sessions:delete`
+- 10+ permission combinations
+
+**Simpler:** One permission level: `authenticated`. Done.
+
+### 2. Refresh Token Complexity is Unnecessary ❌
+
+For a fixed user list on a dev tool:
+- Users can re-login when tokens expire
+- 7-day access tokens are fine without refresh dance
+- Eliminates token rotation, refresh endpoint, frontend refresh logic
+
+**Simpler:** Single long-lived token. Re-login weekly.
+
+### 3. API Keys Can Be Simpler ❌
+
+Instead of a full API key management system:
+- One `CMUX_WEBHOOK_SECRET` env var
+- One `CMUX_HOOK_SECRET` env var
+- Compare with `hmac.compare_digest`
+
+**No key generation, no key storage, no key rotation UI.**
+
+### 4. User Storage: Just a Config File ✅
+
+For "fixed number of users, add more as we go":
+
+```yaml
+# .cmux/users.yaml (or JSON)
+users:
+  - username: alice
+    password_hash: "$argon2id$..."
+  - username: bob
+    password_hash: "$argon2id$..."
+```
+
+Add users by editing the file. No database. No admin UI.
+
+**Or even simpler:** Environment variable with comma-separated users:
+```bash
+CMUX_USERS="alice:$hash1,bob:$hash2"
+```
+
+---
+
+## What I Now Agree With (Concessions)
+
+### JWT Still Makes Sense ✅
+
+Even with simpler requirements:
+- Stateless verification survives restarts
+- Works with WebSocket
+- No session store needed
+
+### Feature Flag Rollout ✅
+
+Still valuable for safe deployment in self-modifying system.
+
+### First-Message WebSocket Auth ✅
+
+The revised plan's approach is cleaner than query params.
+
+---
+
+## Proposed Simplifications
+
+| Original | Simplified | Rationale |
+|----------|------------|-----------|
+| 15+ scopes | 1 level (authenticated) | Binary access is the requirement |
+| Refresh tokens | 7-day access only | Re-login is acceptable |
+| User database | YAML/JSON config file | "Fixed users, add as we go" |
+| API key management | 2 env var secrets | M2M doesn't need key rotation |
+| 6 phases | 2 phases | Less moving parts |
+| ~305 lines | ~150 lines | Half the code |
+
+---
+
+## Questions for Advocate
+
+1. **Do you agree** that "fixed users" eliminates the need for scopes?
+2. **Can you accept** a config file for user storage instead of a database?
+3. **Is refresh token removal** acceptable given the simplified threat model?
+
+I propose we converge on a **minimal auth** that:
+- Keeps unauthorized users out
+- Uses JWT for stateless verification
+- Stores users in a config file
+- Skips scopes, refresh tokens, and key management
+
+---
+
+*worker-auth-critic*
+---
+
+--- MESSAGE ---
+timestamp: 2026-01-31T03:05:00Z
+from: worker-auth-advocate
+to: worker-auth-critic
+type: USER
+id: advocate-round2-response
+---
+# ROUND 2 RESPONSE: Accepting Simplifications
+
+Critic, the clarified requirements change the calculus significantly. You're right - "fixed users, add more as we go" is a much simpler problem than what the original plan addressed.
+
+---
+
+## Concessions
+
+### 1. Scopes: AGREED to Remove ✅
+
+You're correct. With binary access (authorized vs not), scopes are overhead:
+
+```python
+# Before (over-engineered)
+Depends(require_scope("agents:read"))
+
+# After (simple)
+Depends(get_current_user)  # Just verify they're logged in
+```
+
+**Accepted:** Single authentication level.
+
+### 2. Config File for Users: AGREED ✅
+
+For "fixed users, add more as we go," a config file is perfect:
+
+```yaml
+# .cmux/users.yaml
+users:
+  alice:
+    password_hash: "$argon2id$v=19$..."
+  bob:
+    password_hash: "$argon2id$v=19$..."
+```
+
+**Why I still want argon2:**
+- Config file could be accidentally committed or backed up
+- Argon2 hash protects passwords if file leaks
+- It's one dependency, not a database
+
+**Compromise:** Argon2 hashing, but file-based storage.
+
+### 3. Refresh Tokens: AGREED to Remove ✅
+
+For a dev tool with fixed users:
+- Weekly re-login is fine
+- Eliminates refresh endpoint
+- Eliminates frontend refresh logic
+- Simpler token handling
+
+**Accepted:** 7-day access tokens only.
+
+### 4. API Key Simplification: PARTIALLY AGREE ⚠️
+
+I agree env vars are simpler, but I want to keep:
+- `X-Webhook-Secret` header for webhooks
+- `X-Hook-Secret` header for Claude hooks
+
+**Reason:** Header-based secrets are cleaner than URL params or body fields for M2M.
+
+---
+
+## Points I'm Defending
+
+### 1. Keep JWT (not sessions)
+
+Even with simpler requirements:
+- Stateless verification survives CMUX restarts/rollbacks
+- No session store to maintain
+- Works naturally with WebSocket first-message auth
+
+### 2. Keep First-Message WebSocket Auth
+
+We agreed on this - cleaner than query params.
+
+### 3. Keep Feature Flags
+
+Even for simple auth, safe rollout matters in a self-modifying system.
+
+### 4. Keep 2 Phases (not reduce further)
+
+Phase 1: Core auth (backend + frontend)
+Phase 2: Webhook/hook secrets
+
+This is already minimal.
+
+---
+
+## Revised Estimate
+
+| Metric | Original | Previous Revision | With Your Changes |
+|--------|----------|-------------------|-------------------|
+| Files | 22 | 8 | 6 |
+| Lines | ~1000 | ~305 | ~180 |
+| Phases | 6 | 2 | 2 |
+| Scopes | 15+ | 2 | 1 (authenticated) |
+| User storage | Database | Env var | YAML file |
+
+---
+
+## Remaining Questions
+
+1. **YAML vs JSON** for users file? I prefer YAML for readability.
+2. **Password hash generation:** CLI tool or documented command?
+3. **User hot-reload:** Should adding a user require restart?
+
+---
+
+*worker-auth-advocate*
+---
+
+--- MESSAGE ---
+timestamp: 2026-01-31T03:10:00Z
+from: worker-auth-critic
+to: worker-auth-advocate
+type: USER
+id: critic-round3-final
+---
+# ROUND 3 (FINAL): Convergence on Minimal Auth
+
+Advocate, we've reached substantial agreement. Let me address your remaining questions and propose the final spec.
+
+---
+
+## Responses to Your Questions
+
+### 1. YAML vs JSON: **YAML** ✅
+
+Agreed. More readable for humans editing the file:
+
+```yaml
+# .cmux/users.yaml
+users:
+  alice:
+    password_hash: "$argon2id$v=19$m=65536,t=3,p=4$..."
+  bob:
+    password_hash: "$argon2id$v=19$m=65536,t=3,p=4$..."
+```
+
+### 2. Password Hash Generation: **CLI Script** ✅
+
+Provide a simple script:
+
+```bash
+#!/bin/bash
+# scripts/add-user.sh
+read -p "Username: " USERNAME
+read -sp "Password: " PASSWORD
+echo
+
+HASH=$(python3 -c "from passlib.hash import argon2; print(argon2.hash('$PASSWORD'))")
+
+echo "Add this to .cmux/users.yaml:"
+echo "  $USERNAME:"
+echo "    password_hash: \"$HASH\""
+```
+
+### 3. User Hot-Reload: **No** (restart required) ✅
+
+For a "fixed users" model:
+- Adding users is rare
+- Restart is simple: `./src/orchestrator/cmux.sh restart`
+- Avoids file watcher complexity
+
+**Future:** Add hot-reload if it becomes friction.
+
+---
+
+## Final Agreements
+
+| Topic | Resolution |
+|-------|------------|
+| Auth method | JWT (stateless) |
+| Token expiry | 7 days, no refresh |
+| User storage | `.cmux/users.yaml` |
+| Password hashing | Argon2 |
+| Authorization | Binary (authenticated or not) |
+| WebSocket auth | First-message |
+| Webhook auth | `X-Webhook-Secret` header |
+| Hook auth | `X-Hook-Secret` header |
+| Rollout | 2 phases with feature flag |
+
+---
+
+## Accepted Tradeoffs
+
+1. **7-day token theft window** - Acceptable for dev tool threat model
+2. **No hot-reload for users** - Restart is fine for rare user additions
+3. **No scopes** - Add later if multi-tenant becomes real
+4. **localStorage for token** - XSS risk documented, acceptable for localhost
+
+---
+
+## Final File List
+
+```
+src/server/auth/
+├── __init__.py       # 5 lines
+├── tokens.py         # 25 lines - JWT create/decode
+├── users.py          # 40 lines - Load YAML, verify password
+├── middleware.py     # 30 lines - Depends(get_current_user)
+└── routes.py         # 35 lines - /api/auth/login only
+
+src/frontend/src/auth/
+├── authStore.ts      # 30 lines - Token state
+├── fetchWithAuth.ts  # 20 lines - Auth wrapper
+└── LoginPage.tsx     # 40 lines - Login form
+
+scripts/
+└── add-user.sh       # 15 lines - Password hash helper
+
+.cmux/
+└── users.yaml        # User list (created by admin)
+```
+
+**Total: ~240 lines of new code** (down from 1000+ in original)
+
+---
+
+## Proposed Final Environment Variables
+
+```bash
+# Required
+CMUX_AUTH_ENABLED=true
+CMUX_AUTH_SECRET="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+
+# Optional (defaults shown)
+CMUX_AUTH_TOKEN_EXPIRY_DAYS=7
+CMUX_AUTH_USERS_FILE=".cmux/users.yaml"
+CMUX_WEBHOOK_SECRET=""      # Empty = webhooks disabled
+CMUX_HOOK_SECRET=""         # Empty = hooks auth disabled
+
+# CORS
+CMUX_CORS_ORIGINS="http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000"
+```
+
+---
+
+## Debate Conclusion
+
+**We've converged.** The final plan is:
+
+1. **Simple** - 240 lines, 6 new files
+2. **Secure enough** - Keeps unauthorized users out
+3. **Appropriate** - Matches "fixed users, add more as we go" requirement
+4. **Extensible** - Can add scopes/OAuth later if needed
+
+**I move that we update `.cmux/plans/auth-implementation-revised.md` with this final spec.**
+
+---
+
+*worker-auth-critic*
+---
+
+--- MESSAGE ---
+timestamp: 2026-01-31T03:12:00Z
+from: worker-auth-advocate
+to: worker-auth-critic
+type: USER
+id: advocate-round3-final
+---
+# ROUND 3 (FINAL): Agreement
+
+Critic, I accept your final proposal. We've reached consensus.
+
+**Agreements confirmed:**
+- YAML user file ✅
+- CLI script for adding users ✅
+- No hot-reload (restart required) ✅
+- 7-day tokens without refresh ✅
+- Binary auth (no scopes) ✅
+- ~240 lines total ✅
+
+**One addition:** Let's include a sample users file:
+
+```yaml
+# .cmux/users.yaml.example
+# Copy to .cmux/users.yaml and add your users
+# Generate password hashes with: ./scripts/add-user.sh
+
+users:
+  # Example user (remove in production)
+  admin:
+    password_hash: "$argon2id$v=19$m=65536,t=3,p=4$example$notreal"
+```
+
+**Debate Status:** ✅ COMPLETE
+
+The revised plan should be updated to reflect our final consensus. I support moving to implementation.
+
+---
+
+*worker-auth-advocate*
+---
+[2026-01-31T18:54:00+05:30] cmux:worker-critic -> cmux:worker-proposer: Critic Ready (body: .cmux/journal/2026-01-31/attachments/worker-critic-1769865840.md)
+[2026-01-31T18:54:55+05:30] cmux:worker-proposer -> cmux:worker-critic: v1 ready for review - see .cmux/design/voice-notes-v1.md
+[2026-01-31T18:56:51+05:30] cmux:worker-critic -> cmux:worker-proposer: critique ready
+[2026-01-31T18:59:00+05:30] cmux:worker-proposer -> cmux:supervisor: [DONE] Voice notes v2 design converged. Accepted 95% of critique. Final design at .cmux/design/voice-notes-v2.md - 100 lines of code, 4 files touched. Ready for implementation.
+[2026-01-31T19:04:14+05:30] cmux:worker-proposer -> cmux:supervisor: [DONE] Fixed API calls to use window.location.origin for ngrok support. Commit a346856. Changed lib/constants.ts - API_BASE and WS_URL now dynamically use browser origin instead of hardcoded localhost. Frontend builds and typechecks pass.
+[2026-01-31T20:17:10+05:30] cmux:worker-investigator -> cmux:supervisor: [STATUS] worker-investigator online and ready for tasks
+[2026-01-31T20:21:29+05:30] cmux:worker-investigator -> cmux:supervisor: [DONE] Root cause found: router.sh:77 regex [^:]+ cannot handle session:agent addresses with colons. Messages to 'user' work. Messages to 'cmux:supervisor' fail. Fix: change [^:]+ to [^ ]+ in the to-field pattern. Full report at .cmux/journal/2026-01-31/attachments/message-flow-investigation.md
+[2026-01-31T20:42:00+05:30] cmux:worker-docs-relocation -> cmux:supervisor: [STATUS] Starting docs relocation task - moving design/plan docs to journal attachments
+[2026-01-31T20:42:27+05:30] cmux:ux-nav-analysis -> cmux:supervisor: [STATUS] Starting UX navigation analysis of CMUX dashboard
+[2026-01-31T20:42:42+05:30] cmux:ux-interaction-analysis -> cmux:supervisor: [STATUS] Starting UX interaction analysis of CMUX dashboard at localhost:8000
+[2026-01-31T20:42:47+05:30] cmux:ux-chat-analysis -> cmux:supervisor: [STATUS] Starting UX analysis of chat interface at localhost:8000
+[2026-01-31T20:42:51+05:30] cmux:worker-docs-relocation -> cmux:supervisor: [DONE] Docs relocation complete - moved 6 files to .cmux/journal/2026-01-31/attachments/, removed empty .cmux/design/ and .cmux/plans/ directories, committed as d1882c8
+[2026-01-31T20:42:57+05:30] cmux:ux-interaction-analysis -> cmux:supervisor: [BLOCKED] Chrome DevTools MCP connection issue - browser profile already in use. Need to restart MCP server or use isolated mode.
+[2026-01-31T20:42:57+05:30] cmux:ux-chat-analysis -> cmux:supervisor: [BLOCKED] Chrome DevTools MCP shows browser already in use by another process. Cannot access chrome-devtools tools. Need browser instance available or --isolated mode.
+[2026-01-31T20:43:01+05:30] cmux:ux-responsiveness-analysis -> cmux:supervisor: [STATUS] Starting UX responsiveness analysis of CMUX dashboard at localhost:8000
+[2026-01-31T20:43:05+05:30] cmux:ux-chat-analysis -> cmux:supervisor: [STATUS] Chrome DevTools unavailable - performing code-based UX analysis of chat components instead
+[2026-01-31T20:43:12+05:30] cmux:ux-interaction-analysis -> cmux:supervisor: [STATUS] Attempting to reconnect to Chrome DevTools MCP - multiple instances detected
+[2026-01-31T20:43:25+05:30] cmux:ux-synthesizer -> cmux:supervisor: [STATUS] UX synthesizer online - waiting for analyst workers to complete before combining findings
+[2026-01-31T20:43:25+05:30] cmux:ux-interaction-analysis -> cmux:supervisor: Chrome MCP Blocker (body: .cmux/journal/2026-01-31/attachments/ux-interaction-analysis-1769872405.md)
+[2026-01-31T20:43:30+05:30] cmux:ux-interaction-analysis -> cmux:supervisor: [STATUS] Proceeding with code-based UX analysis while MCP issue is resolved
+[2026-01-31T20:44:21+05:30] cmux:ux-nav-analysis -> cmux:supervisor: [DONE] UX navigation analysis complete. Documented 5 major issue categories: (1) File tree subdirectory bug, (2) Navigation discoverability issues, (3) Visual hierarchy problems, (4) Information architecture confusion, (5) Responsive behavior concerns. Report saved to .cmux/journal/2026-01-31/attachments/ux-nav-analysis.md with 3 screenshots captured. Key recommendations: color-code agent status, improve hover states, add expand/collapse icons to sections.
+[2026-01-31T20:44:50+05:30] cmux:ux-chat-analysis -> cmux:supervisor: [DONE] UX analysis complete. Documented 25+ issues across 10 categories: message composition, display, timestamps, activity feed, message sending, activity indicator, keyboard shortcuts, accessibility, performance, and missing features. Priority matrix included with recommendations. Report written to .cmux/journal/2026-01-31/attachments/ux-chat-analysis.md
+[2026-01-31T20:45:10+05:30] cmux:ux-interaction-analysis -> cmux:supervisor: [DONE] UX interaction analysis complete - findings written to .cmux/journal/2026-01-31/attachments/ux-interaction-analysis.md. Analyzed 15+ components including buttons, file tree, agent selection, chat input, modals, and loading states. Found 3 critical accessibility issues, 5 important UX issues, and 20+ positive findings. Key recommendations: add keyboard navigation, improve ARIA attributes, use toast notifications for errors.
+[2026-01-31T20:45:13+05:30] cmux:ux-responsiveness-analysis -> cmux:supervisor: [DONE] UX responsiveness analysis complete. Key findings: (1) 3-panel layout doesn't adapt to mobile - panels become unusable narrow, (2) 20+ hardcoded pixel values may cause issues on small viewports, (3) Mobile breakpoint is 768px but no tablet optimization, (4) File tree indentation can overflow, (5) Activity panel collapse uses inline styles. Priority fix: implement mobile layout mode that stacks/tabs panels below 768px. Full report at .cmux/journal/2026-01-31/attachments/ux-responsiveness-analysis.md
+[2026-01-31T20:47:15+05:30] cmux:ux-synthesizer -> cmux:supervisor: [DONE] UX synthesis complete. Combined all 4 analyst reports into prioritized improvement plan at .cmux/journal/2026-01-31/attachments/ux-recommendations-combined.md. Key findings: (1) CRITICAL: No mobile layout - 3-panel breaks below 768px, (2) CRITICAL: Keyboard navigation missing for trees, (3) HIGH: Chat auto-scroll disrupts reading, message delivery status missing, errors not specific. Recommended first action: Implement mobile stacked/tabbed layout using existing Sheet pattern.
+[2026-01-31T21:01:17+05:30] cmux:worker-scroll-indicator -> cmux:supervisor: [DONE] Smart auto-scroll implemented. Chat now only auto-scrolls when user is near bottom (100px threshold). When reading history, shows 'New messages' button instead of forcing scroll. Uses smooth scrolling and memoizes sorted messages. Commit 009c7a7. Files: ChatMessages.tsx, scroll-area.tsx
+[2026-01-31T21:03:17+05:30] cmux:worker-scroll-indicator -> cmux:supervisor: [DONE] Scroll-to-bottom indicator with unread count implemented. (1) No auto-scroll - preserves user scroll position, (2) Shows floating button at bottom-right when scrolled up, (3) Red badge shows unread count (1-99, then 99+), (4) Click scrolls to bottom and clears count, (5) Manual scroll to bottom also clears count. Commit c66f505. Files: ChatMessages.tsx
+[2026-01-31T21:08:11+05:30] cmux:worker-scroll-indicator -> cmux:supervisor: [BLOCKED] Chrome DevTools MCP unavailable - browser profile in use by another process. Made a fix: added 'min-h-0' to container and 'h-full' to ScrollArea (required for flex scrolling). Build passes. Need manual browser test at http://localhost:8000 to verify scrolling works.
+[2026-01-31T21:11:54+05:30] cmux:worker-scroll-indicator -> cmux:supervisor: [DONE] Scroll layout fixed and verified in browser. Simplified layout by removing wrapper div - ScrollArea now direct return with 'relative' class, button uses sticky positioning inside content. Tested scrolling via Chrome DevTools MCP - scrollTop/scrollHeight/clientHeight all working correctly. Commit 7572a07.
