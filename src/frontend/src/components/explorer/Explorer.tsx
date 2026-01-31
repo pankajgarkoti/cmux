@@ -138,22 +138,10 @@ export function Explorer() {
   }, [agents]);
 
   // Build file tree and separate mailbox
+  // buildFileTree already returns the full recursive structure - pass it directly
+  // to FileTree which handles recursive rendering via FileTreeNode
   const allItems: FileTreeItem[] = filesystemData?.items
-    ? buildFileTree(filesystemData.items).map((item) => ({
-        name: item.name,
-        path: item.path,
-        type: item.type,
-        children: item.children?.map((child) => ({
-          name: child.name,
-          path: child.path,
-          type: child.type,
-          children: child.children?.map((c) => ({
-            name: c.name,
-            path: c.path,
-            type: c.type,
-          })),
-        })),
-      }))
+    ? buildFileTree(filesystemData.items)
     : [];
 
   const mailboxItem = allItems.find(item => item.name === 'mailbox');
