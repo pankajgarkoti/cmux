@@ -5,7 +5,6 @@ from typing import List, Optional
 from ..config import settings
 from ..models.session import Session, SessionStatus
 from .tmux_service import tmux_service
-from .message_formatter import format_dashboard_message, format_system_message, MessageType
 
 
 class SessionManager:
@@ -127,7 +126,11 @@ class SessionManager:
         # 4. Wait for Claude to initialize (CRITICAL: 8 second delay)
         await asyncio.sleep(settings.claude_startup_delay)
 
-        # 5. Send role instructions
+        # 5. Disable vim mode if enabled (for reliable message delivery)
+        await tmux_service.disable_vim_mode(supervisor_name, session_id)
+        await asyncio.sleep(1)
+
+        # 6. Send role instructions
         template_path = f"docs/templates/{template}.md" if template else "docs/templates/FEATURE_SUPERVISOR.md"
         role_msg = f"Read {template_path} to understand your role. Your task: {task_description}"
         await tmux_service.send_input(supervisor_name, role_msg, session_id)
@@ -188,12 +191,12 @@ class SessionManager:
         if not session:
             return False
 
-        # Send formatted pause message to supervisor
-        message = format_system_message(
-            "Session paused. Stop processing new tasks until resumed.",
-            MessageType.STATUS
+        # Send pause message to supervisor
+        await tmux_service.send_input(
+            session.supervisor_agent,
+            "[SYSTEM] Session paused. Stop processing new tasks until resumed.",
+            session_id
         )
-        await tmux_service.send_input(session.supervisor_agent, message, session_id)
 
         session.status = SessionStatus.PAUSED
         return True
@@ -204,12 +207,12 @@ class SessionManager:
         if not session:
             return False
 
-        # Send formatted resume message to supervisor
-        message = format_system_message(
-            "Session resumed. You may continue processing tasks.",
-            MessageType.STATUS
+        # Send resume message to supervisor
+        await tmux_service.send_input(
+            session.supervisor_agent,
+            "[SYSTEM] Session resumed. You may continue processing tasks.",
+            session_id
         )
-        await tmux_service.send_input(session.supervisor_agent, message, session_id)
 
         session.status = SessionStatus.ACTIVE
         return True
@@ -234,8 +237,8 @@ class SessionManager:
             return False
 
         # Format message so supervisor knows it's from dashboard
-        formatted_message = format_dashboard_message(message)
-        await tmux_service.send_input(session.supervisor_agent, formatted_message, session_id)
+        # Send raw message (multiline formatted messages break tmux send-keys)
+        await tmux_service.send_input(session.supervisor_agent, message, session_id)
         return True
 
     async def list_session_agents(self, session_id: str) -> List[str]:

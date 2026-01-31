@@ -140,8 +140,16 @@ launch_supervisor() {
     # Lock window name
     tmux set-option -t "${CMUX_SESSION}:supervisor" allow-rename off 2>/dev/null || true
 
-    # Wait for Claude to initialize, then send role instructions
+    # Wait for Claude to initialize
     sleep 8
+
+    # Disable vim mode if enabled (for reliable message delivery)
+    if tmux capture-pane -t "${CMUX_SESSION}:supervisor" -p | grep -qE "\-\- (INSERT|NORMAL|VISUAL) \-\-"; then
+        tmux_send_keys "$CMUX_SESSION" "supervisor" "/vim"
+        sleep 1
+    fi
+
+    # Send role instructions
     tmux_send_keys "$CMUX_SESSION" "supervisor" "Read docs/SUPERVISOR_ROLE.md to understand your role as the CMUX supervisor agent. This file contains your instructions for managing workers, using the journal system, and coordinating tasks."
 
     log_ok "Supervisor agent launched"
@@ -238,14 +246,41 @@ run_router_loop() {
 HEALTH_FAILURES=0
 MAX_FAILURES=3
 LAST_CTRL_C=0
+CLEANUP_DONE=false
+
+cleanup() {
+    # Prevent running cleanup twice
+    [[ "$CLEANUP_DONE" == "true" ]] && return
+    CLEANUP_DONE=true
+
+    printf "${RED}Cleaning up...${NC}\n"
+
+    # Kill router background process
+    if [[ -n "${ROUTER_PID:-}" ]]; then
+        kill "$ROUTER_PID" 2>/dev/null && printf "  ${GREEN}✓${NC} Router stopped\n"
+    fi
+
+    # Kill FastAPI server
+    local server_pid
+    server_pid=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
+    if [[ -n "$server_pid" ]]; then
+        kill "$server_pid" 2>/dev/null && printf "  ${GREEN}✓${NC} FastAPI server stopped\n"
+    fi
+
+    # Kill all cmux sessions (main + spawned)
+    for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep "^cmux" || true); do
+        tmux kill-session -t "$sess" 2>/dev/null && printf "  ${GREEN}✓${NC} Killed session: $sess\n"
+    done
+
+    printf "${GREEN}Shutdown complete${NC}\n"
+}
 
 handle_exit() {
     local now
     now=$(date +%s)
     if ((now - LAST_CTRL_C < 3)); then
         echo ""
-        printf "${RED}Shutting down...${NC}\n"
-        [[ -n "${ROUTER_PID:-}" ]] && kill "$ROUTER_PID" 2>/dev/null
+        cleanup
         exit 0
     else
         LAST_CTRL_C=$now
@@ -255,6 +290,9 @@ handle_exit() {
         sleep 1
     fi
 }
+
+# Cleanup on any exit (error, TERM, HUP)
+trap cleanup EXIT TERM HUP
 
 run_dashboard() {
     trap handle_exit INT

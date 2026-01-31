@@ -76,6 +76,13 @@ cmd_spawn() {
     info "Waiting ${STARTUP_DELAY}s for Claude to initialize..."
     sleep "$STARTUP_DELAY"
 
+    # Disable vim mode if enabled (for reliable message delivery)
+    if tmux capture-pane -t "${CMUX_SESSION}:${name}" -p | grep -qE "\-\- (INSERT|NORMAL|VISUAL) \-\-"; then
+        tmux send-keys -t "${CMUX_SESSION}:${name}" -l "/vim"
+        tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
+        sleep 1
+    fi
+
     # Send the task
     info "Sending task to worker..."
     tmux send-keys -t "${CMUX_SESSION}:${name}" -l "$task"
