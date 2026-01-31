@@ -125,23 +125,21 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
   }
 
   return (
-    <div className="relative flex-1 flex flex-col">
-      <ScrollArea
-        className="flex-1"
-        viewportRef={viewportRef}
-        onScroll={handleScroll}
-      >
-        <div className="p-4 space-y-4">
-          {sortedMessages.map((message) => (
-            <ChatMessage key={message.id} message={message} />
-          ))}
-          <div ref={bottomRef} />
-        </div>
-      </ScrollArea>
+    <ScrollArea
+      className="flex-1 relative"
+      viewportRef={viewportRef}
+      onScroll={handleScroll}
+    >
+      <div className="p-4 space-y-4">
+        {sortedMessages.map((message) => (
+          <ChatMessage key={message.id} message={message} />
+        ))}
+        <div ref={bottomRef} />
+      </div>
 
-      {/* Scroll to bottom indicator with unread count */}
+      {/* Scroll to bottom indicator with unread count - sticky positioned */}
       {unreadCount > 0 && !isNearBottom && (
-        <div className="absolute bottom-4 right-4 z-10">
+        <div className="sticky bottom-4 float-right mr-4 z-10">
           <Button
             variant="secondary"
             size="icon"
@@ -158,6 +156,6 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
           </Button>
         </div>
       )}
-    </div>
+    </ScrollArea>
   );
 }
