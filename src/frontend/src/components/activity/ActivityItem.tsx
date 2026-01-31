@@ -13,6 +13,7 @@ const typeColors: Record<Activity['type'], string> = {
   status_change: 'border-l-yellow-500',
   webhook_received: 'border-l-orange-500',
   user_message: 'border-l-pink-500',
+  mailbox_message: 'border-l-cyan-500',
 };
 
 export function ActivityItem({ activity }: ActivityItemProps) {
@@ -51,6 +52,12 @@ function getActivitySummary(activity: Activity): string {
       return String(activity.data?.content || 'Message sent').slice(0, 100);
     case 'message_sent':
       return String(activity.data?.content || 'Message').slice(0, 100);
+    case 'mailbox_message': {
+      const from = activity.data?.from_agent || 'unknown';
+      const to = activity.data?.to_agent || 'unknown';
+      const content = String(activity.data?.content || '').slice(0, 60);
+      return `${from} → ${to}: ${content}`;
+    }
     case 'webhook_received':
       return `From: ${activity.data?.source || 'external'}`;
     case 'status_change':

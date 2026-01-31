@@ -62,12 +62,17 @@ route_to_agent() {
     local to="$1"
     local content="$2"
     local from="${3:-unknown}"
+    local msg_type="${4:-mailbox}"
+
+    # Store message in database and broadcast via WebSocket
+    # This makes agent-to-agent messages visible in the UI
+    store_message_via_api "$from" "$to" "$content" "$msg_type"
 
     if [[ "$to" == "user" ]]; then
         # Route to FastAPI server endpoint for user display
         if curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/user" \
             -H "Content-Type: application/json" \
-            -d "{\"content\": $(echo "$content" | jq -Rs .), \"from_agent\": \"supervisor\"}" \
+            -d "{\"content\": $(echo "$content" | jq -Rs .), \"from_agent\": \"$from\"}" \
             >/dev/null 2>&1; then
             log_route "DELIVERED" "$from" "user" "via API"
             log_info "Routed message to user via API"
@@ -98,6 +103,26 @@ route_to_agent() {
     return 1
 }
 
+# Store message in database via API for UI visibility
+store_message_via_api() {
+    local from="$1"
+    local to="$2"
+    local content="$3"
+    local msg_type="${4:-mailbox}"
+
+    # Call internal API to store message and broadcast to WebSocket
+    curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/internal" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"from_agent\": \"$from\",
+            \"to_agent\": \"$to\",
+            \"content\": $(echo "$content" | jq -Rs .),
+            \"type\": \"$msg_type\"
+        }" >/dev/null 2>&1 || {
+            log_route "WARN" "$from" "$to" "failed to store in DB (API unavailable)"
+        }
+}
+
 process_mailbox() {
     if [[ ! -f "$CMUX_MAILBOX" ]]; then
         return 0
@@ -126,13 +151,14 @@ process_mailbox() {
                 local parsed
                 parsed=$(parse_message "$current_message")
 
-                local to
+                local from_agent to msg_type
+                from_agent=$(echo "$parsed" | cut -d'|' -f1)
                 to=$(echo "$parsed" | cut -d'|' -f2)
+                msg_type=$(echo "$parsed" | cut -d'|' -f3)
+                msg_type="${msg_type:-mailbox}"
 
                 if [[ -n "$to" ]]; then
-                    local from_agent
-                    from_agent=$(echo "$parsed" | cut -d'|' -f1)
-                    route_to_agent "$to" "$current_message" "$from_agent"
+                    route_to_agent "$to" "$current_message" "$from_agent" "$msg_type"
                 fi
             fi
             current_message=""
@@ -146,11 +172,13 @@ process_mailbox() {
     if [[ -n "$current_message" ]]; then
         local parsed
         parsed=$(parse_message "$current_message")
-        local to from_agent
-        to=$(echo "$parsed" | cut -d'|' -f2)
+        local from_agent to msg_type
         from_agent=$(echo "$parsed" | cut -d'|' -f1)
+        to=$(echo "$parsed" | cut -d'|' -f2)
+        msg_type=$(echo "$parsed" | cut -d'|' -f3)
+        msg_type="${msg_type:-mailbox}"
         if [[ -n "$to" ]]; then
-            route_to_agent "$to" "$current_message" "$from_agent"
+            route_to_agent "$to" "$current_message" "$from_agent" "$msg_type"
         fi
     fi
 

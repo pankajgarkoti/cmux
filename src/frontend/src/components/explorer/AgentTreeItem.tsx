@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils';
 import { Bot, Crown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useAgentEventStore } from '@/stores/agentEventStore';
 import type { Agent, AgentStatus } from '@/types/agent';
 
 interface AgentTreeItemProps {
@@ -22,6 +23,16 @@ const statusColors: Record<AgentStatus, string> = {
 export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps) {
   const isSupervisor = agent.type === 'supervisor';
 
+  // Check if this agent is actively working
+  // The session ID pattern typically includes the agent name or id
+  const { latestEventBySession, isAgentActive } = useAgentEventStore();
+  const isWorking = Object.keys(latestEventBySession).some((sessionId) => {
+    const matchesAgent =
+      sessionId.toLowerCase().includes(agent.id.toLowerCase()) ||
+      sessionId.toLowerCase().includes(agent.name.toLowerCase());
+    return matchesAgent && isAgentActive(sessionId);
+  });
+
   return (
     <button
       onClick={onClick}
@@ -31,10 +42,14 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
         isSelected && 'bg-sidebar-accent text-sidebar-accent-foreground'
       )}
     >
-      {/* Status indicator */}
+      {/* Status indicator with working animation */}
       <span
-        className={cn('w-2 h-2 rounded-full flex-shrink-0', statusColors[agent.status])}
-        title={agent.status}
+        className={cn(
+          'w-2 h-2 rounded-full flex-shrink-0',
+          statusColors[agent.status],
+          isWorking && 'animate-pulse ring-2 ring-green-400/50'
+        )}
+        title={isWorking ? 'Working...' : agent.status}
       />
 
       {/* Icon */}
@@ -46,6 +61,14 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
 
       {/* Name */}
       <span className="truncate flex-1">{agent.name}</span>
+
+      {/* Working indicator */}
+      {isWorking && (
+        <span
+          className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse flex-shrink-0"
+          title="Processing..."
+        />
+      )}
 
       {/* Type badge */}
       <Badge

@@ -4,7 +4,8 @@ export type ActivityType =
   | 'message_received'
   | 'status_change'
   | 'webhook_received'
-  | 'user_message';
+  | 'user_message'
+  | 'mailbox_message';
 
 export interface Activity {
   id: string;

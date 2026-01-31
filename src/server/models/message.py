@@ -10,6 +10,7 @@ class MessageType(str, Enum):
     RESPONSE = "response"
     ERROR = "error"
     USER = "user"
+    MAILBOX = "mailbox"  # Agent-to-agent messages routed via mailbox
 
 
 class Message(BaseModel):
@@ -30,3 +31,12 @@ class MessageList(BaseModel):
 class UserMessage(BaseModel):
     content: str
     from_agent: str = "supervisor"
+
+
+class InternalMessage(BaseModel):
+    """Message from router daemon for agent-to-agent communication."""
+    from_agent: str
+    to_agent: str
+    content: str
+    type: MessageType = MessageType.MAILBOX
+    metadata: Optional[dict] = None

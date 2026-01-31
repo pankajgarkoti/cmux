@@ -120,8 +120,8 @@ export function useWebSocket() {
         addActivity({
           id: crypto.randomUUID(),
           timestamp: data.timestamp || new Date().toISOString(),
-          type: mapEventToActivityType(data.event),
-          agent_id: data.data?.agent_id || data.data?.session_id || 'system',
+          type: mapEventToActivityType(data.event, data.data as Record<string, unknown>),
+          agent_id: data.data?.agent_id || data.data?.session_id || data.data?.from_agent || 'system',
           data: data.data,
         });
       } catch (e) {
@@ -169,7 +169,7 @@ export function useWebSocket() {
   return { connect, disconnect };
 }
 
-function mapEventToActivityType(event: string): Activity['type'] {
+function mapEventToActivityType(event: string, data?: Record<string, unknown>): Activity['type'] {
   switch (event) {
     case 'webhook_received':
       return 'webhook_received';
@@ -177,6 +177,12 @@ function mapEventToActivityType(event: string): Activity['type'] {
       return 'message_sent';
     case 'user_message':
       return 'user_message';
+    case 'new_message':
+      // Check if it's a mailbox message (agent-to-agent)
+      if (data?.type === 'mailbox') {
+        return 'mailbox_message';
+      }
+      return 'message_received';
     case 'status_change':
       return 'status_change';
     case 'agent_event':

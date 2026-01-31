@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional
 import uuid
 
-from ..models.message import Message, MessageList, UserMessage, MessageType
+from ..models.message import Message, MessageList, UserMessage, InternalMessage, MessageType
 from ..services.mailbox import mailbox_service
 from ..websocket.manager import ws_manager
 
@@ -39,3 +39,29 @@ async def send_to_user(message: UserMessage):
 
     await ws_manager.broadcast("user_message", msg.model_dump(mode="json"))
     return {"success": True, "message_id": msg.id}
+
+
+@router.post("/internal")
+async def store_internal_message(data: InternalMessage):
+    """Store agent-to-agent message from router daemon.
+
+    Called by router.sh when routing messages between agents.
+    Stores message in SQLite and broadcasts to frontend via WebSocket.
+    """
+    msg = Message(
+        id=str(uuid.uuid4()),
+        timestamp=datetime.now(timezone.utc),
+        from_agent=data.from_agent,
+        to_agent=data.to_agent,
+        content=data.content,
+        type=data.type,
+        metadata=data.metadata
+    )
+
+    # Store in memory + SQLite
+    mailbox_service.store_message(msg)
+
+    # Broadcast to frontend
+    await ws_manager.broadcast("new_message", msg.model_dump(mode="json"))
+
+    return {"status": "stored", "id": msg.id}
