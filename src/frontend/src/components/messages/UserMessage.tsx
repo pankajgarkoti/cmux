@@ -13,6 +13,7 @@ const typeColors: Record<Message['type'], string> = {
   response: 'bg-green-500',
   error: 'bg-red-500',
   user: 'bg-purple-500',
+  mailbox: 'bg-cyan-500',
 };
 
 export function UserMessage({ message }: UserMessageProps) {

@@ -83,6 +83,27 @@ cmd_spawn() {
         sleep 1
     fi
 
+    # Send agent identity context first (so workers understand their role)
+    info "Sending agent identity context..."
+    local role_context="You are a worker agent named '${name}' in the CMUX multi-agent system.
+
+IMPORTANT: You are NOT chatting with a human user. You are an autonomous agent that:
+- Receives tasks from the supervisor or other agents
+- Communicates with other agents via the /mailbox skill
+- Should respond to messages that appear in your terminal
+- Reports completion via: ./tools/mailbox done \"summary\"
+- Reports blockers via: ./tools/mailbox blocked \"issue\"
+
+When you see a message like '[cmux:supervisor] Do X', that's the supervisor assigning you work.
+
+Read docs/WORKER_ROLE.md for full worker guidelines.
+
+YOUR TASK:"
+
+    tmux send-keys -t "${CMUX_SESSION}:${name}" -l "$role_context"
+    tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
+    sleep 2
+
     # Send the task
     info "Sending task to worker..."
     tmux send-keys -t "${CMUX_SESSION}:${name}" -l "$task"

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { ChevronRight, Bot, FolderOpen, RefreshCw, Inbox, Crown, Layers, Trash2, Pause, Play, Plus, MoreHorizontal, AlertCircle, Users, Archive } from 'lucide-react';
+import { ChevronRight, Bot, FolderOpen, RefreshCw, Inbox, Crown, Layers, Trash2, Pause, Play, Plus, MoreHorizontal, AlertCircle, Users, Archive, Mail, MessageSquare, ArrowRight } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -36,6 +36,7 @@ import { FileTree, type FileTreeItem } from './FileTree';
 import { api } from '@/lib/api';
 import type { Agent, AgentStatus } from '@/types/agent';
 import type { SessionStatus } from '@/types/session';
+import type { Message } from '@/types/message';
 
 interface SessionGroup {
   session: string;
@@ -339,36 +340,14 @@ export function Explorer() {
             </Collapsible>
           )}
 
-          {/* MAILBOX Section */}
-          {mailboxItem && (
-            <Collapsible open={mailboxOpen} onOpenChange={setMailboxOpen} className="mt-4">
-              <CollapsibleTrigger asChild>
-                <button className="w-full flex items-center gap-1 px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/70 hover:text-sidebar-foreground">
-                  <ChevronRight
-                    className={cn(
-                      'h-3.5 w-3.5 transition-transform',
-                      mailboxOpen && 'rotate-90'
-                    )}
-                  />
-                  <Inbox className="h-3.5 w-3.5" />
-                  <span>Mailbox</span>
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-1">
-                <button
-                  onClick={() => handleFileSelect(mailboxItem)}
-                  className={cn(
-                    'w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors text-left',
-                    'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                    selectedFile?.path === mailboxItem.path && 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  )}
-                >
-                  <Inbox className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                  <span className="truncate">Pending Messages</span>
-                </button>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+          {/* MAILBOX Section - Agent Communication */}
+          <MailboxSection
+            mailboxOpen={mailboxOpen}
+            setMailboxOpen={setMailboxOpen}
+            mailboxItem={mailboxItem}
+            selectedFile={selectedFile}
+            handleFileSelect={handleFileSelect}
+          />
 
           {/* MEMORY Section */}
           <Collapsible open={memoryOpen} onOpenChange={setMemoryOpen} className="mt-4">
@@ -628,5 +607,108 @@ function AgentItem({
         {isSupervisor ? 'SUP' : 'WRK'}
       </Badge>
     </button>
+  );
+}
+
+function MailboxSection({
+  mailboxOpen,
+  setMailboxOpen,
+  mailboxItem,
+  selectedFile,
+  handleFileSelect,
+}: {
+  mailboxOpen: boolean;
+  setMailboxOpen: (open: boolean) => void;
+  mailboxItem: FileTreeItem | undefined;
+  selectedFile: FileTreeItem | null;
+  handleFileSelect: (item: FileTreeItem) => void;
+}) {
+  const { data: messagesData, isLoading } = useQuery({
+    queryKey: ['mailboxMessages'],
+    queryFn: () => api.getMailboxMessages(10),
+    refetchInterval: 5000, // Refresh every 5 seconds
+  });
+
+  const recentMessages = messagesData?.messages || [];
+  const messageCount = recentMessages.length;
+
+  // Extract subject from content (before "(see:" if present)
+  const parseSubject = (content: string) => {
+    const seeIdx = content.indexOf(' (see:');
+    if (seeIdx > 0) return content.substring(0, seeIdx);
+    return content;
+  };
+
+  return (
+    <Collapsible open={mailboxOpen} onOpenChange={setMailboxOpen} className="mt-4">
+      <CollapsibleTrigger asChild>
+        <button className="w-full flex items-center gap-1 px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/70 hover:text-sidebar-foreground">
+          <ChevronRight
+            className={cn(
+              'h-3.5 w-3.5 transition-transform',
+              mailboxOpen && 'rotate-90'
+            )}
+          />
+          <Mail className="h-3.5 w-3.5" />
+          <span className="flex-1 text-left">Mailbox</span>
+          {messageCount > 0 && (
+            <Badge
+              variant="secondary"
+              className="h-5 px-1.5 text-xs bg-blue-500/20 text-blue-400 animate-pulse"
+            >
+              {messageCount}
+            </Badge>
+          )}
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-1 space-y-0.5">
+        {/* View raw mailbox file */}
+        {mailboxItem && (
+          <button
+            onClick={() => handleFileSelect(mailboxItem)}
+            className={cn(
+              'w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors text-left',
+              'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+              selectedFile?.path === mailboxItem.path && 'bg-sidebar-accent text-sidebar-accent-foreground'
+            )}
+          >
+            <Inbox className="h-4 w-4 text-blue-500 flex-shrink-0" />
+            <span className="truncate">View Raw Mailbox</span>
+          </button>
+        )}
+
+        {/* Recent messages */}
+        {isLoading ? (
+          <div className="px-3 py-2">
+            <Skeleton className="h-4 w-full" />
+          </div>
+        ) : recentMessages.length > 0 ? (
+          <div className="space-y-0.5 pt-1">
+            {recentMessages.slice(0, 5).map((msg: Message) => (
+              <div
+                key={msg.id}
+                className="w-full flex items-start gap-2 px-3 py-1.5 text-xs rounded-md hover:bg-sidebar-accent/50"
+              >
+                <MessageSquare className="h-3.5 w-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <span className="font-medium text-foreground/80">{msg.from_agent}</span>
+                    <ArrowRight className="h-2.5 w-2.5" />
+                    <span className="font-medium text-foreground/80">{msg.to_agent}</span>
+                  </div>
+                  <p className="truncate text-muted-foreground mt-0.5">
+                    {parseSubject(msg.content)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="px-3 py-2 text-xs text-muted-foreground">
+            No recent agent messages
+          </p>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

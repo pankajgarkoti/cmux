@@ -171,84 +171,18 @@ launch_supervisor() {
 # Message Router (runs in background)
 #───────────────────────────────────────────────────────────────────────────────
 
-ROUTER_POSITION=0
+# Router is now external: src/orchestrator/router.sh
+# This function starts the external router daemon
 
-route_messages() {
-    local mailbox="$CMUX_MAILBOX"
-
-    [[ ! -f "$mailbox" ]] && return 0
-
-    local current_size
-    current_size=$(wc -c < "$mailbox" | xargs)
-
-    ((current_size <= ROUTER_POSITION)) && return 0
-
-    # Read new content
-    local new_content
-    new_content=$(tail -c +"$((ROUTER_POSITION + 1))" "$mailbox")
-
-    # Process each message
-    local in_message=false
-    local current_message=""
-    local from="" to=""
-
-    while IFS= read -r line; do
-        if [[ "$line" == "--- MESSAGE ---" ]]; then
-            if [[ -n "$current_message" && -n "$to" ]]; then
-                route_single_message "$from" "$to" "$current_message"
-            fi
-            current_message=""
-            from=""
-            to=""
-            in_message=true
-        elif $in_message; then
-            if [[ "$line" =~ ^from:\ *(.+)$ ]]; then
-                from="${BASH_REMATCH[1]}"
-            elif [[ "$line" =~ ^to:\ *(.+)$ ]]; then
-                to="${BASH_REMATCH[1]}"
-            fi
-            current_message+="$line"$'\n'
-        fi
-    done <<< "$new_content"
-
-    # Process last message
-    if [[ -n "$current_message" && -n "$to" ]]; then
-        route_single_message "$from" "$to" "$current_message"
+start_router() {
+    if [[ -n "${ROUTER_PID:-}" ]] && kill -0 "$ROUTER_PID" 2>/dev/null; then
+        return 0  # Already running
     fi
 
-    ROUTER_POSITION=$current_size
-}
-
-route_single_message() {
-    local from="$1"
-    local to="$2"
-    local content="$3"
-
-    echo "$(date -Iseconds) | ROUTE | $from -> $to" >> "$ROUTER_LOG"
-
-    if [[ "$to" == "user" ]]; then
-        # Route to API for user display
-        curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/user" \
-            -H "Content-Type: application/json" \
-            -d "{\"content\": $(echo "$content" | jq -Rs .), \"from_agent\": \"$from\"}" \
-            >/dev/null 2>&1 || true
-        return 0
-    fi
-
-    # Route to agent window
-    if tmux_window_exists "$CMUX_SESSION" "$to"; then
-        tmux_send_keys "$CMUX_SESSION" "$to" "$content"
-    else
-        echo "$(date -Iseconds) | FAILED | $from -> $to | window not found" >> "$ROUTER_LOG"
-    fi
-}
-
-run_router_loop() {
-    echo "$(date -Iseconds) | STARTUP | router ready" >> "$ROUTER_LOG"
-    while true; do
-        route_messages
-        sleep 2
-    done
+    log_step "Starting message router..."
+    "${SCRIPT_DIR}/router.sh" &
+    ROUTER_PID=$!
+    log_ok "Message router started (PID: $ROUTER_PID)"
 }
 
 #───────────────────────────────────────────────────────────────────────────────
@@ -331,13 +265,12 @@ run_dashboard() {
             fi
         fi
 
-        # Router status
+        # Router status - restart if dead
         if [[ -n "${ROUTER_PID:-}" ]] && kill -0 "$ROUTER_PID" 2>/dev/null; then
             printf "  Router:     ${GREEN}●${NC} running (PID: ${ROUTER_PID})\n"
         else
             printf "  Router:     ${YELLOW}●${NC} restarting...\n"
-            run_router_loop &
-            ROUTER_PID=$!
+            start_router
         fi
 
         # Supervisor status
@@ -421,10 +354,7 @@ main() {
     echo ""
 
     # Phase 3: Start router in background
-    log_step "Starting message router..."
-    run_router_loop &
-    ROUTER_PID=$!
-    log_ok "Message router started (PID: $ROUTER_PID)"
+    start_router
     echo ""
 
     # Phase 4: Run health dashboard (foreground)

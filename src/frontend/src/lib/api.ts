@@ -56,6 +56,18 @@ export const api = {
     return res.json();
   },
 
+  async getMailboxMessages(limit = 10): Promise<MessageListResponse> {
+    // Fetch recent messages and filter for mailbox type
+    const res = await fetch(
+      `${API_BASE}/api/messages?limit=${limit}&offset=0`
+    );
+    if (!res.ok) throw new Error('Failed to fetch mailbox messages');
+    const data: MessageListResponse = await res.json();
+    // Filter to only mailbox messages
+    const mailboxMessages = data.messages.filter(m => m.type === 'mailbox');
+    return { messages: mailboxMessages, total: mailboxMessages.length };
+  },
+
   async getAgentEvents(sessionId?: string, limit = 50): Promise<AgentEventsResponse> {
     const params = new URLSearchParams();
     if (sessionId) params.set('session_id', sessionId);

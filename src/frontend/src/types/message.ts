@@ -1,4 +1,4 @@
-export type MessageType = 'task' | 'status' | 'response' | 'error' | 'user';
+export type MessageType = 'task' | 'status' | 'response' | 'error' | 'user' | 'mailbox';
 
 export interface Message {
   id: string;

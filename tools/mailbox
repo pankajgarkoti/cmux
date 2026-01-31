@@ -1,0 +1,267 @@
+#!/usr/bin/env bash
+#===============================================================================
+# mailbox - Send messages to other agents or the user
+#
+# Usage:
+#   mailbox send <to> "<subject>" "<body>"   - Send with body file attached
+#   mailbox quick <to> "<subject>"           - Quick notification (no body)
+#   mailbox done "<summary>"                 - Tell supervisor complete
+#   mailbox blocked "<issue>"                - Tell supervisor blocked
+#
+# Mailbox Format (single line):
+#   [timestamp] from -> to: subject (body: path)
+#
+# Recipients:
+#   supervisor, worker-name      - Adds cmux: prefix automatically
+#   cmux-feature:worker-a        - Full session:window address
+#   user                         - Goes to dashboard API
+#===============================================================================
+
+set -euo pipefail
+
+CMUX_MAILBOX="${CMUX_MAILBOX:-.cmux/mailbox}"
+CMUX_PORT="${CMUX_PORT:-8000}"
+CMUX_SESSION="${CMUX_SESSION:-cmux}"
+CMUX_AGENT_NAME="${CMUX_AGENT_NAME:-unknown}"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+DIM='\033[2m'
+NC='\033[0m'
+
+#-------------------------------------------------------------------------------
+# Helpers
+#-------------------------------------------------------------------------------
+
+die() { echo -e "${RED}error:${NC} $1" >&2; exit 1; }
+info() { echo -e "${CYAN}▶${NC} $1"; }
+ok() { echo -e "${GREEN}✓${NC} $1"; }
+
+# Full tmux address for this agent
+get_from_address() {
+    echo "${CMUX_SESSION}:${CMUX_AGENT_NAME}"
+}
+
+# Normalize recipient to tmux address
+normalize_to() {
+    local to="$1"
+    if [[ "$to" == "user" ]]; then
+        echo "user"
+    elif [[ "$to" == *":"* ]]; then
+        echo "$to"  # Already a full address
+    else
+        echo "${CMUX_SESSION}:${to}"  # Add session prefix
+    fi
+}
+
+# Get today's attachments directory
+get_attachments_dir() {
+    local dir=".cmux/journal/$(date +%Y-%m-%d)/attachments"
+    mkdir -p "$dir"
+    echo "$dir"
+}
+
+# Ensure mailbox file exists
+ensure_mailbox() {
+    mkdir -p "$(dirname "$CMUX_MAILBOX")"
+    touch "$CMUX_MAILBOX"
+}
+
+#-------------------------------------------------------------------------------
+# Commands
+#-------------------------------------------------------------------------------
+
+cmd_send() {
+    local to="${1:-}"
+    local subject="${2:-}"
+    local body="${3:-}"
+
+    [[ -z "$to" ]] && die "usage: mailbox send <to> \"<subject>\" \"<body>\""
+    [[ -z "$subject" ]] && die "usage: mailbox send <to> \"<subject>\" \"<body>\""
+    [[ -z "$body" ]] && die "usage: mailbox send <to> \"<subject>\" \"<body>\""
+
+    local from=$(get_from_address)
+    local to_addr=$(normalize_to "$to")
+    local timestamp=$(date -Iseconds)
+
+    # Create body file
+    local attachments_dir=$(get_attachments_dir)
+    local filename="${CMUX_AGENT_NAME}-$(date +%s).md"
+    local filepath="${attachments_dir}/${filename}"
+
+    cat > "$filepath" << EOF
+# $subject
+
+**From:** $from
+**To:** $to_addr
+**Date:** $timestamp
+
+---
+
+$body
+EOF
+
+    # Special case: user messages go to API
+    if [[ "$to_addr" == "user" ]]; then
+        local msg_content
+        msg_content=$(printf '%s\n\n(see: %s)' "$subject" "$filepath" | jq -Rs .)
+        if curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/user" \
+            -H "Content-Type: application/json" \
+            -d "{\"content\": $msg_content, \"from_agent\": \"$CMUX_AGENT_NAME\"}" \
+            >/dev/null 2>&1; then
+            ok "Sent to user: $subject"
+        else
+            die "Failed to send to user (API unavailable)"
+        fi
+        return 0
+    fi
+
+    # Append single-line entry to mailbox
+    ensure_mailbox
+    echo "[$timestamp] $from -> $to_addr: $subject (body: $filepath)" >> "$CMUX_MAILBOX"
+    ok "Sent: $subject -> $to"
+    echo -e "${DIM}Body: $filepath${NC}"
+}
+
+cmd_quick() {
+    local to="${1:-}"
+    local subject="${2:-}"
+
+    [[ -z "$to" ]] && die "usage: mailbox quick <to> \"<subject>\""
+    [[ -z "$subject" ]] && die "usage: mailbox quick <to> \"<subject>\""
+
+    local from=$(get_from_address)
+    local to_addr=$(normalize_to "$to")
+    local timestamp=$(date -Iseconds)
+
+    # Special case: user messages go to API
+    if [[ "$to_addr" == "user" ]]; then
+        if curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/user" \
+            -H "Content-Type: application/json" \
+            -d "{\"content\": $(printf '%s' "$subject" | jq -Rs .), \"from_agent\": \"$CMUX_AGENT_NAME\"}" \
+            >/dev/null 2>&1; then
+            ok "Sent to user: $subject"
+        else
+            die "Failed to send to user (API unavailable)"
+        fi
+        return 0
+    fi
+
+    # Single-line entry without body
+    ensure_mailbox
+    echo "[$timestamp] $from -> $to_addr: $subject" >> "$CMUX_MAILBOX"
+    ok "Sent: $subject -> $to"
+}
+
+cmd_done() {
+    local summary="${1:-}"
+    [[ -z "$summary" ]] && die "usage: mailbox done \"<summary>\""
+    cmd_quick "supervisor" "[DONE] $summary"
+}
+
+cmd_blocked() {
+    local issue="${1:-}"
+    [[ -z "$issue" ]] && die "usage: mailbox blocked \"<issue>\""
+    cmd_quick "supervisor" "[BLOCKED] $issue"
+}
+
+cmd_status() {
+    local update="${1:-}"
+    [[ -z "$update" ]] && die "usage: mailbox status \"<update>\""
+    cmd_quick "supervisor" "[STATUS] $update"
+}
+
+cmd_read() {
+    # Show recent mailbox entries
+    local lines="${1:-10}"
+
+    if [[ ! -f "$CMUX_MAILBOX" ]]; then
+        echo -e "${DIM}Mailbox is empty${NC}"
+        return 0
+    fi
+
+    echo -e "${CYAN}Recent mailbox entries:${NC}"
+    echo ""
+    tail -n "$lines" "$CMUX_MAILBOX" | while IFS= read -r line; do
+        echo -e "${DIM}$line${NC}"
+    done
+}
+
+cmd_help() {
+    cat << 'EOF'
+mailbox - Send messages to other agents or the user
+
+USAGE:
+    mailbox <command> [arguments]
+
+COMMANDS:
+    send <to> "<subject>" "<body>"   Send with body file attached
+    quick <to> "<subject>"           Quick notification (no body)
+    done "<summary>"                 Tell supervisor: [DONE] summary
+    blocked "<issue>"                Tell supervisor: [BLOCKED] issue
+    status "<update>"                Tell supervisor: [STATUS] update
+    read [lines]                     Show recent mailbox entries
+    help                             Show this help message
+
+RECIPIENTS:
+    supervisor, worker-auth          Adds session prefix automatically
+    cmux-feature:worker-a            Full session:window address
+    user                             Goes to dashboard API
+
+EXAMPLES:
+    # Send detailed analysis
+    mailbox send worker-auth "JWT Review" "Found issues in token.py..."
+
+    # Quick status update
+    mailbox quick supervisor "Starting auth work"
+
+    # Report done
+    mailbox done "JWT implementation complete, tests passing"
+
+    # Report blocked
+    mailbox blocked "Need API credentials"
+
+    # Progress update
+    mailbox status "Implementing token refresh logic"
+
+    # Message to user
+    mailbox send user "Bug Fixed" "Changed token.py line 42..."
+
+MAILBOX FORMAT:
+    Single-line entries:
+    [timestamp] from -> to: subject (body: path)
+
+    Example:
+    [2026-01-31T06:00:00Z] cmux:worker-auth -> cmux:supervisor: [DONE] JWT complete
+
+ENVIRONMENT:
+    CMUX_MAILBOX        Path to mailbox file (default: .cmux/mailbox)
+    CMUX_SESSION        tmux session name (default: cmux)
+    CMUX_AGENT_NAME     This agent's name (default: unknown)
+    CMUX_PORT           API server port (default: 8000)
+EOF
+}
+
+#-------------------------------------------------------------------------------
+# Main
+#-------------------------------------------------------------------------------
+
+main() {
+    local cmd="${1:-help}"
+    shift || true
+
+    case "$cmd" in
+        send)    cmd_send "$@" ;;
+        quick)   cmd_quick "$@" ;;
+        done)    cmd_done "$@" ;;
+        blocked) cmd_blocked "$@" ;;
+        status)  cmd_status "$@" ;;
+        read)    cmd_read "$@" ;;
+        help|--help|-h) cmd_help ;;
+        *)       die "unknown command: $cmd (try 'mailbox help')" ;;
+    esac
+}
+
+main "$@"

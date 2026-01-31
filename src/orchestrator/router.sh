@@ -1,4 +1,18 @@
 #!/usr/bin/env bash
+#===============================================================================
+# router.sh - Message Router Daemon
+#
+# Routes messages from the mailbox to target agents or the user.
+# Watches .cmux/mailbox for new single-line messages and delivers them.
+#
+# Mailbox Format (single line):
+#   [timestamp] from -> to: subject (body: path)
+#
+# Examples:
+#   [2026-01-31T06:00:00Z] cmux:worker-auth -> cmux:supervisor: [DONE] JWT complete
+#   [2026-01-31T06:00:00Z] cmux:worker -> user: Bug fixed (body: path/to/file.md)
+#===============================================================================
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,110 +26,101 @@ CMUX_PORT="${CMUX_PORT:-8000}"
 CMUX_ROUTER_LOG="${CMUX_ROUTER_LOG:-.cmux/router.log}"
 
 POLL_INTERVAL=2
-PROCESSED_MARKER=".cmux/.router_position"
+LINE_MARKER=".cmux/.router_line"
 
-# Log a routing event
+#-------------------------------------------------------------------------------
+# Logging
+#-------------------------------------------------------------------------------
+
 log_route() {
     local status="$1"
     local from="$2"
     local to="$3"
     local details="${4:-}"
-    echo "$(date -Iseconds) | $status | $from → $to | $details" >> "$CMUX_ROUTER_LOG"
+    echo "$(date -Iseconds) | $status | $from -> $to | $details" >> "$CMUX_ROUTER_LOG"
 }
 
-# Get list of all cmux sessions
-get_cmux_sessions() {
-    tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -E '^cmux(-|$)' || true
-}
+#-------------------------------------------------------------------------------
+# Position Tracking (line-based)
+#-------------------------------------------------------------------------------
 
-get_last_position() {
-    if [[ -f "$PROCESSED_MARKER" ]]; then
-        cat "$PROCESSED_MARKER"
+get_last_line() {
+    if [[ -f "$LINE_MARKER" ]]; then
+        cat "$LINE_MARKER"
     else
         echo "0"
     fi
 }
 
-save_position() {
-    echo "$1" > "$PROCESSED_MARKER"
+save_line() {
+    echo "$1" > "$LINE_MARKER"
 }
 
-parse_message() {
-    local content="$1"
+#-------------------------------------------------------------------------------
+# Session Discovery
+#-------------------------------------------------------------------------------
 
-    # Extract fields from message format
-    local timestamp from to msg_type msg_id body
-
-    timestamp=$(echo "$content" | grep "^timestamp:" | cut -d: -f2- | xargs)
-    from=$(echo "$content" | grep "^from:" | cut -d: -f2- | xargs)
-    to=$(echo "$content" | grep "^to:" | cut -d: -f2- | xargs)
-    msg_type=$(echo "$content" | grep "^type:" | cut -d: -f2- | xargs)
-    msg_id=$(echo "$content" | grep "^id:" | cut -d: -f2- | xargs)
-
-    # Body is everything after the second ---
-    body=$(echo "$content" | sed -n '/^---$/,/^---$/!p' | tail -n +2)
-
-    echo "$from|$to|$msg_type|$msg_id|$body"
+get_cmux_sessions() {
+    tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -E '^cmux(-|$)' || true
 }
 
-route_to_agent() {
-    local to="$1"
-    local content="$2"
-    local from="${3:-unknown}"
-    local msg_type="${4:-mailbox}"
+#-------------------------------------------------------------------------------
+# Message Parsing (Single-Line Format)
+#-------------------------------------------------------------------------------
 
-    # Store message in database and broadcast via WebSocket
-    # This makes agent-to-agent messages visible in the UI
-    store_message_via_api "$from" "$to" "$content" "$msg_type"
+# Parse: [timestamp] from -> to: subject (body: path)
+parse_line() {
+    local line="$1"
 
-    if [[ "$to" == "user" ]]; then
-        # Route to FastAPI server endpoint for user display
-        if curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/user" \
-            -H "Content-Type: application/json" \
-            -d "{\"content\": $(echo "$content" | jq -Rs .), \"from_agent\": \"$from\"}" \
-            >/dev/null 2>&1; then
-            log_route "DELIVERED" "$from" "user" "via API"
-            log_info "Routed message to user via API"
+    # Regex: [timestamp] from -> to: subject (body: path)?
+    # Uses extended regex for cleaner matching
+    if [[ "$line" =~ ^\[([^\]]+)\]\ ([^\ ]+)\ -\>\ ([^:]+):\ (.+)$ ]]; then
+        local timestamp="${BASH_REMATCH[1]}"
+        local from="${BASH_REMATCH[2]}"
+        local to="${BASH_REMATCH[3]}"
+        local rest="${BASH_REMATCH[4]}"
+
+        # Extract body path if present: (body: path)
+        local subject body_path
+        if [[ "$rest" =~ \(body:\ (.+)\)$ ]]; then
+            body_path="${BASH_REMATCH[1]}"
+            # Remove (body: path) from subject
+            subject="${rest% (body:*}"
         else
-            log_route "FAILED" "$from" "user" "API error"
+            subject="$rest"
+            body_path=""
         fi
+
+        # Output: timestamp|from|to|subject|body_path
+        echo "$timestamp|$from|$to|$subject|$body_path"
         return 0
     fi
 
-    # Check all cmux sessions for the target agent
-    local sessions
-    sessions=$(get_cmux_sessions)
-
-    while IFS= read -r session; do
-        [[ -z "$session" ]] && continue
-
-        if tmux_window_exists "$session" "$to"; then
-            tmux_send_keys "$session" "$to" "$content"
-            log_route "DELIVERED" "$from" "$to" "session=$session"
-            log_info "Routed message to agent: $to in session: $session"
-            return 0
-        fi
-    done <<< "$sessions"
-
-    # Agent not found in any session
-    log_route "FAILED" "$from" "$to" "agent not found"
-    log_status "BLOCKED" "Cannot route to unknown agent: $to"
+    # No match
     return 1
 }
 
-# Store message in database via API for UI visibility
+#-------------------------------------------------------------------------------
+# Message Storage & Broadcast
+#-------------------------------------------------------------------------------
+
 store_message_via_api() {
     local from="$1"
     local to="$2"
     local content="$3"
     local msg_type="${4:-mailbox}"
 
+    # Extract agent name from session:agent format
+    local from_agent="${from##*:}"
+    local to_agent="${to##*:}"
+    [[ "$to" == "user" ]] && to_agent="user"
+
     # Call internal API to store message and broadcast to WebSocket
     curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/internal" \
         -H "Content-Type: application/json" \
         -d "{
-            \"from_agent\": \"$from\",
-            \"to_agent\": \"$to\",
+            \"from_agent\": \"$from_agent\",
+            \"to_agent\": \"$to_agent\",
             \"content\": $(echo "$content" | jq -Rs .),
             \"type\": \"$msg_type\"
         }" >/dev/null 2>&1 || {
@@ -123,77 +128,136 @@ store_message_via_api() {
         }
 }
 
+#-------------------------------------------------------------------------------
+# Message Routing
+#-------------------------------------------------------------------------------
+
+route_message() {
+    local from="$1"
+    local to="$2"
+    local subject="$3"
+    local body_path="$4"
+
+    # Build content for storage
+    local content="$subject"
+    [[ -n "$body_path" ]] && content="$subject (see: $body_path)"
+
+    # Store in DB + broadcast to frontend
+    store_message_via_api "$from" "$to" "$content" "mailbox"
+
+    # Route to user via API (already handled by store, but also send direct)
+    if [[ "$to" == "user" ]]; then
+        local from_agent="${from##*:}"
+        curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/user" \
+            -H "Content-Type: application/json" \
+            -d "{\"content\": $(echo "$content" | jq -Rs .), \"from_agent\": \"$from_agent\"}" \
+            >/dev/null 2>&1 || true
+        log_route "DELIVERED" "$from" "user" "via API"
+        return 0
+    fi
+
+    # Parse session:window from address
+    local session window
+    if [[ "$to" == *":"* ]]; then
+        session="${to%%:*}"
+        window="${to#*:}"
+    else
+        session="$CMUX_SESSION"
+        window="$to"
+    fi
+
+    # Check all cmux sessions for the target agent
+    local sessions
+    sessions=$(get_cmux_sessions)
+    local delivered=false
+
+    while IFS= read -r sess; do
+        [[ -z "$sess" ]] && continue
+
+        # Try exact session match first
+        if [[ "$sess" == "$session" ]] && tmux_window_exists "$sess" "$window"; then
+            # Inject notification to target agent's tmux
+            tmux_send_keys "$sess" "$window" "[$from] $subject"
+            [[ -n "$body_path" ]] && tmux_send_keys "$sess" "$window" "  -> $body_path"
+            log_route "DELIVERED" "$from" "$to" "session=$sess"
+            delivered=true
+            break
+        fi
+    done <<< "$sessions"
+
+    # If not found in exact session, try any cmux session
+    if [[ "$delivered" == "false" ]]; then
+        while IFS= read -r sess; do
+            [[ -z "$sess" ]] && continue
+            if tmux_window_exists "$sess" "$window"; then
+                tmux_send_keys "$sess" "$window" "[$from] $subject"
+                [[ -n "$body_path" ]] && tmux_send_keys "$sess" "$window" "  -> $body_path"
+                log_route "DELIVERED" "$from" "$to" "session=$sess (fallback)"
+                delivered=true
+                break
+            fi
+        done <<< "$sessions"
+    fi
+
+    if [[ "$delivered" == "false" ]]; then
+        log_route "FAILED" "$from" "$to" "window not found"
+        return 1
+    fi
+
+    return 0
+}
+
+#-------------------------------------------------------------------------------
+# Mailbox Processing
+#-------------------------------------------------------------------------------
+
 process_mailbox() {
     if [[ ! -f "$CMUX_MAILBOX" ]]; then
         return 0
     fi
 
-    local last_pos current_pos
-    last_pos=$(get_last_position)
-    current_pos=$(wc -c < "$CMUX_MAILBOX" | xargs)
+    # Get current line count
+    local last_line current_line
+    last_line=$(get_last_line)
+    current_line=$(wc -l < "$CMUX_MAILBOX" | xargs)
 
-    if ((current_pos <= last_pos)); then
+    if ((current_line <= last_line)); then
         return 0
     fi
 
-    # Read new content
-    local new_content
-    new_content=$(tail -c +"$((last_pos + 1))" "$CMUX_MAILBOX")
+    # Process each new line
+    local line_num=$((last_line + 1))
+    tail -n +"$line_num" "$CMUX_MAILBOX" | while IFS= read -r line; do
+        # Skip empty lines
+        [[ -z "$line" ]] && continue
 
-    # Process each message (separated by "--- MESSAGE ---")
-    local in_message=false
-    local current_message=""
-
-    while IFS= read -r line; do
-        if [[ "$line" == "--- MESSAGE ---" ]]; then
-            if [[ -n "$current_message" ]]; then
-                # Process previous message
-                local parsed
-                parsed=$(parse_message "$current_message")
-
-                local from_agent to msg_type
-                from_agent=$(echo "$parsed" | cut -d'|' -f1)
-                to=$(echo "$parsed" | cut -d'|' -f2)
-                msg_type=$(echo "$parsed" | cut -d'|' -f3)
-                msg_type="${msg_type:-mailbox}"
-
-                if [[ -n "$to" ]]; then
-                    route_to_agent "$to" "$current_message" "$from_agent" "$msg_type"
-                fi
-            fi
-            current_message=""
-            in_message=true
-        elif $in_message; then
-            current_message+="$line"$'\n'
-        fi
-    done <<< "$new_content"
-
-    # Process last message if any
-    if [[ -n "$current_message" ]]; then
+        # Parse the single-line format
         local parsed
-        parsed=$(parse_message "$current_message")
-        local from_agent to msg_type
-        from_agent=$(echo "$parsed" | cut -d'|' -f1)
-        to=$(echo "$parsed" | cut -d'|' -f2)
-        msg_type=$(echo "$parsed" | cut -d'|' -f3)
-        msg_type="${msg_type:-mailbox}"
-        if [[ -n "$to" ]]; then
-            route_to_agent "$to" "$current_message" "$from_agent" "$msg_type"
+        if parsed=$(parse_line "$line"); then
+            IFS='|' read -r timestamp from to subject body_path <<< "$parsed"
+            log_info "Routing: $from -> $to: $subject"
+            route_message "$from" "$to" "$subject" "$body_path"
+        else
+            log_route "SKIP" "unknown" "unknown" "invalid format: ${line:0:50}..."
         fi
-    fi
+    done
 
-    save_position "$current_pos"
+    save_line "$current_line"
 }
 
+#-------------------------------------------------------------------------------
+# Main
+#-------------------------------------------------------------------------------
+
 main() {
-    log_info "Message router started"
+    log_info "Message router started (single-line format)"
 
     # Ensure directories exist
-    mkdir -p "$(dirname "$PROCESSED_MARKER")"
+    mkdir -p "$(dirname "$LINE_MARKER")"
     mkdir -p "$(dirname "$CMUX_ROUTER_LOG")"
 
     # Log startup
-    log_route "STARTUP" "router" "all" "Router daemon started"
+    log_route "STARTUP" "router" "all" "Router daemon started (v2 - single-line format)"
 
     while true; do
         process_mailbox
