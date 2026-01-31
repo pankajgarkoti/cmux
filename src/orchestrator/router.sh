@@ -73,8 +73,12 @@ parse_line() {
     local line="$1"
 
     # Regex: [timestamp] from -> to: subject (body: path)?
-    # Uses extended regex for cleaner matching
-    if [[ "$line" =~ ^\[([^\]]+)\]\ ([^\ ]+)\ -\>\ ([^:]+):\ (.+)$ ]]; then
+    # Note on address format: supports "agent" or "session:agent" (one colon max)
+    # The "to" field uses alternation: ([^\ :]+:[^\ :]+|[^\ :]+)
+    #   - Either: session:agent (two parts separated by colon, neither contains space/colon)
+    #   - Or: just agent (single part with no colon)
+    # This ensures we match "cmux:supervisor" correctly, not just "cmux"
+    if [[ "$line" =~ ^\[([^\]]+)\]\ ([^\ ]+)\ -\>\ ([^\ :]+:[^\ :]+|[^\ :]+):\ (.+)$ ]]; then
         local timestamp="${BASH_REMATCH[1]}"
         local from="${BASH_REMATCH[2]}"
         local to="${BASH_REMATCH[3]}"
@@ -91,10 +95,16 @@ parse_line() {
             body_path=""
         fi
 
+        # Log successful parse for debugging
+        log_route "PARSED" "$from" "$to" "subject=${subject:0:40}"
+
         # Output: timestamp|from|to|subject|body_path
         echo "$timestamp|$from|$to|$subject|$body_path"
         return 0
     fi
+
+    # Log parse failure for debugging
+    log_route "PARSE_FAIL" "unknown" "unknown" "line=${line:0:60}"
 
     # No match
     return 1
