@@ -27,7 +27,20 @@ async def get_messages(
 
 @router.post("/user")
 async def send_to_user(message: UserMessage):
-    """Endpoint for supervisor to send message to user (displayed in dashboard)."""
+    """Endpoint for agents to send messages to user (displayed in dashboard).
+
+    HOW SUPERVISOR/AGENT REPLIES REACH THE FRONTEND:
+    - Agent text output to terminal stays in tmux only (not automatic)
+    - To display a message in the dashboard, agents must explicitly use:
+        ./tools/mailbox send user "subject" "body"
+      or:
+        ./tools/mailbox quick user "message"
+    - This calls the API directly for user-targeted messages
+    - The router.sh daemon also routes "-> user" messages through this endpoint
+
+    This is by design: explicit mailbox communication keeps the dashboard
+    focused on intentional agent-to-user messages, not terminal noise.
+    """
     msg = Message(
         id=str(uuid.uuid4()),
         timestamp=datetime.now(timezone.utc),
