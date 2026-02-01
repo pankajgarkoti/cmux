@@ -1,7 +1,12 @@
 import asyncio
+import tempfile
+import os
 from typing import List, Optional
 
 from ..config import settings
+
+# Threshold for using load-buffer instead of send-keys (4KB)
+LONG_MESSAGE_THRESHOLD = 4096
 
 
 class TmuxService:
@@ -70,26 +75,57 @@ class TmuxService:
     async def send_input(self, window: str, text: str, session: Optional[str] = None):
         """Send text input to a tmux window.
 
-        IMPORTANT: Uses the two-step send pattern that is essential for
-        reliable tmux input - send text literally, then Enter separately.
-        Includes a small delay for multiline paste to be processed by Claude Code.
+        For short messages: Uses send-keys -l (literal) then Enter separately.
+        For long messages (>4KB): Uses load-buffer/paste-buffer via temp file
+        to bypass ARG_MAX command-line limits.
         """
         session = session or self.default_session
         target = f"{session}:{window}"
-        # Step 1: Send text LITERALLY (no Enter) using -l flag
-        await self._run_command([
-            "tmux", "send-keys", "-t", target, "-l", text
-        ])
-        # Step 2: Small delay for multiline paste to be processed
+
+        if len(text) > LONG_MESSAGE_THRESHOLD:
+            # Long message: use load-buffer/paste-buffer via temp file
+            await self._send_via_buffer(target, text)
+        else:
+            # Short message: use send-keys -l
+            await self._run_command([
+                "tmux", "send-keys", "-t", target, "-l", text
+            ])
+
+        # Delay for multiline paste to be processed
         # Claude Code shows "[Pasted text #N +X lines]" and needs time to register
         if "\n" in text:
             await asyncio.sleep(0.15)  # 150ms delay for multiline
         else:
             await asyncio.sleep(0.05)  # 50ms for single line
-        # Step 3: Send Enter SEPARATELY
+
+        # Send Enter SEPARATELY to submit
         await self._run_command([
             "tmux", "send-keys", "-t", target, "Enter"
         ])
+
+    async def _send_via_buffer(self, target: str, text: str):
+        """Send long text via tmux load-buffer/paste-buffer to bypass ARG_MAX."""
+        # Create temp file with the message content
+        fd, tmp_path = tempfile.mkstemp(prefix="cmux_msg_", suffix=".txt")
+        try:
+            os.write(fd, text.encode("utf-8"))
+            os.close(fd)
+
+            # Load into tmux buffer
+            await self._run_command([
+                "tmux", "load-buffer", tmp_path
+            ])
+
+            # Paste buffer into target pane
+            await self._run_command([
+                "tmux", "paste-buffer", "-t", target
+            ])
+        finally:
+            # Clean up temp file
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
     async def send_interrupt(self, window: str, session: Optional[str] = None):
         """Send Ctrl+C to a tmux window."""
