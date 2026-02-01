@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Body
 from datetime import datetime, timezone
 from typing import List
 import asyncio
@@ -11,6 +11,7 @@ from ..models.message import Message, MessageType
 from ..services.agent_manager import agent_manager
 from ..services.tmux_service import tmux_service
 from ..services.mailbox import mailbox_service
+from ..services.agent_registry import agent_registry
 from ..services.conversation_store import (
     conversation_store,
     ArchivedAgent,
@@ -191,3 +192,25 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logger.warning(f"WebSocket error for {client_id}: {e}")
         await ws_manager.disconnect(client_id)
+
+
+@router.post("/register")
+async def register_agent(
+    agent_id: str = Body(...),
+    agent_type: str = Body("worker"),
+    created_by: str = Body("system")
+):
+    """Internal endpoint for registering agents from shell scripts."""
+    agent_registry.register(agent_id, {
+        "type": agent_type,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": created_by
+    })
+    return {"registered": agent_id}
+
+
+@router.delete("/register/{agent_id:path}")
+async def unregister_agent(agent_id: str):
+    """Internal endpoint for unregistering agents."""
+    agent_registry.unregister(agent_id)
+    return {"unregistered": agent_id}

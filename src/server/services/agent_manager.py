@@ -1,8 +1,10 @@
 from typing import List, Optional
+from datetime import datetime, timezone
 
 from ..config import settings
 from ..models.agent import Agent, AgentType, AgentStatus
 from .tmux_service import tmux_service
+from .agent_registry import agent_registry
 
 
 class AgentManager:
@@ -54,6 +56,10 @@ class AgentManager:
                 agents.append(agent)
                 self._agents[agent_id] = agent
 
+        # Clean up stale registry entries
+        all_windows = {a.id for a in agents}
+        agent_registry.cleanup_stale(all_windows)
+
         return agents
 
     async def get_agent(self, agent_id: str) -> Optional[Agent]:
@@ -90,6 +96,15 @@ class AgentManager:
             status=AgentStatus.PENDING
         )
         self._agents[agent_id] = agent
+
+        # Register in persistent registry
+        agent_registry.register(agent_id, {
+            "type": "worker",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "session": session,
+            "window": name
+        })
+
         return agent
 
     async def remove_agent(self, agent_id: str) -> bool:
@@ -107,8 +122,11 @@ class AgentManager:
 
         session, window = self.parse_agent_id(agent_id)
         success = await tmux_service.kill_window(window, session)
-        if success and agent_id in self._agents:
-            del self._agents[agent_id]
+        if success:
+            if agent_id in self._agents:
+                del self._agents[agent_id]
+            # Unregister from persistent registry
+            agent_registry.unregister(agent_id)
         return success
 
     async def send_message_to_agent(self, agent_id: str, message: str) -> bool:
