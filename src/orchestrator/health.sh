@@ -26,6 +26,64 @@ check_server_health() {
     fi
 }
 
+check_frontend_health() {
+    local dist_dir="${CMUX_PROJECT_ROOT}/src/frontend/dist"
+
+    # Check index.html exists
+    [[ ! -f "${dist_dir}/index.html" ]] && return 1
+
+    # Check assets directory has at least one JS file
+    local js_count
+    js_count=$(find "${dist_dir}/assets" -name '*.js' -type f 2>/dev/null | wc -l | xargs)
+    ((js_count == 0)) && return 1
+
+    # Check files are actually servable via HTTP
+    if ! curl -sf "http://localhost:${CMUX_PORT}/" -o /dev/null 2>&1; then
+        return 1
+    fi
+
+    return 0
+}
+
+attempt_frontend_recovery() {
+    log_status "IN_PROGRESS" "Attempting frontend rebuild..."
+
+    local frontend_dir="${CMUX_PROJECT_ROOT}/src/frontend"
+    local dist_dir="${frontend_dir}/dist"
+    local dist_new="${frontend_dir}/dist_new"
+    local dist_old="${frontend_dir}/dist_old"
+
+    cd "$frontend_dir"
+
+    # Try build to temp directory
+    if npm run build -- --outDir "$dist_new" >/dev/null 2>&1; then
+        # Atomic swap
+        rm -rf "$dist_old" 2>/dev/null || true
+        [[ -d "$dist_dir" ]] && mv "$dist_dir" "$dist_old"
+        mv "$dist_new" "$dist_dir"
+        rm -rf "$dist_old" 2>/dev/null || true
+
+        log_status "COMPLETE" "Frontend rebuilt successfully"
+        return 0
+    fi
+
+    # Build failed - try npm ci first
+    log_info "Build failed, running npm ci..."
+    if npm ci --silent 2>/dev/null && npm run build -- --outDir "$dist_new" >/dev/null 2>&1; then
+        rm -rf "$dist_old" 2>/dev/null || true
+        [[ -d "$dist_dir" ]] && mv "$dist_dir" "$dist_old"
+        mv "$dist_new" "$dist_dir"
+        rm -rf "$dist_old" 2>/dev/null || true
+
+        log_status "COMPLETE" "Frontend rebuilt after npm ci"
+        return 0
+    fi
+
+    rm -rf "$dist_new" 2>/dev/null || true
+    log_status "FAILED" "Frontend rebuild failed"
+    return 1
+}
+
 # Mark current commit as healthy
 mark_healthy() {
     local commit
