@@ -30,11 +30,13 @@ A hierarchical team where a Tech Lead makes technical decisions and workers impl
 
 ## Roles
 
-| Role | Reports To | Responsibility |
-|------|------------|----------------|
-| Supervisor | User | Outcome owner, delegates to Tech Lead |
-| Tech Lead | Supervisor | Technical decisions, code review, worker coordination |
-| Workers | Tech Lead | Implementation |
+| Role | Reports To | Role Template | Responsibility |
+|------|------------|---------------|----------------|
+| Supervisor | User | — | Outcome owner, delegates to Tech Lead |
+| Tech Lead | Supervisor | `docs/templates/roles/TECH_LEAD.md` | Technical decisions, code review, worker coordination |
+| Backend Worker | Tech Lead | `docs/templates/roles/FEATURE_BACKEND.md` | Backend implementation |
+| Frontend Worker | Tech Lead | `docs/templates/roles/FEATURE_FRONTEND.md` | Frontend implementation |
+| Tester | Tech Lead | `docs/templates/roles/TESTER.md` | Validation and testing |
 
 ## Communication Graph
 
@@ -99,8 +101,9 @@ Ready for final approval.
 ./tools/workers spawn "tech-lead" "Read docs/templates/roles/TECH_LEAD.md. Your task: [FEATURE]. You own technical decisions. Spawn workers as needed."
 
 # Tech lead spawns workers
-./tools/workers spawn "worker-schema" "Your task: [SPECIFIC TASK]. Report to me when complete. Do not proceed without my review."
-./tools/workers spawn "worker-api" "Your task: [SPECIFIC TASK]. Wait for schema worker to complete."
+./tools/workers spawn "worker-backend" "Read docs/templates/roles/FEATURE_BACKEND.md. Your task: [BACKEND TASK]. Report to me when complete. Do not proceed without my review."
+./tools/workers spawn "worker-frontend" "Read docs/templates/roles/FEATURE_FRONTEND.md. Your task: [FRONTEND TASK]. Wait for backend API contract."
+./tools/workers spawn "worker-tester" "Read docs/templates/roles/TESTER.md. Your task: Test [FEATURE] when implementation is ready."
 ```
 
 ## When NOT to Use
