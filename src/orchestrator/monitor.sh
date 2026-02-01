@@ -206,11 +206,40 @@ cleanup() {
         kill "$ROUTER_PID" 2>/dev/null && printf "  ${GREEN}✓${NC} Router stopped\n"
     fi
 
-    # Kill FastAPI server
-    local server_pid
-    server_pid=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
-    if [[ -n "$server_pid" ]]; then
-        kill "$server_pid" 2>/dev/null && printf "  ${GREEN}✓${NC} FastAPI server stopped\n"
+    # Kill FastAPI server with SIGTERM → SIGKILL escalation
+    local pids
+    pids=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
+    if [[ -n "$pids" ]]; then
+        # SIGTERM first
+        for pid in $pids; do
+            kill "$pid" 2>/dev/null && printf "  ${GREEN}✓${NC} Sent SIGTERM to PID $pid\n"
+        done
+
+        # Wait up to 3 seconds for graceful shutdown
+        local wait_count=0
+        while lsof -ti tcp:"$CMUX_PORT" >/dev/null 2>&1 && ((wait_count < 3)); do
+            sleep 1
+            ((wait_count++))
+        done
+
+        # SIGKILL any remaining
+        pids=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
+        if [[ -n "$pids" ]]; then
+            for pid in $pids; do
+                kill -9 "$pid" 2>/dev/null && printf "  ${YELLOW}!${NC} Force killed PID $pid\n"
+            done
+        fi
+    fi
+
+    # Fallback: kill by process name
+    pkill -f "uvicorn.*src.server.main:app" 2>/dev/null || true
+
+    # Verify port is free
+    sleep 1
+    if lsof -ti tcp:"$CMUX_PORT" >/dev/null 2>&1; then
+        printf "  ${YELLOW}!${NC} Port $CMUX_PORT still in use\n"
+    else
+        printf "  ${GREEN}✓${NC} FastAPI server stopped\n"
     fi
 
     # Kill all cmux sessions (main + spawned)

@@ -155,11 +155,33 @@ rollback_and_restart() {
 }
 
 stop_server() {
-    local pid
-    pid=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
-    if [[ -n "$pid" ]]; then
-        kill "$pid" 2>/dev/null || true
+    local pids
+    pids=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
+
+    if [[ -n "$pids" ]]; then
+        # SIGTERM first (graceful shutdown)
+        for pid in $pids; do
+            kill "$pid" 2>/dev/null && log_info "Sent SIGTERM to PID $pid"
+        done
+
+        # Wait up to 5 seconds for graceful shutdown
+        local wait_count=0
+        while lsof -ti tcp:"$CMUX_PORT" >/dev/null 2>&1 && ((wait_count < 5)); do
+            sleep 1
+            ((wait_count++))
+        done
+
+        # SIGKILL any remaining
+        pids=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
+        if [[ -n "$pids" ]]; then
+            for pid in $pids; do
+                kill -9 "$pid" 2>/dev/null && log_info "Force killed PID $pid"
+            done
+        fi
     fi
+
+    # Fallback: kill by process name
+    pkill -f "uvicorn.*src.server.main:app" 2>/dev/null || true
 }
 
 start_server() {

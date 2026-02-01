@@ -92,21 +92,66 @@ EOF
 cmd_stop() {
     log_info "Stopping cmux system..."
 
-    # Stop FastAPI server
-    local pid
-    pid=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
-    if [[ -n "$pid" ]]; then
-        kill "$pid" 2>/dev/null || true
+    local STOP_TIMEOUT=15
+
+    # Start timeout watchdog
+    (
+        sleep "$STOP_TIMEOUT"
+        log_fail "Stop timed out - forcing kill"
+        pkill -9 -f "uvicorn.*src.server.main:app" 2>/dev/null || true
+        local force_pids
+        force_pids=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
+        [[ -n "$force_pids" ]] && echo "$force_pids" | xargs kill -9 2>/dev/null || true
+    ) &
+    local timeout_pid=$!
+
+    # Get all PIDs holding the port
+    local pids
+    pids=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
+
+    if [[ -n "$pids" ]]; then
+        # SIGTERM first (graceful shutdown) - log each kill
+        for pid in $pids; do
+            kill "$pid" 2>/dev/null && log_info "Sent SIGTERM to PID $pid"
+        done
+
+        # Wait up to 5 seconds for graceful shutdown
+        local wait_count=0
+        while lsof -ti tcp:"$CMUX_PORT" >/dev/null 2>&1 && ((wait_count < 5)); do
+            sleep 1
+            ((wait_count++))
+        done
+
+        # SIGKILL any remaining
+        pids=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
+        if [[ -n "$pids" ]]; then
+            for pid in $pids; do
+                kill -9 "$pid" 2>/dev/null && log_info "Force killed PID $pid"
+            done
+        fi
+    fi
+
+    # Fallback: kill by process name (catches orphan workers)
+    pkill -f "uvicorn.*src.server.main:app" 2>/dev/null || true
+
+    # Cancel timeout watchdog
+    kill "$timeout_pid" 2>/dev/null || true
+    wait "$timeout_pid" 2>/dev/null || true
+
+    # Verify port is free
+    sleep 1
+    if lsof -ti tcp:"$CMUX_PORT" >/dev/null 2>&1; then
+        printf "${YELLOW}!${NC} Port $CMUX_PORT still in use (may need: kill -9 \$(lsof -ti tcp:$CMUX_PORT))\n"
+    else
         printf "${GREEN}✓${NC} FastAPI server stopped\n"
     fi
 
-    # Kill main tmux session
+    # Kill tmux sessions (unchanged from original)
     if tmux has-session -t "$CMUX_SESSION" 2>/dev/null; then
         tmux kill-session -t "$CMUX_SESSION"
         printf "${GREEN}✓${NC} tmux session killed\n"
     fi
 
-    # Kill any spawned worker sessions
     for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep "^cmux-" || true); do
         tmux kill-session -t "$sess" 2>/dev/null || true
         printf "${GREEN}✓${NC} Killed spawned session: $sess\n"
