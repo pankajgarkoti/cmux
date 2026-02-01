@@ -192,6 +192,21 @@ start_router() {
 }
 
 #───────────────────────────────────────────────────────────────────────────────
+# Log Watcher (runs in background)
+#───────────────────────────────────────────────────────────────────────────────
+
+start_log_watcher() {
+    if [[ -n "${LOG_WATCHER_PID:-}" ]] && kill -0 "$LOG_WATCHER_PID" 2>/dev/null; then
+        return 0  # Already running
+    fi
+
+    log_step "Starting log watcher..."
+    "${SCRIPT_DIR}/log-watcher.sh" &
+    LOG_WATCHER_PID=$!
+    log_ok "Log watcher started (PID: $LOG_WATCHER_PID)"
+}
+
+#───────────────────────────────────────────────────────────────────────────────
 # Health Monitor Dashboard
 #───────────────────────────────────────────────────────────────────────────────
 
@@ -210,6 +225,11 @@ cleanup() {
     # Kill router background process
     if [[ -n "${ROUTER_PID:-}" ]]; then
         kill "$ROUTER_PID" 2>/dev/null && printf "  ${GREEN}✓${NC} Router stopped\n"
+    fi
+
+    # Kill log watcher background process
+    if [[ -n "${LOG_WATCHER_PID:-}" ]]; then
+        kill "$LOG_WATCHER_PID" 2>/dev/null && printf "  ${GREEN}✓${NC} Log watcher stopped\n"
     fi
 
     # Kill FastAPI server with SIGTERM → SIGKILL escalation
@@ -392,7 +412,11 @@ main() {
     start_router
     echo ""
 
-    # Phase 4: Run health dashboard (foreground)
+    # Phase 4: Start log watcher in background
+    start_log_watcher
+    echo ""
+
+    # Phase 5: Run health dashboard (foreground)
     log_ok "Entering dashboard mode..."
     sleep 2
     run_dashboard
