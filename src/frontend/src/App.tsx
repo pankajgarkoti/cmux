@@ -7,6 +7,7 @@ import { ChatPanel } from './components/chat/ChatPanel';
 import { ActivityTimeline } from './components/activity/ActivityTimeline';
 import { StatusBar } from './components/status/StatusBar';
 import { TooltipProvider } from './components/ui/tooltip';
+import { OnboardingModal } from './components/onboarding/OnboardingModal';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useAgentEvents } from './hooks/useAgentEvents';
 import { useThemeStore } from './stores/themeStore';
@@ -43,6 +44,7 @@ function Dashboard() {
         right={<ActivityTimeline />}
       />
       <StatusBar />
+      <OnboardingModal />
     </Layout>
   );
 }
