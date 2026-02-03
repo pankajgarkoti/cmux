@@ -63,20 +63,20 @@ test_simple="[2026-01-31T18:54:00+05:30] cmux:worker -> user: Hello"
 
 ### Messages That APPEAR in Dashboard
 
-| Condition | Example | Reason |
-|-----------|---------|--------|
-| Direct API calls to `/api/messages/user` | `./tools/mailbox send user "Hello"` | Bypasses router, goes direct to API |
-| Messages to `user` via router | When router regex works | `user` has no colon |
-| Messages sent via `POST /api/agents/{id}/message` | User sending to agent | Direct API, no router |
-| Old multi-line messages already in mailbox | Historical messages | May have been routed before format change |
+| Condition                                         | Example                             | Reason                                    |
+| ------------------------------------------------- | ----------------------------------- | ----------------------------------------- |
+| Direct API calls to `/api/messages/user`          | `./tools/mailbox send user "Hello"` | Bypasses router, goes direct to API       |
+| Messages to `user` via router                     | When router regex works             | `user` has no colon                       |
+| Messages sent via `POST /api/agents/{id}/message` | User sending to agent               | Direct API, no router                     |
+| Old multi-line messages already in mailbox        | Historical messages                 | May have been routed before format change |
 
 ### Messages That DON'T APPEAR in Dashboard
 
-| Condition | Example | Reason |
-|-----------|---------|--------|
-| Messages with session:agent addresses | `cmux:supervisor`, `cmux:worker-auth` | Colon in "to" breaks regex |
-| Agent-to-agent messages | worker-a -> worker-b | Both use session:window format |
-| Status/Done/Blocked to supervisor | `./tools/mailbox done "message"` | Supervisor address is `cmux:supervisor` |
+| Condition                             | Example                               | Reason                                  |
+| ------------------------------------- | ------------------------------------- | --------------------------------------- |
+| Messages with session:agent addresses | `cmux:supervisor`, `cmux:worker-auth` | Colon in "to" breaks regex              |
+| Agent-to-agent messages               | worker-a -> worker-b                  | Both use session:window format          |
+| Status/Done/Blocked to supervisor     | `./tools/mailbox done "message"`      | Supervisor address is `cmux:supervisor` |
 
 ---
 
@@ -118,11 +118,13 @@ User clicks Send in dashboard
 ### Change in `src/orchestrator/router.sh` line 77:
 
 **Before** (broken):
+
 ```bash
 if [[ "$line" =~ ^\[([^\]]+)\]\ ([^\ ]+)\ -\>\ ([^:]+):\ (.+)$ ]]; then
 ```
 
 **After** (fixed):
+
 ```bash
 if [[ "$line" =~ ^\[([^\]]+)\]\ ([^\ ]+)\ -\>\ ([^\ ]+):\ (.+)$ ]]; then
 ```
@@ -156,14 +158,14 @@ However, the `mailbox_service.py` still has methods that write this old format (
 
 ## Files Analyzed
 
-| File | Purpose | Finding |
-|------|---------|---------|
-| `src/orchestrator/router.sh:77` | Message routing | **BUG**: regex `[^:]+` for "to" field |
-| `tools/mailbox` | Agent messaging tool | Works correctly, produces valid format |
-| `src/server/routes/messages.py` | Message API endpoints | Works correctly |
-| `src/server/websocket/manager.py` | WebSocket broadcast | Works correctly |
-| `src/frontend/src/hooks/useWebSocket.ts` | Frontend message handling | Works correctly |
-| `src/server/services/mailbox.py` | Message storage | Has old multi-line format methods (unused?) |
+| File                                     | Purpose                   | Finding                                     |
+| ---------------------------------------- | ------------------------- | ------------------------------------------- |
+| `src/orchestrator/router.sh:77`          | Message routing           | **BUG**: regex `[^:]+` for "to" field       |
+| `tools/mailbox`                          | Agent messaging tool      | Works correctly, produces valid format      |
+| `src/server/routes/messages.py`          | Message API endpoints     | Works correctly                             |
+| `src/server/websocket/manager.py`        | WebSocket broadcast       | Works correctly                             |
+| `src/frontend/src/hooks/useWebSocket.ts` | Frontend message handling | Works correctly                             |
+| `src/server/services/mailbox.py`         | Message storage           | Has old multi-line format methods (unused?) |
 
 ---
 

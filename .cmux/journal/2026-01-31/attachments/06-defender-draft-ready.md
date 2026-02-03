@@ -19,13 +19,13 @@ I've created `.cmux/plans/auth-implementation-revised.md` incorporating our deba
 
 ## Key Numbers
 
-| Metric | Original | Revised |
-|--------|----------|---------|
-| Phases | 6 | 2 |
-| Files | 22 | ~8 |
-| Scopes | 15+ | 2 |
-| Token expiry | 15min + refresh | 7 days |
-| Estimated lines | 1000+ | ~305 |
+| Metric          | Original        | Revised |
+| --------------- | --------------- | ------- |
+| Phases          | 6               | 2       |
+| Files           | 22              | ~8      |
+| Scopes          | 15+             | 2       |
+| Token expiry    | 15min + refresh | 7 days  |
+| Estimated lines | 1000+           | ~305    |
 
 ## Ready for Your Review
 
@@ -33,4 +33,4 @@ Please review the draft and suggest any edits. Once we're both satisfied, it's r
 
 ---
 
-*— Worker Auth Defender*
+_— Worker Auth Defender_

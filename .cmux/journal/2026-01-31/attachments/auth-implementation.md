@@ -31,27 +31,29 @@ CMUX currently has **zero authentication** - all 34 API endpoints and WebSocket 
 
 ### 1.1 Attack Surface
 
-| Vulnerability | Risk Level | Impact |
-|--------------|------------|--------|
-| Zero authentication on all endpoints | 🔴 Critical | Full system control |
-| WebSocket without auth | 🔴 Critical | Real-time data hijacking |
-| Agent event forgery | 🔴 Critical | Fake tool execution events |
-| File system exposure | 🟠 High | Read all `.cmux` files |
-| Session manipulation | 🟠 High | Pause/terminate any session |
-| Journal access | 🟠 High | Read all decision logs |
-| Message forgery | 🟠 High | Inject messages as any agent |
-| Webhook injection | 🟡 Medium | Trigger arbitrary webhooks |
-| CORS allows all origins | 🟡 Medium | Cross-site requests |
+| Vulnerability                        | Risk Level  | Impact                       |
+| ------------------------------------ | ----------- | ---------------------------- |
+| Zero authentication on all endpoints | 🔴 Critical | Full system control          |
+| WebSocket without auth               | 🔴 Critical | Real-time data hijacking     |
+| Agent event forgery                  | 🔴 Critical | Fake tool execution events   |
+| File system exposure                 | 🟠 High     | Read all `.cmux` files       |
+| Session manipulation                 | 🟠 High     | Pause/terminate any session  |
+| Journal access                       | 🟠 High     | Read all decision logs       |
+| Message forgery                      | 🟠 High     | Inject messages as any agent |
+| Webhook injection                    | 🟡 Medium   | Trigger arbitrary webhooks   |
+| CORS allows all origins              | 🟡 Medium   | Cross-site requests          |
 
 ### 1.2 Current Architecture
 
 **Backend:**
+
 - FastAPI app in `src/server/main.py`
 - 7 route modules under `src/server/routes/`
 - CORS middleware allows `["*"]` origins
 - Pydantic Settings for configuration
 
 **Frontend:**
+
 - React + TypeScript + Vite
 - Plain `fetch()` API calls in `src/frontend/src/lib/api.ts`
 - Zustand stores for state management
@@ -59,16 +61,16 @@ CMUX currently has **zero authentication** - all 34 API endpoints and WebSocket 
 
 ### 1.3 Endpoints Inventory
 
-| Route Group | Endpoints | Current Auth |
-|-------------|-----------|--------------|
-| `/api/agents/` | 10 (incl. WebSocket) | None |
-| `/api/sessions/` | 9 | None |
-| `/api/messages/` | 2 | None |
-| `/api/journal/` | 6 | None |
-| `/api/filesystem/` | 2 | None |
-| `/api/agent-events/` | 3 | None |
-| `/api/webhooks/` | 2 | None |
-| **Total** | **34** | **None** |
+| Route Group          | Endpoints            | Current Auth |
+| -------------------- | -------------------- | ------------ |
+| `/api/agents/`       | 10 (incl. WebSocket) | None         |
+| `/api/sessions/`     | 9                    | None         |
+| `/api/messages/`     | 2                    | None         |
+| `/api/journal/`      | 6                    | None         |
+| `/api/filesystem/`   | 2                    | None         |
+| `/api/agent-events/` | 3                    | None         |
+| `/api/webhooks/`     | 2                    | None         |
+| **Total**            | **34**               | **None**     |
 
 ---
 
@@ -76,26 +78,29 @@ CMUX currently has **zero authentication** - all 34 API endpoints and WebSocket 
 
 ### 2.1 Options Evaluated
 
-| Method | Pros | Cons | Fit for CMUX |
-|--------|------|------|--------------|
-| **JWT** | Stateless, scalable, WebSocket-friendly | Token revocation complexity | ✅ Recommended |
-| Session-based | Simple, easy revocation | Requires session store, stateful | ❌ Less suitable |
-| OAuth 2.0 | Standard, third-party auth | Complex setup, overkill for single-user | 🟡 Future addition |
-| API Keys | Simple for M2M | Not suitable for frontend, no user context | 🟡 For webhooks only |
+| Method        | Pros                                    | Cons                                       | Fit for CMUX         |
+| ------------- | --------------------------------------- | ------------------------------------------ | -------------------- |
+| **JWT**       | Stateless, scalable, WebSocket-friendly | Token revocation complexity                | ✅ Recommended       |
+| Session-based | Simple, easy revocation                 | Requires session store, stateful           | ❌ Less suitable     |
+| OAuth 2.0     | Standard, third-party auth              | Complex setup, overkill for single-user    | 🟡 Future addition   |
+| API Keys      | Simple for M2M                          | Not suitable for frontend, no user context | 🟡 For webhooks only |
 
 ### 2.2 Recommended Approach: JWT + API Keys Hybrid
 
 **Primary:** JWT tokens for user/frontend authentication
+
 - Short-lived access tokens (15 minutes)
 - Long-lived refresh tokens (7 days)
 - Stateless validation
 
 **Secondary:** API keys for machine-to-machine
+
 - Webhook signature validation
 - Claude Code hook authentication
 - External service integration
 
 **Future:** OAuth 2.0 provider support
+
 - GitHub OAuth for team access
 - Pluggable provider architecture
 
@@ -118,16 +123,17 @@ CMUX currently has **zero authentication** - all 34 API endpoints and WebSocket 
 
 ### 3.1 Protection Levels
 
-| Level | Description | Endpoints |
-|-------|-------------|-----------|
-| **Public** | No auth required | `/api/webhooks/health` |
-| **API Key** | Machine authentication | `/api/webhooks/{source}`, `/api/agent-events` POST |
-| **User Auth** | JWT required | All other endpoints |
-| **Admin** | Special permissions | Session termination, system config |
+| Level         | Description            | Endpoints                                          |
+| ------------- | ---------------------- | -------------------------------------------------- |
+| **Public**    | No auth required       | `/api/webhooks/health`                             |
+| **API Key**   | Machine authentication | `/api/webhooks/{source}`, `/api/agent-events` POST |
+| **User Auth** | JWT required           | All other endpoints                                |
+| **Admin**     | Special permissions    | Session termination, system config                 |
 
 ### 3.2 Route-by-Route Protection
 
 #### Agents (`/api/agents/`)
+
 ```python
 GET  /                    → User Auth (agents:read)
 GET  /{agent_id}          → User Auth (agents:read)
@@ -142,6 +148,7 @@ WS   /ws                  → User Auth (query token)
 ```
 
 #### Sessions (`/api/sessions/`)
+
 ```python
 GET  /                    → User Auth (sessions:read)
 POST /                    → User Auth (sessions:create)
@@ -155,12 +162,14 @@ GET  /{session_id}/agents → User Auth (sessions:read)
 ```
 
 #### Messages (`/api/messages/`)
+
 ```python
 GET  /                    → User Auth (messages:read)
 POST /user                → Internal Only (agents only)
 ```
 
 #### Journal (`/api/journal/`)
+
 ```python
 GET  /                    → User Auth (journal:read)
 POST /entry               → User Auth (journal:write)
@@ -171,12 +180,14 @@ GET  /artifact/{filename} → User Auth (journal:read)
 ```
 
 #### Filesystem (`/api/filesystem/`)
+
 ```python
 GET  /                    → User Auth (filesystem:read)
 GET  /content             → User Auth (filesystem:read)
 ```
 
 #### Agent Events (`/api/agent-events/`)
+
 ```python
 POST /                    → API Key (hook authentication)
 GET  /                    → User Auth (events:read)
@@ -184,6 +195,7 @@ GET  /sessions            → User Auth (events:read)
 ```
 
 #### Webhooks (`/api/webhooks/`)
+
 ```python
 GET  /health              → Public
 POST /{source}            → API Key (per-source)
@@ -281,7 +293,7 @@ async def websocket_endpoint(
 ```typescript
 // src/frontend/src/hooks/useWebSocket.ts
 
-import { useAuthStore } from '../auth/authStore';
+import { useAuthStore } from "../auth/authStore";
 
 export function useWebSocket() {
   const { accessToken } = useAuthStore();
@@ -316,9 +328,9 @@ WebSocket connections may outlive access tokens. Strategy:
 // Client-side handling
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
-  if (data.type === 'token_expiring') {
+  if (data.type === "token_expiring") {
     const newToken = await refreshToken();
-    ws.send(JSON.stringify({ type: 'token_refresh', token: newToken }));
+    ws.send(JSON.stringify({ type: "token_refresh", token: newToken }));
   }
 };
 ```
@@ -332,8 +344,8 @@ ws.onmessage = (event) => {
 ```typescript
 // src/frontend/src/auth/authStore.ts
 
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 interface AuthState {
   user: User | null;
@@ -360,11 +372,11 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           const res = await fetch(`${API_BASE}/api/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, password }),
           });
-          if (!res.ok) throw new Error('Login failed');
+          if (!res.ok) throw new Error("Login failed");
           const data = await res.json();
           set({
             user: data.user,
@@ -393,8 +405,8 @@ export const useAuthStore = create<AuthState>()(
           return;
         }
         const res = await fetch(`${API_BASE}/api/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ refresh_token: refreshToken }),
         });
         if (!res.ok) {
@@ -405,8 +417,8 @@ export const useAuthStore = create<AuthState>()(
         set({ accessToken: data.access_token });
       },
     }),
-    { name: 'cmux-auth' }
-  )
+    { name: "cmux-auth" },
+  ),
 );
 ```
 
@@ -415,20 +427,20 @@ export const useAuthStore = create<AuthState>()(
 ```typescript
 // src/frontend/src/auth/fetchWithAuth.ts
 
-import { useAuthStore } from './authStore';
+import { useAuthStore } from "./authStore";
 
 export async function fetchWithAuth(
   url: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<Response> {
   const { accessToken, refresh, logout } = useAuthStore.getState();
 
   if (!accessToken) {
-    throw new Error('Not authenticated');
+    throw new Error("Not authenticated");
   }
 
   const headers = new Headers(options.headers);
-  headers.set('Authorization', `Bearer ${accessToken}`);
+  headers.set("Authorization", `Bearer ${accessToken}`);
 
   let res = await fetch(url, { ...options, headers });
 
@@ -438,9 +450,9 @@ export async function fetchWithAuth(
     const newToken = useAuthStore.getState().accessToken;
     if (!newToken) {
       logout();
-      throw new Error('Session expired');
+      throw new Error("Session expired");
     }
-    headers.set('Authorization', `Bearer ${newToken}`);
+    headers.set("Authorization", `Bearer ${newToken}`);
     res = await fetch(url, { ...options, headers });
   }
 
@@ -453,13 +465,13 @@ export async function fetchWithAuth(
 ```typescript
 // src/frontend/src/lib/api.ts
 
-import { fetchWithAuth } from '../auth/fetchWithAuth';
+import { fetchWithAuth } from "../auth/fetchWithAuth";
 
 export const api = {
   // Replace all fetch() calls with fetchWithAuth()
   async listAgents(): Promise<Agent[]> {
     const res = await fetchWithAuth(`${API_BASE}/api/agents/`);
-    if (!res.ok) throw new Error('Failed to fetch agents');
+    if (!res.ok) throw new Error("Failed to fetch agents");
     return res.json();
   },
   // ... update all other methods
@@ -529,6 +541,7 @@ export function LoginPage() {
 ### Phase 1: Core Auth Infrastructure (Foundation)
 
 **Backend:**
+
 - [ ] Create `src/server/auth/` module
 - [ ] Implement JWT utilities (`tokens.py`)
 - [ ] Add auth configuration to `config.py`
@@ -538,12 +551,14 @@ export function LoginPage() {
 - [ ] Create `verify_token` dependency
 
 **Frontend:**
+
 - [ ] Create `src/frontend/src/auth/` directory
 - [ ] Implement `authStore.ts`
 - [ ] Create `fetchWithAuth.ts` wrapper
 - [ ] Add login page component
 
 **Files to Create:**
+
 ```
 src/server/auth/
 ├── __init__.py
@@ -565,6 +580,7 @@ src/frontend/src/auth/
 ### Phase 2: Protect REST Endpoints
 
 **Backend:**
+
 - [ ] Add auth dependencies to `/api/agents/`
 - [ ] Add auth dependencies to `/api/sessions/`
 - [ ] Add auth dependencies to `/api/messages/`
@@ -574,6 +590,7 @@ src/frontend/src/auth/
 - [ ] Update CORS to restrict origins
 
 **Frontend:**
+
 - [ ] Update `lib/api.ts` to use `fetchWithAuth`
 - [ ] Add `ProtectedRoute` wrapper to App.tsx
 - [ ] Handle 401 responses globally
@@ -582,12 +599,14 @@ src/frontend/src/auth/
 ### Phase 3: WebSocket Authentication
 
 **Backend:**
+
 - [ ] Add token query parameter to WebSocket endpoint
 - [ ] Validate token before accepting connection
 - [ ] Track user ID per connection
 - [ ] Implement token refresh during connection
 
 **Frontend:**
+
 - [ ] Update `useWebSocket.ts` to include token
 - [ ] Handle `token_expiring` events
 - [ ] Reconnect on token refresh
@@ -595,12 +614,14 @@ src/frontend/src/auth/
 ### Phase 4: API Key Authentication
 
 **Backend:**
+
 - [ ] Create API key model and storage
 - [ ] Implement API key generation endpoint
 - [ ] Add API key validation for webhooks
 - [ ] Add API key validation for agent events
 
 **Files:**
+
 ```
 src/server/auth/
 ├── api_keys.py       # API key generation/validation
@@ -629,12 +650,12 @@ src/server/auth/
 
 ### 7.1 Token Security
 
-| Concern | Mitigation |
-|---------|------------|
-| Token theft | Short expiry (15 min), HTTPS only |
+| Concern             | Mitigation                        |
+| ------------------- | --------------------------------- |
+| Token theft         | Short expiry (15 min), HTTPS only |
 | Refresh token theft | HTTP-only cookie option, rotation |
-| XSS attacks | Store in memory, not localStorage |
-| CSRF attacks | SameSite cookies, CSRF tokens |
+| XSS attacks         | Store in memory, not localStorage |
+| CSRF attacks        | SameSite cookies, CSRF tokens     |
 
 ### 7.2 Password Security
 
@@ -867,30 +888,30 @@ async def verify_token_or_legacy(
 
 ## Appendix A: File Changes Summary
 
-| File | Action | Description |
-|------|--------|-------------|
-| `src/server/auth/__init__.py` | Create | Auth module exports |
-| `src/server/auth/config.py` | Create | Auth settings |
-| `src/server/auth/tokens.py` | Create | JWT utilities |
-| `src/server/auth/models.py` | Create | User, Token models |
-| `src/server/auth/dependencies.py` | Create | FastAPI Depends |
-| `src/server/auth/users.py` | Create | User storage |
-| `src/server/auth/routes.py` | Create | Auth endpoints |
-| `src/server/config.py` | Modify | Add auth settings |
-| `src/server/main.py` | Modify | Mount auth routes, update CORS |
-| `src/server/routes/agents.py` | Modify | Add auth dependencies |
-| `src/server/routes/sessions.py` | Modify | Add auth dependencies |
-| `src/server/routes/messages.py` | Modify | Add auth dependencies |
-| `src/server/routes/journal.py` | Modify | Add auth dependencies |
-| `src/server/routes/filesystem.py` | Modify | Add auth dependencies |
-| `src/server/routes/agent_events.py` | Modify | Add auth dependencies |
-| `src/frontend/src/auth/authStore.ts` | Create | Auth state management |
-| `src/frontend/src/auth/fetchWithAuth.ts` | Create | Auth fetch wrapper |
-| `src/frontend/src/auth/ProtectedRoute.tsx` | Create | Route guard |
-| `src/frontend/src/lib/api.ts` | Modify | Use authenticated fetch |
-| `src/frontend/src/hooks/useWebSocket.ts` | Modify | Add token to WS URL |
-| `src/frontend/src/pages/Login.tsx` | Create | Login page |
-| `src/frontend/src/App.tsx` | Modify | Add routes, protection |
+| File                                       | Action | Description                    |
+| ------------------------------------------ | ------ | ------------------------------ |
+| `src/server/auth/__init__.py`              | Create | Auth module exports            |
+| `src/server/auth/config.py`                | Create | Auth settings                  |
+| `src/server/auth/tokens.py`                | Create | JWT utilities                  |
+| `src/server/auth/models.py`                | Create | User, Token models             |
+| `src/server/auth/dependencies.py`          | Create | FastAPI Depends                |
+| `src/server/auth/users.py`                 | Create | User storage                   |
+| `src/server/auth/routes.py`                | Create | Auth endpoints                 |
+| `src/server/config.py`                     | Modify | Add auth settings              |
+| `src/server/main.py`                       | Modify | Mount auth routes, update CORS |
+| `src/server/routes/agents.py`              | Modify | Add auth dependencies          |
+| `src/server/routes/sessions.py`            | Modify | Add auth dependencies          |
+| `src/server/routes/messages.py`            | Modify | Add auth dependencies          |
+| `src/server/routes/journal.py`             | Modify | Add auth dependencies          |
+| `src/server/routes/filesystem.py`          | Modify | Add auth dependencies          |
+| `src/server/routes/agent_events.py`        | Modify | Add auth dependencies          |
+| `src/frontend/src/auth/authStore.ts`       | Create | Auth state management          |
+| `src/frontend/src/auth/fetchWithAuth.ts`   | Create | Auth fetch wrapper             |
+| `src/frontend/src/auth/ProtectedRoute.tsx` | Create | Route guard                    |
+| `src/frontend/src/lib/api.ts`              | Modify | Use authenticated fetch        |
+| `src/frontend/src/hooks/useWebSocket.ts`   | Modify | Add token to WS URL            |
+| `src/frontend/src/pages/Login.tsx`         | Create | Login page                     |
+| `src/frontend/src/App.tsx`                 | Modify | Add routes, protection         |
 
 ---
 
@@ -920,17 +941,17 @@ dependencies = [
 
 ## Appendix C: Estimated Effort
 
-| Phase | Scope | Complexity |
-|-------|-------|------------|
-| Phase 1: Core Infrastructure | Backend auth module, frontend store | Medium |
-| Phase 2: REST Protection | Update 34 endpoints | Low-Medium |
-| Phase 3: WebSocket Auth | Connection validation | Medium |
-| Phase 4: API Keys | Webhook/hook auth | Low |
-| Phase 5: Enhanced Security | Rate limiting, audit | Medium |
-| Phase 6: OAuth | Future work | High |
+| Phase                        | Scope                               | Complexity |
+| ---------------------------- | ----------------------------------- | ---------- |
+| Phase 1: Core Infrastructure | Backend auth module, frontend store | Medium     |
+| Phase 2: REST Protection     | Update 34 endpoints                 | Low-Medium |
+| Phase 3: WebSocket Auth      | Connection validation               | Medium     |
+| Phase 4: API Keys            | Webhook/hook auth                   | Low        |
+| Phase 5: Enhanced Security   | Rate limiting, audit                | Medium     |
+| Phase 6: OAuth               | Future work                         | High       |
 
 **Recommended approach:** Implement phases 1-3 together, then phase 4, then phase 5 as needed.
 
 ---
 
-*This plan is a living document. Update as implementation progresses.*
+_This plan is a living document. Update as implementation progresses._

@@ -26,13 +26,14 @@ expose the enterprise-brain creep. This isn't Microsoft Entra. The plan should s
 
 Your "one gate" alternative is too simple:
 
-| Scenario | One Gate Problem |
-|----------|-----------------|
-| CI/CD webhook triggers builds | Would have full agent control |
+| Scenario                          | One Gate Problem              |
+| --------------------------------- | ----------------------------- |
+| CI/CD webhook triggers builds     | Would have full agent control |
 | External monitoring checks health | Would have full agent control |
-| Future read-only dashboard | Would have full agent control |
+| Future read-only dashboard        | Would have full agent control |
 
 **Middle ground:** Two levels, not fifteen:
+
 - **Admin access**: Full control (user login)
 - **Service access**: Specific endpoints (API keys for webhooks)
 
@@ -54,16 +55,17 @@ That's it. No `agents:read` vs `agents:write` theater.
 
 Your session cookie solution isn't simpler in practice:
 
-| Issue | JWT | Session Cookie |
-|-------|-----|----------------|
-| CORS credentials mode | N/A | Must set `credentials: 'include'` everywhere |
-| SameSite restrictions | N/A | Breaks if frontend served from different port |
-| Mobile/CLI clients | Works with `Authorization` header | Cookies problematic |
-| Proxy/CDN scenarios | Header passes through | Cookie handling varies |
+| Issue                 | JWT                               | Session Cookie                                |
+| --------------------- | --------------------------------- | --------------------------------------------- |
+| CORS credentials mode | N/A                               | Must set `credentials: 'include'` everywhere  |
+| SameSite restrictions | N/A                               | Breaks if frontend served from different port |
+| Mobile/CLI clients    | Works with `Authorization` header | Cookies problematic                           |
+| Proxy/CDN scenarios   | Header passes through             | Cookie handling varies                        |
 
 CMUX frontend runs on `:5173`, backend on `:8000`. `SameSite=Strict` would **block the cookie** on cross-origin requests in development.
 
 **My counter-proposal:**
+
 - JWT, but 24-hour expiry (not 15 minutes)
 - No refresh tokens - just re-login daily
 - No WebSocket token refresh - connection persists until page reload
@@ -100,6 +102,7 @@ If multi-user is ever needed, we add it then. But today? One environment variabl
 > "The plan spends 937 lines on the minor threat"
 
 A login form doesn't stop:
+
 - Agent running `rm -rf /`
 - Agent exfiltrating secrets
 - Prompt injection through messages
@@ -108,13 +111,14 @@ A login form doesn't stop:
 
 But network access control still matters:
 
-| Without Auth | With Auth |
-|--------------|-----------|
+| Without Auth                          | With Auth           |
+| ------------------------------------- | ------------------- |
 | Anyone on your WiFi can send commands | At least basic gate |
-| Public cloud deployments exposed | Protected |
-| Shared dev machine scenarios | Isolated |
+| Public cloud deployments exposed      | Protected           |
+| Shared dev machine scenarios          | Isolated            |
 
 **The auth plan isn't wrong, it's incomplete.** Network auth is Layer 1. We ALSO need:
+
 - Sandboxing for agent commands (Phase 2 effort)
 - Secret detection in outbound traffic
 - Read-only filesystem modes for untrusted tasks
@@ -134,6 +138,7 @@ I agree these are missing. But "don't add auth because bigger threats exist" isn
 Your claim: "Session cookie sent automatically with WS upgrade"
 
 **This is only true if:**
+
 1. Same origin (CMUX frontend `:5173` vs backend `:8000` = different origin)
 2. `credentials: 'include'` set on WebSocket (not standard in all browsers)
 3. `Access-Control-Allow-Credentials: true` on server
@@ -169,14 +174,14 @@ if not authenticated:
 
 After your critique, here's what I now support:
 
-| Original Plan | My Revised Position |
-|--------------|---------------------|
-| 15+ scopes | 2 levels: admin, service |
-| 15-min access + 7-day refresh | 24-hour access, no refresh |
-| User model with storage | Single env var password |
-| Query param WebSocket auth | First-message auth |
-| 6 phases | 3 phases: basic auth → webhooks → future |
-| 22 files | ~8-10 files |
+| Original Plan                 | My Revised Position                      |
+| ----------------------------- | ---------------------------------------- |
+| 15+ scopes                    | 2 levels: admin, service                 |
+| 15-min access + 7-day refresh | 24-hour access, no refresh               |
+| User model with storage       | Single env var password                  |
+| Query param WebSocket auth    | First-message auth                       |
+| 6 phases                      | 3 phases: basic auth → webhooks → future |
+| 22 files                      | ~8-10 files                              |
 
 ### What I Won't Concede
 
@@ -198,4 +203,4 @@ You proposed "Simple Password Gate" with session cookies. Please address:
 
 ---
 
-*— Worker Auth Defender*
+_— Worker Auth Defender_

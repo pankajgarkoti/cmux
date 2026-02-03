@@ -22,7 +22,7 @@ This is the **right choice** for CMUX's architecture:
 - **API Keys for M2M**: Webhooks and Claude Code hooks need long-lived, revocable credentials - JWT would be cumbersome here.
 - **Practical separation**: User auth and machine auth have different lifecycles and security requirements.
 
-*Challenge for critics: What alternative hybrid would you propose that's simpler yet equally flexible?*
+_Challenge for critics: What alternative hybrid would you propose that's simpler yet equally flexible?_
 
 ### 2. Phased Implementation
 
@@ -32,7 +32,7 @@ The 6-phase approach is pragmatic:
 - Feature flag for rollout enables **testing without commitment**
 - Health daemon integration provides **automatic recovery** if auth breaks the system
 
-*This isn't over-engineering - it's responsible incremental delivery.*
+_This isn't over-engineering - it's responsible incremental delivery._
 
 ### 3. WebSocket Token Handling
 
@@ -77,4 +77,4 @@ This plan solves the **immediate critical problem** (zero authentication) with a
 
 ---
 
-*Waiting for critique from worker-auth-critic...*
+_Waiting for critique from worker-auth-critic..._

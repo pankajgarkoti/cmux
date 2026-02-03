@@ -12,31 +12,31 @@ The critic is right. I over-engineered a 100-line feature into 500+ lines.
 
 ### Accepted (All Major Points)
 
-| Cut Item | Reason I Accept |
-|----------|-----------------|
-| AudioVisualizer | CSS pulse animation is sufficient |
-| Zustand voiceStore | useState handles 3 states fine |
-| useVoiceRecording hook | Premature abstraction |
-| TranscriptionProvider ABC | YAGNI - one provider |
-| VoiceService class | Route handler is enough |
-| GET /api/voice/status | Handle errors when they happen |
-| send_immediately param | Not the use case |
-| target_agent param | Not the use case |
-| Language parameter | Whisper auto-detects |
-| Rate limiting | Local dev tool |
-| Cleanup job | Delete immediately |
-| 5 config options | Just need OPENAI_API_KEY |
-| 3-phase plan | Just implement it |
-| Testing strategy | Write with code |
-| Success metrics | Ship and see |
+| Cut Item                  | Reason I Accept                   |
+| ------------------------- | --------------------------------- |
+| AudioVisualizer           | CSS pulse animation is sufficient |
+| Zustand voiceStore        | useState handles 3 states fine    |
+| useVoiceRecording hook    | Premature abstraction             |
+| TranscriptionProvider ABC | YAGNI - one provider              |
+| VoiceService class        | Route handler is enough           |
+| GET /api/voice/status     | Handle errors when they happen    |
+| send_immediately param    | Not the use case                  |
+| target_agent param        | Not the use case                  |
+| Language parameter        | Whisper auto-detects              |
+| Rate limiting             | Local dev tool                    |
+| Cleanup job               | Delete immediately                |
+| 5 config options          | Just need OPENAI_API_KEY          |
+| 3-phase plan              | Just implement it                 |
+| Testing strategy          | Write with code                   |
+| Success metrics           | Ship and see                      |
 
 ### Defended (Minor Additions)
 
-| Item | Why Keep It |
-|------|-------------|
-| Escape to cancel | 1 line of code, prevents accidental sends |
-| Error toast | User needs to know if transcription failed |
-| Disabled state during transcribe | Prevent double-clicks |
+| Item                             | Why Keep It                                |
+| -------------------------------- | ------------------------------------------ |
+| Escape to cancel                 | 1 line of code, prevents accidental sends  |
+| Error toast                      | User needs to know if transcription failed |
+| Disabled state during transcribe | Prevent double-clicks                      |
 
 These add ~10 lines total. Worth it.
 
@@ -60,10 +60,10 @@ src/server/main.py                                (MODIFY - 2 lines)
 ### Frontend: VoiceButton.tsx
 
 ```tsx
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Mic, Square, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Mic, Square, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface VoiceButtonProps {
   onTranscript: (text: string) => void;
@@ -71,79 +71,102 @@ interface VoiceButtonProps {
   disabled?: boolean;
 }
 
-export function VoiceButton({ onTranscript, onError, disabled }: VoiceButtonProps) {
-  const [state, setState] = useState<'idle' | 'recording' | 'transcribing'>('idle');
+export function VoiceButton({
+  onTranscript,
+  onError,
+  disabled,
+}: VoiceButtonProps) {
+  const [state, setState] = useState<"idle" | "recording" | "transcribing">(
+    "idle",
+  );
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
 
-  const stop = useCallback(async (cancelled = false) => {
-    if (!mediaRecorder.current || state !== 'recording') return;
+  const stop = useCallback(
+    async (cancelled = false) => {
+      if (!mediaRecorder.current || state !== "recording") return;
 
-    mediaRecorder.current.stream.getTracks().forEach(t => t.stop());
+      mediaRecorder.current.stream.getTracks().forEach((t) => t.stop());
 
-    if (cancelled) {
-      setState('idle');
-      return;
-    }
-
-    setState('transcribing');
-    mediaRecorder.current.stop();
-
-    await new Promise<void>(r => { mediaRecorder.current!.onstop = () => r(); });
-    const blob = new Blob(chunks.current, { type: 'audio/webm' });
-
-    try {
-      const form = new FormData();
-      form.append('audio', blob);
-      const res = await fetch('/api/voice/transcribe', { method: 'POST', body: form });
-
-      if (!res.ok) {
-        throw new Error(res.status === 503 ? 'Voice transcription not configured' : 'Transcription failed');
+      if (cancelled) {
+        setState("idle");
+        return;
       }
 
-      const { text, error } = await res.json();
-      if (error) throw new Error(error);
-      if (text) onTranscript(text);
-    } catch (e) {
-      onError?.(e instanceof Error ? e.message : 'Transcription failed');
-    } finally {
-      setState('idle');
-    }
-  }, [state, onTranscript, onError]);
+      setState("transcribing");
+      mediaRecorder.current.stop();
+
+      await new Promise<void>((r) => {
+        mediaRecorder.current!.onstop = () => r();
+      });
+      const blob = new Blob(chunks.current, { type: "audio/webm" });
+
+      try {
+        const form = new FormData();
+        form.append("audio", blob);
+        const res = await fetch("/api/voice/transcribe", {
+          method: "POST",
+          body: form,
+        });
+
+        if (!res.ok) {
+          throw new Error(
+            res.status === 503
+              ? "Voice transcription not configured"
+              : "Transcription failed",
+          );
+        }
+
+        const { text, error } = await res.json();
+        if (error) throw new Error(error);
+        if (text) onTranscript(text);
+      } catch (e) {
+        onError?.(e instanceof Error ? e.message : "Transcription failed");
+      } finally {
+        setState("idle");
+      }
+    },
+    [state, onTranscript, onError],
+  );
 
   const start = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorder.current = new MediaRecorder(stream);
       chunks.current = [];
-      mediaRecorder.current.ondataavailable = (e) => chunks.current.push(e.data);
+      mediaRecorder.current.ondataavailable = (e) =>
+        chunks.current.push(e.data);
       mediaRecorder.current.start();
-      setState('recording');
+      setState("recording");
     } catch {
-      onError?.('Microphone access denied');
+      onError?.("Microphone access denied");
     }
   };
 
   // Escape to cancel
   useEffect(() => {
-    if (state !== 'recording') return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') stop(true); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    if (state !== "recording") return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") stop(true);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, [state, stop]);
 
-  const isRecording = state === 'recording';
-  const isTranscribing = state === 'transcribing';
+  const isRecording = state === "recording";
+  const isTranscribing = state === "transcribing";
 
   return (
     <Button
       type="button"
-      variant={isRecording ? 'destructive' : 'outline'}
+      variant={isRecording ? "destructive" : "outline"}
       size="icon"
       onClick={isRecording ? () => stop(false) : start}
       disabled={disabled || isTranscribing}
-      className={cn('h-11 w-11 flex-shrink-0', isRecording && 'animate-pulse')}
-      title={isRecording ? 'Stop recording (Esc to cancel)' : 'Record voice message'}
+      className={cn("h-11 w-11 flex-shrink-0", isRecording && "animate-pulse")}
+      title={
+        isRecording ? "Stop recording (Esc to cancel)" : "Record voice message"
+      }
     >
       {isTranscribing ? (
         <Loader2 className="h-4 w-4 animate-spin" />
@@ -246,11 +269,11 @@ async def transcribe(audio: UploadFile):
 
 ## Error States
 
-| Error | Display |
-|-------|---------|
-| Microphone denied | Toast: "Microphone access denied" |
+| Error                  | Display                                     |
+| ---------------------- | ------------------------------------------- |
+| Microphone denied      | Toast: "Microphone access denied"           |
 | OPENAI_API_KEY missing | Toast: "Voice transcription not configured" |
-| Transcription fails | Toast: "Transcription failed" |
+| Transcription fails    | Toast: "Transcription failed"               |
 
 ## Dependencies
 
@@ -287,4 +310,4 @@ These can be added if users request them.
 
 ---
 
-*Converged design complete. Ready for implementation.*
+_Converged design complete. Ready for implementation._

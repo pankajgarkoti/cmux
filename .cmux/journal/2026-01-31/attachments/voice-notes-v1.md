@@ -95,19 +95,19 @@ audio transcribed → text sent to supervisor as message
 
 #### Frontend
 
-| Component | Responsibility |
-|-----------|---------------|
-| `VoiceRecorder` | Recording UI, microphone access, state management |
-| `AudioVisualizer` | Real-time waveform display during recording |
-| `useVoiceRecording` | Hook for MediaRecorder API abstraction |
-| `voiceStore` | Zustand store for recording state |
+| Component           | Responsibility                                    |
+| ------------------- | ------------------------------------------------- |
+| `VoiceRecorder`     | Recording UI, microphone access, state management |
+| `AudioVisualizer`   | Real-time waveform display during recording       |
+| `useVoiceRecording` | Hook for MediaRecorder API abstraction            |
+| `voiceStore`        | Zustand store for recording state                 |
 
 #### Backend
 
-| Component | Responsibility |
-|-----------|---------------|
-| `voice_routes.py` | REST endpoints for voice operations |
-| `VoiceService` | Audio processing, transcription orchestration |
+| Component               | Responsibility                                |
+| ----------------------- | --------------------------------------------- |
+| `voice_routes.py`       | REST endpoints for voice operations           |
+| `VoiceService`          | Audio processing, transcription orchestration |
 | `TranscriptionProvider` | Abstract interface for transcription backends |
 
 ---
@@ -128,6 +128,7 @@ interface VoiceRecorderProps {
 ```
 
 **Key Features**:
+
 - Requests microphone permission on first use
 - Uses MediaRecorder API with webm/opus codec
 - Streams audio data to ArrayBuffer chunks
@@ -184,12 +185,12 @@ Modify existing `ChatInput.tsx`:
 // src/frontend/src/stores/voiceStore.ts
 
 interface VoiceState {
-  status: 'idle' | 'requesting' | 'recording' | 'transcribing' | 'error';
+  status: "idle" | "requesting" | "recording" | "transcribing" | "error";
   duration: number;
   error: string | null;
   hasPermission: boolean | null;
 
-  setStatus: (status: VoiceState['status']) => void;
+  setStatus: (status: VoiceState["status"]) => void;
   setDuration: (duration: number) => void;
   setError: (error: string | null) => void;
   setHasPermission: (has: boolean) => void;
@@ -314,6 +315,7 @@ class LocalWhisperProvider(TranscriptionProvider):
 ### 6.1 POST /api/voice/transcribe
 
 **Request**:
+
 ```
 Content-Type: multipart/form-data
 
@@ -328,6 +330,7 @@ audio: <binary audio data>
 | `language` | string | "en" | ISO 639-1 language code |
 
 **Response (200)**:
+
 ```json
 {
   "success": true,
@@ -338,6 +341,7 @@ audio: <binary audio data>
 ```
 
 **Response (400 - Bad Request)**:
+
 ```json
 {
   "success": false,
@@ -347,6 +351,7 @@ audio: <binary audio data>
 ```
 
 **Response (503 - Service Unavailable)**:
+
 ```json
 {
   "success": false,
@@ -358,6 +363,7 @@ audio: <binary audio data>
 ### 6.2 GET /api/voice/status
 
 **Response (200)**:
+
 ```json
 {
   "available": true,
@@ -424,23 +430,23 @@ class Settings(BaseSettings):
 
 ### 9.1 Frontend Errors
 
-| Error | User Message | Recovery |
-|-------|--------------|----------|
-| Microphone denied | "Microphone access denied. Please allow access in browser settings." | Show settings link |
-| No microphone | "No microphone found. Please connect a microphone." | - |
-| Recording failed | "Recording failed. Please try again." | Retry button |
-| Upload failed | "Failed to upload audio. Please check your connection." | Retry button |
+| Error                | User Message                                                         | Recovery                |
+| -------------------- | -------------------------------------------------------------------- | ----------------------- |
+| Microphone denied    | "Microphone access denied. Please allow access in browser settings." | Show settings link      |
+| No microphone        | "No microphone found. Please connect a microphone."                  | -                       |
+| Recording failed     | "Recording failed. Please try again."                                | Retry button            |
+| Upload failed        | "Failed to upload audio. Please check your connection."              | Retry button            |
 | Transcription failed | "Could not transcribe audio. Please try again or type your message." | Fall back to text input |
 
 ### 9.2 Backend Errors
 
-| Error | HTTP Status | Response |
-|-------|-------------|----------|
-| Invalid audio format | 400 | `{"error": "unsupported_format"}` |
-| File too large | 413 | `{"error": "file_too_large"}` |
-| Duration too long | 400 | `{"error": "duration_exceeded"}` |
-| Transcription service down | 503 | `{"error": "transcription_unavailable"}` |
-| Transcription failed | 500 | `{"error": "transcription_failed"}` |
+| Error                      | HTTP Status | Response                                 |
+| -------------------------- | ----------- | ---------------------------------------- |
+| Invalid audio format       | 400         | `{"error": "unsupported_format"}`        |
+| File too large             | 413         | `{"error": "file_too_large"}`            |
+| Duration too long          | 400         | `{"error": "duration_exceeded"}`         |
+| Transcription service down | 503         | `{"error": "transcription_unavailable"}` |
+| Transcription failed       | 500         | `{"error": "transcription_failed"}`      |
 
 ---
 
@@ -596,4 +602,4 @@ python-multipart = "*"  # For file uploads (may already be present)
 
 ---
 
-*End of proposal - awaiting critique from worker-critic*
+_End of proposal - awaiting critique from worker-critic_

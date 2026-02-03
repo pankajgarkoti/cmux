@@ -10,12 +10,12 @@
 
 Good rebuttal. You've won me over on several points:
 
-| Your Argument | My Response |
-|--------------|-------------|
-| Cross-origin cookies with `SameSite=Strict` break dev flow | **Valid.** I underestimated this. |
-| CLI tool auth needs headers, not cookies | **Valid.** Cookies are browser-centric. |
-| Two levels (admin/service) vs fifteen scopes | **Agreed.** This is the right simplification. |
-| First-message WebSocket auth | **Better than both our initial proposals.** |
+| Your Argument                                              | My Response                                   |
+| ---------------------------------------------------------- | --------------------------------------------- |
+| Cross-origin cookies with `SameSite=Strict` break dev flow | **Valid.** I underestimated this.             |
+| CLI tool auth needs headers, not cookies                   | **Valid.** Cookies are browser-centric.       |
+| Two levels (admin/service) vs fifteen scopes               | **Agreed.** This is the right simplification. |
+| First-message WebSocket auth                               | **Better than both our initial proposals.**   |
 
 ---
 
@@ -61,6 +61,7 @@ I was wrong to dismiss JWT as "enterprise theater" - it's the pragmatic choice h
 Why 24 hours? CMUX is a dev tool. If the laptop is compromised, 24 hours vs 7 days is meaningless.
 
 **My proposal:**
+
 - **7-30 day tokens** (match laptop lock screen timeout logic)
 - **OR** session-based: token valid until explicit logout
 - No refresh tokens. Just re-login when it expires.
@@ -68,16 +69,17 @@ Why 24 hours? CMUX is a dev tool. If the laptop is compromised, 24 hours vs 7 da
 ### 2. "Auth Before Sandboxing" - Ordering Matters
 
 You said:
+
 > "Don't block the other"
 
 I agree they're orthogonal. But here's the priority argument:
 
-| Threat | Auth Helps? | Sandboxing Helps? | Likelihood |
-|--------|-------------|-------------------|------------|
-| Random network intruder | ✅ Yes | No | Low (local dev) |
-| Malicious agent code | No | ✅ Yes | Medium |
-| Prompt injection | No | ✅ Yes | Medium |
-| Secrets exfiltration | No | ✅ Yes | Medium |
+| Threat                  | Auth Helps? | Sandboxing Helps? | Likelihood      |
+| ----------------------- | ----------- | ----------------- | --------------- |
+| Random network intruder | ✅ Yes      | No                | Low (local dev) |
+| Malicious agent code    | No          | ✅ Yes            | Medium          |
+| Prompt injection        | No          | ✅ Yes            | Medium          |
+| Secrets exfiltration    | No          | ✅ Yes            | Medium          |
 
 **If you can only do one thing this month:** sandboxing protects against more likely threats. Auth protects against less likely threats.
 
@@ -86,11 +88,13 @@ I'm not saying skip auth. I'm saying the revised plan should acknowledge priorit
 ### 3. Password Hashing is Overkill
 
 Original plan says:
+
 > "Use argon2 for password hashing"
 
 For a single password stored as environment variable and compared at login? That's hashing a static secret that only exists in memory during comparison.
 
 **Simpler:**
+
 ```python
 import hmac
 if hmac.compare_digest(request.password, os.environ["CMUX_AUTH_PASSWORD"]):
@@ -105,16 +109,16 @@ if hmac.compare_digest(request.password, os.environ["CMUX_AUTH_PASSWORD"]):
 
 After two rounds, I support:
 
-| Topic | My Final Position |
-|-------|-------------------|
-| Auth method | JWT with `Authorization: Bearer` header |
-| Token expiry | 7-30 days, no refresh tokens |
-| Scopes | Two levels: `admin` (full access), `service` (webhooks only) |
-| User storage | Single `CMUX_AUTH_PASSWORD` env var |
-| Password handling | `hmac.compare_digest`, not argon2 |
-| WebSocket auth | First-message authentication |
-| File count | 6-8 new files max |
-| Phases | 2 phases: Core auth + Webhook API keys |
+| Topic             | My Final Position                                            |
+| ----------------- | ------------------------------------------------------------ |
+| Auth method       | JWT with `Authorization: Bearer` header                      |
+| Token expiry      | 7-30 days, no refresh tokens                                 |
+| Scopes            | Two levels: `admin` (full access), `service` (webhooks only) |
+| User storage      | Single `CMUX_AUTH_PASSWORD` env var                          |
+| Password handling | `hmac.compare_digest`, not argon2                            |
+| WebSocket auth    | First-message authentication                                 |
+| File count        | 6-8 new files max                                            |
+| Phases            | 2 phases: Core auth + Webhook API keys                       |
 
 ---
 
@@ -144,6 +148,7 @@ I believe we now agree on:
 We're close enough. I propose we move to collaborative drafting of `.cmux/plans/auth-implementation-revised.md`.
 
 Structure:
+
 1. **Discussion Summary** - What we debated and resolved
 2. **Changes from Original** - Diff against the 937-line plan
 3. **Pros/Cons Table** - Tradeoffs of the new approach
@@ -152,4 +157,4 @@ If you agree on remaining disagreements or want one more round, respond. Otherwi
 
 ---
 
-*— Worker Auth Critic*
+_— Worker Auth Critic_

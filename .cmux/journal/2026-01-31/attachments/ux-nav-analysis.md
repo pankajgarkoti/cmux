@@ -35,6 +35,7 @@ The CMUX dashboard uses a three-panel layout with a left sidebar, central comman
 ```
 
 ### Panel Widths (observed)
+
 - Left sidebar: ~17.7% (resizable, min 10%, max 25%)
 - Center panel: ~42% (resizable)
 - Right activity: ~40% (resizable, collapsible)
@@ -50,6 +51,7 @@ The CMUX dashboard uses a three-panel layout with a left sidebar, central comman
 **Impact:** Users cannot browse files nested more than 2-3 levels deep, making the MEMORY section less useful.
 
 **Current Behavior:**
+
 - `journal > 2026-01-31 > attachments` - clicking shows nothing
 - Files inside subdirectories are invisible
 
@@ -63,14 +65,15 @@ The CMUX dashboard uses a three-panel layout with a left sidebar, central comman
 
 **Issue:** Many clickable elements lack visual affordance.
 
-| Element | Issue |
-|---------|-------|
-| Agent buttons (SUP/WRK badges) | No hover state visible in snapshot |
-| File tree items | Appear as plain text, not obviously clickable |
-| "View Raw Mailbox" button | Styled differently but purpose unclear |
-| Separator/resizer bars | No visual indicator of draggability |
+| Element                        | Issue                                         |
+| ------------------------------ | --------------------------------------------- |
+| Agent buttons (SUP/WRK badges) | No hover state visible in snapshot            |
+| File tree items                | Appear as plain text, not obviously clickable |
+| "View Raw Mailbox" button      | Styled differently but purpose unclear        |
+| Separator/resizer bars         | No visual indicator of draggability           |
 
 **Recommendations:**
+
 - Add subtle hover states to all interactive elements
 - Use cursor changes (pointer, col-resize) more prominently
 - Add subtle icons (folder, file) to file tree items
@@ -90,11 +93,13 @@ The CMUX dashboard uses a three-panel layout with a left sidebar, central comman
 **Current:** All agents show as simple buttons with SUP/WRK badges.
 
 **Missing Information:**
+
 - Active vs idle status not color-coded
 - No visual distinction between healthy, blocked, or failed agents
 - Count badge shows total (7) but no breakdown
 
 **Recommendation:**
+
 - Color-code agent status: green (active), gray (idle), red (blocked/failed)
 - Add status indicator dots next to agent names
 - Show status breakdown in header: "AGENTS 7 (2 active, 1 blocked)"
@@ -104,11 +109,13 @@ The CMUX dashboard uses a three-panel layout with a left sidebar, central comman
 **Current:** All messages shown with same styling regardless of type.
 
 **Issues:**
+
 - [DONE], [STATUS], [BLOCKED] prefixes in message text, not visually distinct
 - No color coding for message types
 - From/To information is small and de-emphasized
 
 **Recommendation:**
+
 - Color-code message types: green for DONE, blue for STATUS, red for BLOCKED
 - Make from/to more prominent with avatar or colored badges
 - Add timestamp grouping (Today, Yesterday, Older)
@@ -118,11 +125,13 @@ The CMUX dashboard uses a three-panel layout with a left sidebar, central comman
 **Current:** 50 events in a flat list.
 
 **Issues:**
+
 - All events look identical
 - No grouping by agent or time
 - "Tool Call" events dominate without clear differentiation
 
 **Recommendation:**
+
 - Group events by agent with collapsible sections
 - Show event type icons (tool, message, status)
 - Add filtering by event type
@@ -134,16 +143,19 @@ The CMUX dashboard uses a three-panel layout with a left sidebar, central comman
 #### 4.1 Command Center Header Confusion
 
 **Current Header Elements:**
+
 ```
 "Command Center" | WORKING | "Send tasks to the supervisor agent" | Connected | [dropdown]
 ```
 
 **Issues:**
+
 - "WORKING" status unclear - what is working?
 - "Send tasks to the supervisor agent" - is this instruction or capability description?
 - Dropdown button has no label
 
 **Recommendation:**
+
 - Rename to "Supervisor Chat" or "Task Assignment"
 - Show currently selected agent prominently
 - Replace status text with icon + tooltip
@@ -158,6 +170,7 @@ The CMUX dashboard uses a three-panel layout with a left sidebar, central comman
 #### 4.3 No Global Navigation
 
 **Issue:** No way to navigate to:
+
 - Settings/configuration
 - Help/documentation
 - System health overview
@@ -170,12 +183,14 @@ The CMUX dashboard uses a three-panel layout with a left sidebar, central comman
 ### 5. RESPONSIVE BEHAVIOR (to verify)
 
 **Panel Resizers:** Vertical separators exist but behavior unclear:
+
 - Separator 1: value="17.67" (sidebar width)
 - Separator 2: value="59.61" (activity panel)
 
 **Collapse behavior:** Activity panel has "Collapse" button, but sidebar and other sections lack quick collapse.
 
 **Recommendation:**
+
 - Add double-click to collapse/expand panels
 - Add keyboard shortcuts for panel management
 - Persist layout preferences in localStorage
@@ -196,16 +211,19 @@ The CMUX dashboard uses a three-panel layout with a left sidebar, central comman
 ## PRIORITY RECOMMENDATIONS
 
 ### High Priority
+
 1. ~~Fix file tree subdirectory expansion~~ (In progress by worker-filetree-fix)
 2. Add visual status indicators to agent list
 3. Color-code message types in mailbox preview
 
 ### Medium Priority
+
 4. Add expand/collapse icons to section headers
 5. Improve hover states on all interactive elements
 6. Add filtering to activity panel
 
 ### Low Priority
+
 7. Rename "MEMORY" section for clarity
 8. Add global navigation/settings access
 9. Implement keyboard shortcuts for navigation
@@ -223,42 +241,45 @@ The CMUX dashboard uses a three-panel layout with a left sidebar, central comman
 ## APPENDIX: Element Inventory
 
 ### Sidebar Elements
-| Element | Type | State |
-|---------|------|-------|
-| AGENTS header | Button | expandable, expanded |
-| Create new session | Button | - |
-| All Agents | Button | ALL badge |
-| supervisor | Button | SUP badge |
-| workers (7) | Buttons | WRK badges |
-| MAILBOX header | Button | expandable, expanded |
-| View Raw Mailbox | Button | - |
-| Message previews | Static text | 5 visible |
-| MEMORY header | Button | expandable, expanded |
-| Refresh | Button | - |
-| File tree | Buttons | nested, some expandable |
+
+| Element            | Type        | State                   |
+| ------------------ | ----------- | ----------------------- |
+| AGENTS header      | Button      | expandable, expanded    |
+| Create new session | Button      | -                       |
+| All Agents         | Button      | ALL badge               |
+| supervisor         | Button      | SUP badge               |
+| workers (7)        | Buttons     | WRK badges              |
+| MAILBOX header     | Button      | expandable, expanded    |
+| View Raw Mailbox   | Button      | -                       |
+| Message previews   | Static text | 5 visible               |
+| MEMORY header      | Button      | expandable, expanded    |
+| Refresh            | Button      | -                       |
+| File tree          | Buttons     | nested, some expandable |
 
 ### Command Center Elements
-| Element | Type | Purpose |
-|---------|------|---------|
-| Heading | h2 | "Command Center" |
-| Status badge | Static | "WORKING" |
-| Description | Static | "Send tasks to the supervisor agent" |
-| Connection | Static | "Connected" |
-| Agent selector | Button | dropdown menu |
-| Chat messages | List | scrollable |
-| Input textbox | Multiline | message composition |
-| Send button | Button | disabled when empty |
+
+| Element        | Type      | Purpose                              |
+| -------------- | --------- | ------------------------------------ |
+| Heading        | h2        | "Command Center"                     |
+| Status badge   | Static    | "WORKING"                            |
+| Description    | Static    | "Send tasks to the supervisor agent" |
+| Connection     | Static    | "Connected"                          |
+| Agent selector | Button    | dropdown menu                        |
+| Chat messages  | List      | scrollable                           |
+| Input textbox  | Multiline | message composition                  |
+| Send button    | Button    | disabled when empty                  |
 
 ### Activity Panel Elements
-| Element | Type | Count |
-|---------|------|-------|
-| Heading | h2 | "ACTIVITY" |
-| Event count | Static | "50 events" |
-| Filter dropdown | Button | haspopup menu |
-| Collapse button | Button | - |
-| Event items | Buttons | 50, expandable |
-| Footer status | Static | "Connected, X agents, Y active" |
+
+| Element         | Type    | Count                           |
+| --------------- | ------- | ------------------------------- |
+| Heading         | h2      | "ACTIVITY"                      |
+| Event count     | Static  | "50 events"                     |
+| Filter dropdown | Button  | haspopup menu                   |
+| Collapse button | Button  | -                               |
+| Event items     | Buttons | 50, expandable                  |
+| Footer status   | Static  | "Connected, X agents, Y active" |
 
 ---
 
-*Analysis complete. Findings should be synthesized with other UX workers for comprehensive recommendations.*
+_Analysis complete. Findings should be synthesized with other UX workers for comprehensive recommendations._

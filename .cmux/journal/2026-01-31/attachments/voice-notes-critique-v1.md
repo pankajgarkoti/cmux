@@ -53,6 +53,7 @@ You have ONE provider. Abstractions are for when you have 2+.
 A service class with temp file management, cleanup jobs?
 
 **Replace with**:
+
 ```python
 @router.post("/transcribe")
 async def transcribe(audio: UploadFile):
@@ -140,13 +141,13 @@ This isn't a product launch. Ship it. See if it works.
 
 ### 19. 5 Open Questions ❌ ANSWER THEM NOW
 
-| Question | Answer |
-|----------|--------|
-| Streaming vs batch? | **Batch.** Simpler. |
-| Store audio? | **No.** Transcribe and delete. |
-| Auto-send? | **No.** Put in input. |
-| Mobile support? | **Not MVP.** Desktop first. |
-| Fallback provider? | **Error.** "Configure OPENAI_API_KEY" |
+| Question            | Answer                                |
+| ------------------- | ------------------------------------- |
+| Streaming vs batch? | **Batch.** Simpler.                   |
+| Store audio?        | **No.** Transcribe and delete.        |
+| Auto-send?          | **No.** Put in input.                 |
+| Mobile support?     | **Not MVP.** Desktop first.           |
+| Fallback provider?  | **Error.** "Configure OPENAI_API_KEY" |
 
 ---
 
@@ -157,8 +158,14 @@ This isn't a product launch. Ship it. See if it works.
 ```tsx
 // src/frontend/src/components/chat/VoiceButton.tsx
 
-export function VoiceButton({ onTranscript }: { onTranscript: (text: string) => void }) {
-  const [state, setState] = useState<'idle' | 'recording' | 'transcribing'>('idle');
+export function VoiceButton({
+  onTranscript,
+}: {
+  onTranscript: (text: string) => void;
+}) {
+  const [state, setState] = useState<"idle" | "recording" | "transcribing">(
+    "idle",
+  );
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
 
@@ -168,29 +175,35 @@ export function VoiceButton({ onTranscript }: { onTranscript: (text: string) => 
     chunks.current = [];
     mediaRecorder.current.ondataavailable = (e) => chunks.current.push(e.data);
     mediaRecorder.current.start();
-    setState('recording');
+    setState("recording");
   };
 
   const stop = async () => {
-    setState('transcribing');
+    setState("transcribing");
     mediaRecorder.current?.stop();
-    mediaRecorder.current?.stream.getTracks().forEach(t => t.stop());
+    mediaRecorder.current?.stream.getTracks().forEach((t) => t.stop());
 
-    await new Promise(r => mediaRecorder.current!.onstop = r);
-    const blob = new Blob(chunks.current, { type: 'audio/webm' });
+    await new Promise((r) => (mediaRecorder.current!.onstop = r));
+    const blob = new Blob(chunks.current, { type: "audio/webm" });
 
     const form = new FormData();
-    form.append('audio', blob);
-    const res = await fetch('/api/voice/transcribe', { method: 'POST', body: form });
+    form.append("audio", blob);
+    const res = await fetch("/api/voice/transcribe", {
+      method: "POST",
+      body: form,
+    });
     const { text } = await res.json();
 
     onTranscript(text);
-    setState('idle');
+    setState("idle");
   };
 
   return (
-    <button onClick={state === 'recording' ? stop : start} disabled={state === 'transcribing'}>
-      {state === 'recording' ? '⏹️' : state === 'transcribing' ? '...' : '🎤'}
+    <button
+      onClick={state === "recording" ? stop : start}
+      disabled={state === "transcribing"}
+    >
+      {state === "recording" ? "⏹️" : state === "transcribing" ? "..." : "🎤"}
     </button>
   );
 }
@@ -226,24 +239,24 @@ async def transcribe(audio: UploadFile):
 ### Integration: 3 Lines in ChatInput
 
 ```tsx
-<VoiceButton onTranscript={(text) => setMessage(prev => prev + text)} />
+<VoiceButton onTranscript={(text) => setMessage((prev) => prev + text)} />
 ```
 
 ---
 
 ## COMPARISON
 
-| Metric | Proposal v1 | Minimal |
-|--------|-------------|---------|
-| Frontend files | 5 | 1 |
-| Backend files | 6 | 1 |
-| Lines of code | ~500+ | ~100 |
-| New dependencies | 0 | 0 |
-| Config options | 5 | 0 |
-| API endpoints | 2 | 1 |
-| Zustand stores | 1 | 0 |
-| Abstract classes | 1 | 0 |
-| Phases | 3 | 1 |
+| Metric           | Proposal v1 | Minimal |
+| ---------------- | ----------- | ------- |
+| Frontend files   | 5           | 1       |
+| Backend files    | 6           | 1       |
+| Lines of code    | ~500+       | ~100    |
+| New dependencies | 0           | 0       |
+| Config options   | 5           | 0       |
+| API endpoints    | 2           | 1       |
+| Zustand stores   | 1           | 0       |
+| Abstract classes | 1           | 0       |
+| Phases           | 3           | 1       |
 
 ---
 
@@ -260,6 +273,7 @@ async def transcribe(audio: UploadFile):
 ## COUNTER-PROPOSAL
 
 Implement the minimal version above. Ship it. If users want:
+
 - Waveform visualization → add it then
 - Multiple languages → add dropdown then
 - Local Whisper → add provider abstraction then
@@ -274,6 +288,7 @@ Implement the minimal version above. Ship it. If users want:
 The proposal demonstrates good thinking about edge cases and future needs. But this is a dev tool, not a product. The 600-line design should be ~50 lines. The implementation should be ~100 lines.
 
 **Recommendation**: Throw away everything except:
+
 1. VoiceButton component (simplified)
 2. /api/voice/transcribe endpoint (no service class)
 3. Integration with ChatInput
@@ -282,4 +297,4 @@ Ship in 1 hour, not 1 day.
 
 ---
 
-*worker-critic*
+_worker-critic_

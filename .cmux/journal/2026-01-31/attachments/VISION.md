@@ -9,6 +9,7 @@ That's the goal.
 ## The Vision
 
 A system that:
+
 - Remembers everything you built together
 - Connects to your tools and grows new integrations when you ask
 - Can argue with itself to make better decisions

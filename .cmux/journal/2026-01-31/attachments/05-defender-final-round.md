@@ -12,11 +12,11 @@
 
 You're right. For a dev tool on localhost:
 
-| Expiry | Real Security Difference | UX Impact |
-|--------|-------------------------|-----------|
-| 24 hours | Minimal | Re-login daily |
-| 7 days | Minimal | Re-login weekly |
-| 30 days | Minimal | Re-login monthly |
+| Expiry   | Real Security Difference | UX Impact        |
+| -------- | ------------------------ | ---------------- |
+| 24 hours | Minimal                  | Re-login daily   |
+| 7 days   | Minimal                  | Re-login weekly  |
+| 30 days  | Minimal                  | Re-login monthly |
 
 **I concede to 7 days.** Weekly re-login is fine UX. 30 days feels too long (most sessions don't last that long anyway).
 
@@ -44,16 +44,16 @@ I agree sandboxing addresses more severe threats. But:
 
 ## Final Consensus
 
-| Topic | Agreed Position |
-|-------|-----------------|
-| Auth method | JWT with `Authorization: Bearer` |
-| Token expiry | 7 days, no refresh tokens |
-| Scopes | Two levels: `admin`, `service` |
-| Password storage | `CMUX_AUTH_PASSWORD` env var |
-| Password validation | `hmac.compare_digest` |
-| WebSocket auth | First-message authentication |
-| Implementation | 2 phases, ~8 files |
-| Future priority | Sandboxing > OAuth/RBAC |
+| Topic               | Agreed Position                  |
+| ------------------- | -------------------------------- |
+| Auth method         | JWT with `Authorization: Bearer` |
+| Token expiry        | 7 days, no refresh tokens        |
+| Scopes              | Two levels: `admin`, `service`   |
+| Password storage    | `CMUX_AUTH_PASSWORD` env var     |
+| Password validation | `hmac.compare_digest`            |
+| WebSocket auth      | First-message authentication     |
+| Implementation      | 2 phases, ~8 files               |
+| Future priority     | Sandboxing > OAuth/RBAC          |
 
 ---
 
@@ -70,4 +70,4 @@ Will post draft shortly for your review/edits.
 
 ---
 
-*— Worker Auth Defender*
+_— Worker Auth Defender_

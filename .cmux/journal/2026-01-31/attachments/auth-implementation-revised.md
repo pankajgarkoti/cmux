@@ -10,6 +10,7 @@
 ## Executive Summary
 
 A minimal authentication system for CMUX that:
+
 - Keeps unauthorized users out
 - Supports a fixed list of users (add more via config file)
 - Uses JWT for stateless verification
@@ -19,14 +20,15 @@ A minimal authentication system for CMUX that:
 
 ## 1. Requirements (Clarified)
 
-| Requirement | Implementation |
-|-------------|----------------|
-| Protect from unauthorized users | JWT-based authentication |
-| Fixed number of users | YAML config file |
-| Add users as we go | Edit config, restart server |
-| Simple authorization | Binary: authenticated or not |
+| Requirement                     | Implementation               |
+| ------------------------------- | ---------------------------- |
+| Protect from unauthorized users | JWT-based authentication     |
+| Fixed number of users           | YAML config file             |
+| Add users as we go              | Edit config, restart server  |
+| Simple authorization            | Binary: authenticated or not |
 
 **What we're NOT building:**
+
 - User self-registration
 - OAuth/SSO
 - Fine-grained permissions (scopes)
@@ -62,6 +64,7 @@ users:
 ```
 
 **Adding a user:**
+
 ```bash
 ./scripts/add-user.sh
 # Prompts for username and password
@@ -250,8 +253,8 @@ src/frontend/src/auth/
 #### authStore.ts (~30 lines)
 
 ```typescript
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 interface AuthState {
   token: string | null;
@@ -269,43 +272,51 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
 
       login: async (username: string, password: string) => {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username, password }),
         });
-        if (!res.ok) throw new Error('Invalid credentials');
+        if (!res.ok) throw new Error("Invalid credentials");
         const data = await res.json();
-        set({ token: data.token, username: data.username, isAuthenticated: true });
+        set({
+          token: data.token,
+          username: data.username,
+          isAuthenticated: true,
+        });
       },
 
-      logout: () => set({ token: null, username: null, isAuthenticated: false }),
+      logout: () =>
+        set({ token: null, username: null, isAuthenticated: false }),
     }),
-    { name: 'cmux-auth' }
-  )
+    { name: "cmux-auth" },
+  ),
 );
 ```
 
 #### fetchWithAuth.ts (~20 lines)
 
 ```typescript
-import { useAuthStore } from './authStore';
+import { useAuthStore } from "./authStore";
 
-export async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+export async function fetchWithAuth(
+  url: string,
+  options: RequestInit = {},
+): Promise<Response> {
   const { token, logout } = useAuthStore.getState();
 
   if (!token) {
-    throw new Error('Not authenticated');
+    throw new Error("Not authenticated");
   }
 
   const headers = new Headers(options.headers);
-  headers.set('Authorization', `Bearer ${token}`);
+  headers.set("Authorization", `Bearer ${token}`);
 
   const response = await fetch(url, { ...options, headers });
 
   if (response.status === 401) {
     logout();
-    throw new Error('Session expired');
+    throw new Error("Session expired");
   }
 
   return response;
@@ -315,14 +326,14 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
 #### LoginPage.tsx (~40 lines)
 
 ```tsx
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from './authStore';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "./authStore";
 
 export function LoginPage() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuthStore();
   const navigate = useNavigate();
@@ -330,12 +341,12 @@ export function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError("");
     try {
       await login(username, password);
-      navigate('/');
+      navigate("/");
     } catch (err) {
-      setError('Invalid username or password');
+      setError("Invalid username or password");
     } finally {
       setLoading(false);
     }
@@ -358,7 +369,7 @@ export function LoginPage() {
           onChange={(e) => setPassword(e.target.value)}
         />
         <button type="submit" disabled={loading}>
-          {loading ? 'Logging in...' : 'Login'}
+          {loading ? "Logging in..." : "Login"}
         </button>
         {error && <p className="error">{error}</p>}
       </form>
@@ -438,7 +449,7 @@ app.add_middleware(
 )
 ```
 
-### src/server/routes/*.py (all route files)
+### src/server/routes/\*.py (all route files)
 
 ```python
 # Add to each endpoint that needs protection
@@ -457,7 +468,7 @@ async def list_agents(user: str = Depends(get_current_user)):
 ws.onopen = () => {
   const { token } = useAuthStore.getState();
   if (token) {
-    ws.send(JSON.stringify({ type: 'auth', token }));
+    ws.send(JSON.stringify({ type: "auth", token }));
   }
 };
 ```
@@ -621,22 +632,22 @@ wscat -c ws://localhost:8000/api/agents/ws
 
 ## 10. File Summary
 
-| File | Lines | Action |
-|------|-------|--------|
-| `src/server/auth/__init__.py` | 5 | Create |
-| `src/server/auth/tokens.py` | 25 | Create |
-| `src/server/auth/users.py` | 40 | Create |
-| `src/server/auth/middleware.py` | 30 | Create |
-| `src/server/auth/routes.py` | 35 | Create |
-| `src/server/config.py` | +15 | Modify |
-| `src/server/main.py` | +10 | Modify |
-| `src/server/routes/*.py` | +2 each | Modify |
-| `src/frontend/src/auth/authStore.ts` | 30 | Create |
-| `src/frontend/src/auth/fetchWithAuth.ts` | 20 | Create |
-| `src/frontend/src/pages/LoginPage.tsx` | 40 | Create |
-| `scripts/add-user.sh` | 15 | Create |
-| `.cmux/users.yaml.example` | 10 | Create |
-| **Total new code** | **~240** | |
+| File                                     | Lines    | Action |
+| ---------------------------------------- | -------- | ------ |
+| `src/server/auth/__init__.py`            | 5        | Create |
+| `src/server/auth/tokens.py`              | 25       | Create |
+| `src/server/auth/users.py`               | 40       | Create |
+| `src/server/auth/middleware.py`          | 30       | Create |
+| `src/server/auth/routes.py`              | 35       | Create |
+| `src/server/config.py`                   | +15      | Modify |
+| `src/server/main.py`                     | +10      | Modify |
+| `src/server/routes/*.py`                 | +2 each  | Modify |
+| `src/frontend/src/auth/authStore.ts`     | 30       | Create |
+| `src/frontend/src/auth/fetchWithAuth.ts` | 20       | Create |
+| `src/frontend/src/pages/LoginPage.tsx`   | 40       | Create |
+| `scripts/add-user.sh`                    | 15       | Create |
+| `.cmux/users.yaml.example`               | 10       | Create |
+| **Total new code**                       | **~240** |        |
 
 ---
 
@@ -649,6 +660,7 @@ This plan emerged from 3 rounds of structured debate:
 **Round 3:** Converged on minimal auth with YAML user storage
 
 **Key simplifications from original:**
+
 - 15+ scopes → 1 level (authenticated)
 - Refresh tokens → 7-day access only
 - User database → YAML config file
@@ -657,6 +669,7 @@ This plan emerged from 3 rounds of structured debate:
 - ~1000 lines → ~240 lines
 
 **Accepted tradeoffs:**
+
 - 7-day token theft window (acceptable for dev tool)
 - No hot-reload for users (restart required)
 - localStorage for tokens (XSS risk documented)
@@ -665,4 +678,4 @@ This plan emerged from 3 rounds of structured debate:
 
 **Status:** ✅ APPROVED FOR IMPLEMENTATION
 
-*Plan finalized 2026-01-31 after advocate-critic debate.*
+_Plan finalized 2026-01-31 after advocate-critic debate._

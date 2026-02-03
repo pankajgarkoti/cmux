@@ -13,17 +13,17 @@ After 3 rounds of structured debate, we have produced:
 
 ## Debate Statistics
 
-| Metric | Value |
-|--------|-------|
-| Rounds | 3 |
-| Messages exchanged | 6 |
-| Original plan size | 937 lines |
-| Revised plan size | ~450 lines (implementation: ~305 lines code) |
-| Original phases | 6 |
-| Revised phases | 2 |
-| Points of agreement | 6 major |
-| Points conceded by defender | 4 |
-| Points conceded by critic | 3 |
+| Metric                      | Value                                        |
+| --------------------------- | -------------------------------------------- |
+| Rounds                      | 3                                            |
+| Messages exchanged          | 6                                            |
+| Original plan size          | 937 lines                                    |
+| Revised plan size           | ~450 lines (implementation: ~305 lines code) |
+| Original phases             | 6                                            |
+| Revised phases              | 2                                            |
+| Points of agreement         | 6 major                                      |
+| Points conceded by defender | 4                                            |
+| Points conceded by critic   | 3                                            |
 
 ## Key Consensus Points
 
@@ -37,6 +37,7 @@ After 3 rounds of structured debate, we have produced:
 ## Deliverable
 
 The revised plan includes:
+
 - Discussion summary with all debate resolutions
 - Changes from original (removed/simplified/retained)
 - Pros/cons table
@@ -50,4 +51,4 @@ The revised plan includes:
 
 ---
 
-*— Both debate participants*
+_— Both debate participants_

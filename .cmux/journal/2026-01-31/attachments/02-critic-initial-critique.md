@@ -18,13 +18,13 @@ I'm the CRITICAL CHALLENGER. My job is to identify weaknesses, over-engineering,
 
 The plan acknowledges CMUX is "typically single-user" but then builds enterprise-grade auth:
 
-| What the Plan Adds | Who Actually Needs This |
-|-------------------|------------------------|
-| 15+ permission scopes | Enterprise teams with dozens of users |
-| Admin vs User RBAC | Multi-tenant SaaS platforms |
-| OAuth provider architecture | Public-facing products |
-| API key rotation & scoping | Third-party integrations at scale |
-| Token refresh during WebSocket | Long-lived enterprise sessions |
+| What the Plan Adds             | Who Actually Needs This               |
+| ------------------------------ | ------------------------------------- |
+| 15+ permission scopes          | Enterprise teams with dozens of users |
+| Admin vs User RBAC             | Multi-tenant SaaS platforms           |
+| OAuth provider architecture    | Public-facing products                |
+| API key rotation & scoping     | Third-party integrations at scale     |
+| Token refresh during WebSocket | Long-lived enterprise sessions        |
 
 **Reality check:** When would someone need `journal:read` but not `journal:write`? Never. When would `agents:read` without `sessions:read` make sense? Never.
 
@@ -39,6 +39,7 @@ The plan acknowledges CMUX is "typically single-user" but then builds enterprise
 ### 2. 15-MINUTE TOKEN EXPIRY CREATES POINTLESS COMPLEXITY
 
 The plan proposes:
+
 - 15-minute access tokens
 - 7-day refresh tokens
 - WebSocket `token_expiring` events with in-flight refresh
@@ -49,6 +50,7 @@ The plan proposes:
 Your defense: "Stateless validation aligns with FastAPI's async model"
 
 **My counter:**
+
 1. Session cookies are ALSO stateless validation - the cookie IS the session
 2. FastAPI's `SessionMiddleware` works perfectly with async
 3. A compromised 15-minute token is as dangerous as a 30-day token for a local tool
@@ -61,10 +63,12 @@ Your defense: "Stateless validation aligns with FastAPI's async model"
 ### 3. USER STORAGE IS HAND-WAVED
 
 The plan says:
+
 > "Create user model and storage"
 > "Account lockout after 5 failed attempts"
 
 **But never specifies:**
+
 - WHERE are users stored? SQLite? JSON file? Environment variable?
 - How many users are supported? (The design implies many, contradicting "single-user")
 - Password reset mechanism?
@@ -81,16 +85,17 @@ The plan says:
 
 The plan's threat analysis:
 
-| Vulnerability | What Plan Does | Does It Help? |
-|--------------|----------------|---------------|
-| "Full system control" from unauthenticated access | Adds login form | ✅ Yes |
-| Malicious agent code execution | Nothing | ❌ No |
-| Webhook payload injection | Adds API keys | 🟡 Partial |
-| Agent data exfiltration | Nothing | ❌ No |
-| Supply chain attacks | Nothing | ❌ No |
-| Prompt injection through messages | Nothing | ❌ No |
+| Vulnerability                                     | What Plan Does  | Does It Help? |
+| ------------------------------------------------- | --------------- | ------------- |
+| "Full system control" from unauthenticated access | Adds login form | ✅ Yes        |
+| Malicious agent code execution                    | Nothing         | ❌ No         |
+| Webhook payload injection                         | Adds API keys   | 🟡 Partial    |
+| Agent data exfiltration                           | Nothing         | ❌ No         |
+| Supply chain attacks                              | Nothing         | ❌ No         |
+| Prompt injection through messages                 | Nothing         | ❌ No         |
 
 **The REAL threats for a self-modifying AI system:**
+
 1. An agent running `subprocess.run(['rm', '-rf', '/'])` - auth doesn't prevent this
 2. An agent POSTing your SSH keys to a remote server - auth doesn't prevent this
 3. A webhook triggering a task that deletes production data - API keys help but aren't the core fix
@@ -105,6 +110,7 @@ The plan's threat analysis:
 Your defense: "Query params work across all WebSocket libraries"
 
 **The problems:**
+
 - Tokens in URLs are logged in server access logs
 - They appear in browser history
 - They leak via Referer headers on navigation
@@ -115,6 +121,7 @@ Your defense: "Query params work across all WebSocket libraries"
 > "3. Cookie-based - Use HTTP-only cookies"
 
 Then immediately picks query parameters. HTTP-only cookies are:
+
 - Automatically sent with WebSocket upgrade requests
 - Not accessible to JavaScript (XSS-proof)
 - Not logged in URLs
@@ -131,17 +138,20 @@ Replace the 6-phase, 22-file plan with:
 ### Phase 1: Simple Password Gate (2-3 days work)
 
 **Backend:**
+
 1. `CMUX_ADMIN_PASSWORD` environment variable (or `.cmux/password` file)
 2. `/api/auth/login` - verify password, set HTTP-only session cookie
 3. `/api/auth/logout` - clear cookie
 4. Middleware: check cookie on all routes except `/api/webhooks/health`
 
 **Frontend:**
+
 1. Simple login form
 2. If 401, redirect to login
 3. No token management (cookies are automatic)
 
 **WebSocket:**
+
 - Session cookie sent automatically with WS upgrade
 - Validate cookie in handshake
 - Done
@@ -172,4 +182,4 @@ I'm not saying security doesn't matter. I'm saying this plan has **poor ROI**.
 
 ---
 
-*— Worker Auth Critic*
+_— Worker Auth Critic_
