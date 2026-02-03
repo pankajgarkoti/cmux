@@ -1,11 +1,22 @@
 """Filesystem API routes for exploring .cmux directory."""
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from pathlib import Path
 from typing import Optional
+import mimetypes
 
 from ..config import settings
+
+# Initialize mimetypes with additional common extensions
+mimetypes.init()
+mimetypes.add_type('application/pdf', '.pdf')
+mimetypes.add_type('image/webp', '.webp')
+mimetypes.add_type('audio/mpeg', '.mp3')
+mimetypes.add_type('audio/wav', '.wav')
+mimetypes.add_type('video/mp4', '.mp4')
+mimetypes.add_type('video/webm', '.webm')
 
 router = APIRouter()
 
@@ -130,3 +141,44 @@ async def get_file_content(
         raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
 
     return FileContentResponse(content=content, path=str(path))
+
+
+@router.get("/raw")
+async def get_file_raw(
+    path: str = Query(..., description="Relative path to file within .cmux directory")
+) -> FileResponse:
+    """Get a raw file from the .cmux directory with proper content type.
+
+    This endpoint serves files as-is with the appropriate MIME type,
+    suitable for binary files like images, PDFs, audio, and video.
+    """
+    cmux_dir = get_cmux_dir()
+    file_path = cmux_dir.parent / path
+
+    # Security: ensure we're not escaping the cmux directory
+    try:
+        file_path.resolve().relative_to(cmux_dir.resolve())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid path: must be within .cmux directory")
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    if not file_path.is_file():
+        raise HTTPException(status_code=400, detail="Path is not a file")
+
+    # Limit file size for raw serving (10MB for binary files)
+    max_size = 10 * 1024 * 1024  # 10MB
+    if file_path.stat().st_size > max_size:
+        raise HTTPException(status_code=413, detail="File too large")
+
+    # Determine MIME type
+    mime_type, _ = mimetypes.guess_type(str(file_path))
+    if mime_type is None:
+        mime_type = 'application/octet-stream'
+
+    return FileResponse(
+        path=file_path,
+        media_type=mime_type,
+        filename=file_path.name
+    )
