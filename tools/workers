@@ -112,6 +112,7 @@ EOF
     info "Sending task to worker..."
     local instruction="Read ${context_file} for your identity and task assignment, then begin working on the task described there."
     tmux send-keys -t "${CMUX_SESSION}:${name}" -l "$instruction"
+    sleep 0.1
     tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
 
     ok "Worker '$name' spawned and task assigned"
@@ -196,7 +197,10 @@ cmd_send() {
     info "Sending message to: $name"
 
     # Send message using literal flag then Enter
+    # Small delay between text and Enter ensures Claude Code receives both
+    # (matches lib/tmux.sh delay pattern used by router)
     tmux send-keys -t "${CMUX_SESSION}:${name}" -l "$message"
+    sleep 0.1
     tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
 
     ok "Message sent to '$name'"
