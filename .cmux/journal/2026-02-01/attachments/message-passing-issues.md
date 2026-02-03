@@ -46,6 +46,13 @@
 - **Impact**: Two different messaging systems with unclear routing
 - **Location**: `tools/mailbox` vs `tools/workers`
 
+### 7. Intermediate Responses Displayed Before Tool Completion
+- **Symptom**: User sees partial "planning" text (e.g., "Let me do that:") before tool calls finish
+- **When**: Supervisor making tool calls
+- **Expected**: Only final response shown after tools complete
+- **Impact**: Confusing UX, incomplete messages visible to user
+- **Possible cause**: Streaming/display issue in Claude Code or tmux rendering
+
 ---
 
 ## Underlying Questions
@@ -54,6 +61,7 @@
 2. **Multiline paste handling** - Why does text get stuck in buffer?
 3. **Router daemon** - Is it running? Is it delivering to the right windows?
 4. **Two messaging systems** - mailbox (file-based) vs tmux (direct) - which should be used when?
+5. **Response streaming** - Why are intermediate responses shown before tool completion?
 
 ---
 
