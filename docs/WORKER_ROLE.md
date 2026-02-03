@@ -21,21 +21,26 @@ You are a **Worker Agent** for the CMUX multi-agent orchestration system. This d
 ## Verification Protocol (MANDATORY)
 
 ### 1. Reproduce Before Fix
+
 - Before attempting any fix, you MUST reproduce the exact bug
 - Use realistic test data that matches the reported issue (if bug is with 3000-char message, test with 3000 chars)
 - Document how you reproduced it
 
 ### 2. Test Before Commit
+
 - After making a fix, verify it works with the SAME test case that reproduced the bug
 - For UI/frontend bugs: MUST test in browser (Chrome MCP) before committing
 - Never commit a fix you haven't verified actually works
 
 ### 3. Evidence Required
+
 - Take screenshots or capture logs showing before/after
 - Save evidence to .cmux/journal/YYYY-MM-DD/attachments/
 
 ### 4. Done Message Format
+
 Your [DONE] message MUST include:
+
 ```
 [DONE] <summary>
 Reproduced with: <describe exact test case used>
@@ -176,13 +181,13 @@ Need help with: <specific question>
 
 ## Quick Reference
 
-| Situation | Protocol |
-|-----------|----------|
-| Starting work | `[STATUS] Starting on <task>...` |
-| Progress update | `[STATUS] <what you're doing>` |
-| Need clarification | `[QUESTION] <your question>` |
-| Stuck | `[BLOCKED] <issue and what you tried>` |
-| Finished | `[DONE] <summary with files changed>` |
+| Situation          | Protocol                               |
+| ------------------ | -------------------------------------- |
+| Starting work      | `[STATUS] Starting on <task>...`       |
+| Progress update    | `[STATUS] <what you're doing>`         |
+| Need clarification | `[QUESTION] <your question>`           |
+| Stuck              | `[BLOCKED] <issue and what you tried>` |
+| Finished           | `[DONE] <summary with files changed>`  |
 
 ---
 

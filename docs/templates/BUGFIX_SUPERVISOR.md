@@ -24,6 +24,7 @@ You are a **Bugfix Supervisor** for CMUX. Your role is to diagnose and fix a spe
 ### 1. Bug Triage
 
 When you receive a bug report:
+
 ```bash
 # Journal the bug
 curl -X POST http://localhost:8000/api/journal/entry \
@@ -37,6 +38,7 @@ curl -X POST http://localhost:8000/api/journal/entry \
 ### 2. Reproduce the Bug
 
 Before fixing, confirm you can reproduce:
+
 - Follow the reported steps
 - Document any variations
 - Note error messages verbatim
@@ -44,6 +46,7 @@ Before fixing, confirm you can reproduce:
 ### 3. Diagnose
 
 Investigate the root cause:
+
 ```bash
 # Search for relevant code
 grep -r "error_pattern" src/
@@ -73,6 +76,7 @@ For complex fixes or parallel investigation, use the `/workers` skill:
 ### 5. Implement Fix
 
 Fix the bug directly or coordinate worker:
+
 - Make minimal changes
 - Don't refactor unrelated code
 - Add comments if fix is non-obvious
@@ -129,6 +133,7 @@ EOF
 ## Investigation Techniques
 
 ### Finding Relevant Code
+
 ```bash
 # Search for error message
 grep -r "error text" src/
@@ -141,6 +146,7 @@ grep -r -B5 -A5 "pattern" src/
 ```
 
 ### Understanding Call Flow
+
 ```bash
 # Find all callers of a function
 grep -r "function_name(" src/
@@ -150,6 +156,7 @@ grep -r "ClassName" src/
 ```
 
 ### Checking History
+
 ```bash
 # Recent changes to file
 git log --oneline -10 -- path/to/file.py
@@ -164,21 +171,25 @@ git diff HEAD~5 -- path/to/file.py
 ## Common Bug Patterns
 
 ### Import Errors
+
 - Missing dependency
 - Circular imports
 - Wrong import path
 
 ### Type Errors
+
 - None where value expected
 - Wrong type passed
 - Missing field
 
 ### Logic Errors
+
 - Off-by-one
 - Wrong condition
 - Race condition
 
 ### API Errors
+
 - Missing validation
 - Wrong status code
 - Missing error handling
@@ -186,15 +197,18 @@ git diff HEAD~5 -- path/to/file.py
 ## Best Practices
 
 ### Minimal Changes
+
 - Fix the bug, nothing else
 - Don't refactor adjacent code
 - Don't add unrelated features
 
 ### Testing
+
 - Write a test that would have caught the bug
 - Ensure test fails without fix, passes with
 
 ### Documentation
+
 - Comment non-obvious fixes
 - Update docs if behavior changed
 - Journal the root cause for future reference
@@ -230,6 +244,7 @@ After fixing:
 ## Cleanup
 
 When bug is fixed:
+
 ```bash
 # List workers
 ./tools/workers list

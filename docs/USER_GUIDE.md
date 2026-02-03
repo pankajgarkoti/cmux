@@ -28,13 +28,13 @@ What makes CMUX special is that **the AI agents can modify CMUX itself**. If you
 
 ### Key Features
 
-| Feature | Description |
-|---------|-------------|
-| **Multi-Agent Orchestration** | Supervisor delegates to multiple workers in parallel |
-| **Real-time Dashboard** | Watch agents work, see their output, send messages |
-| **Self-Improvement** | Agents can safely modify the CMUX codebase |
-| **Auto-Recovery** | If something breaks, the system automatically rolls back |
-| **Persistent Memory** | Journal system preserves context across sessions |
+| Feature                       | Description                                              |
+| ----------------------------- | -------------------------------------------------------- |
+| **Multi-Agent Orchestration** | Supervisor delegates to multiple workers in parallel     |
+| **Real-time Dashboard**       | Watch agents work, see their output, send messages       |
+| **Self-Improvement**          | Agents can safely modify the CMUX codebase               |
+| **Auto-Recovery**             | If something breaks, the system automatically rolls back |
+| **Persistent Memory**         | Journal system preserves context across sessions         |
 
 ---
 
@@ -91,6 +91,7 @@ tmux session: "cmux"
 ```
 
 Each agent runs in its own tmux window, providing:
+
 - **Isolation**: One agent can't crash another
 - **Visibility**: You can attach and watch any agent work
 - **Persistence**: Sessions survive disconnections
@@ -108,6 +109,7 @@ FastAPI Server (port 8000)
 ```
 
 The server:
+
 - Tracks all agents and their status
 - Routes messages between agents
 - Broadcasts updates to the dashboard
@@ -184,6 +186,7 @@ cd ../..
 ```
 
 This command:
+
 1. Creates a tmux session named `cmux`
 2. Starts the FastAPI server on port 8000
 3. Launches the supervisor agent
@@ -230,11 +233,11 @@ Feature Session (cmux-auth) - Created for complex features
 
 ### When to Use What
 
-| Situation | Approach |
-|-----------|----------|
-| Simple fix | Supervisor creates a worker in main session |
-| Quick search | Supervisor creates a worker in main session |
-| New feature | Supervisor spawns a dedicated feature session |
+| Situation      | Approach                                      |
+| -------------- | --------------------------------------------- |
+| Simple fix     | Supervisor creates a worker in main session   |
+| Quick search   | Supervisor creates a worker in main session   |
+| New feature    | Supervisor spawns a dedicated feature session |
 | Major refactor | Supervisor spawns a dedicated feature session |
 
 ### Worker Lifecycle
@@ -299,12 +302,12 @@ The most important aspect of CMUX is its safety model. Since agents can modify t
 
 ### What Gets Preserved During Rollback
 
-| Preserved | Not Preserved |
-|-----------|---------------|
+| Preserved                         | Not Preserved                       |
+| --------------------------------- | ----------------------------------- |
 | tmux sessions (agents stay alive) | Code changes (stashed, recoverable) |
-| Journal entries | Server state |
-| Stashed changes | Frontend build |
-| Error context | Runtime data |
+| Journal entries                   | Server state                        |
+| Stashed changes                   | Frontend build                      |
+| Error context                     | Runtime data                        |
 
 ### The Recovery Flow
 
@@ -408,12 +411,12 @@ The dashboard at `http://localhost:8000` provides real-time visibility into CMUX
 
 ### Agent Status Colors
 
-| Color | Status | Meaning |
-|-------|--------|---------|
-| 🟢 Green | IDLE/COMPLETE | Ready or finished |
-| 🔵 Blue | IN_PROGRESS | Actively working |
-| 🟡 Yellow | PENDING/TESTING | Waiting or validating |
-| 🔴 Red | FAILED/BLOCKED | Error or waiting on dependency |
+| Color     | Status          | Meaning                        |
+| --------- | --------------- | ------------------------------ |
+| 🟢 Green  | IDLE/COMPLETE   | Ready or finished              |
+| 🔵 Blue   | IN_PROGRESS     | Actively working               |
+| 🟡 Yellow | PENDING/TESTING | Waiting or validating          |
+| 🔴 Red    | FAILED/BLOCKED  | Error or waiting on dependency |
 
 ---
 
@@ -587,4 +590,4 @@ git stash pop
 
 ---
 
-*CMUX is experimental software. It's designed to be safe for experimentation, but use it with appropriate caution in production environments.*
+_CMUX is experimental software. It's designed to be safe for experimentation, but use it with appropriate caution in production environments._

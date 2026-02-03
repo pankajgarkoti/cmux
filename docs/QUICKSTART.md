@@ -39,11 +39,13 @@ cd src/frontend && npm install && npm run build && cd ../..
 ## Send Your First Task
 
 In the dashboard:
+
 1. Select "supervisor" in the left panel
 2. Type: "List all files in the src directory"
 3. Click Send
 
 Or via API:
+
 ```bash
 curl -X POST http://localhost:8000/api/agents/supervisor/message \
   -H "Content-Type: application/json" \
@@ -58,13 +60,13 @@ curl -X POST http://localhost:8000/api/agents/supervisor/message \
 
 ## Key Commands
 
-| Command | Description |
-|---------|-------------|
-| `./src/orchestrator/cmux.sh start` | Start CMUX |
-| `./src/orchestrator/cmux.sh stop` | Stop CMUX |
-| `./src/orchestrator/cmux.sh status` | Check status |
-| `./src/orchestrator/cmux.sh logs` | View logs |
-| `tmux attach -t cmux` | Watch agents work |
+| Command                             | Description       |
+| ----------------------------------- | ----------------- |
+| `./src/orchestrator/cmux.sh start`  | Start CMUX        |
+| `./src/orchestrator/cmux.sh stop`   | Stop CMUX         |
+| `./src/orchestrator/cmux.sh status` | Check status      |
+| `./src/orchestrator/cmux.sh logs`   | View logs         |
+| `tmux attach -t cmux`               | Watch agents work |
 
 ## What Just Happened?
 
@@ -78,6 +80,7 @@ tmux session "cmux"
 ```
 
 The supervisor can:
+
 - Create workers for simple tasks
 - Spawn sessions for complex features
 - Modify CMUX itself (safely - auto-rollback on failure)
@@ -90,4 +93,4 @@ The supervisor can:
 
 ---
 
-*Having issues? Check the [troubleshooting section](./USER_GUIDE.md#troubleshooting) in the User Guide.*
+_Having issues? Check the [troubleshooting section](./USER_GUIDE.md#troubleshooting) in the User Guide._

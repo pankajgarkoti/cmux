@@ -25,6 +25,7 @@ CMUX protects against breaking itself during self-modification:
 These components have low risk of breaking the system:
 
 ### Frontend (`src/frontend/`)
+
 - React components
 - Styling and CSS
 - State management (stores)
@@ -32,22 +33,26 @@ These components have low risk of breaking the system:
 - Types and interfaces
 
 ### API Routes (`src/server/routes/`)
+
 - Adding new endpoints
 - Modifying response formats
 - Adding validation
 - New route files
 
 ### Data Models (`src/server/models/`)
+
 - Adding new models
 - Adding fields to existing models
 - Pydantic validation rules
 
 ### Tests (`tests/`)
+
 - New test files
 - Test fixtures
 - Test utilities
 
 ### Documentation (`docs/`)
+
 - Guides and tutorials
 - Template files
 - README updates
@@ -57,6 +62,7 @@ These components have low risk of breaking the system:
 These components are more sensitive:
 
 ### Services (`src/server/services/`)
+
 - `agent_manager.py` - Agent lifecycle management
 - `session_manager.py` - Session creation and termination
 - `tmux_service.py` - tmux operations
@@ -65,26 +71,31 @@ These components are more sensitive:
 **Risk**: Breaking services can cause server startup failure.
 
 **Mitigation**:
+
 1. Test changes locally before applying
 2. Make incremental changes
 3. Ensure health endpoint remains accessible
 
 ### WebSocket Manager (`src/server/websocket/`)
+
 - Connection handling
 - Broadcast logic
 
 **Risk**: Breaking WebSocket can prevent frontend updates.
 
 **Mitigation**:
+
 1. Keep the basic broadcast interface stable
 2. Test connection and disconnect handling
 
 ### Configuration (`src/server/config.py`)
+
 - Settings and defaults
 
 **Risk**: Invalid config can prevent server startup.
 
 **Mitigation**:
+
 1. Provide sensible defaults
 2. Validate values at startup
 
@@ -93,15 +104,19 @@ These components are more sensitive:
 These components are critical for recovery:
 
 ### `src/orchestrator/health.sh`
+
 The recovery system itself. Breaking this removes the safety net.
 
 ### `src/orchestrator/cmux.sh`
+
 System startup. Breaking this prevents system from starting.
 
 ### `.cmux/` Directory Structure
+
 Runtime data paths. Changing structure can break multiple components.
 
 ### Changes to Health Endpoint
+
 `/api/webhooks/health` must always respond to health checks.
 
 ## Required Validation Checklist
@@ -149,26 +164,32 @@ cd src/frontend && npm run typecheck
 ## Best Practices for Self-Improvement
 
 ### 1. Make Small, Incremental Changes
+
 - One logical change at a time
 - Easier to isolate issues if something breaks
 
 ### 2. Test Before Committing
+
 - Run the validation checklist
 - Verify behavior manually
 
 ### 3. Document What You're Changing
+
 - Add journal entry before making changes
 - Explain the rationale
 
 ### 4. Keep the Health Endpoint Sacred
+
 - Never modify `/api/webhooks/health` to not respond
 - If you must change it, ensure it still returns 200
 
 ### 5. Preserve Session Compatibility
+
 - Don't change session naming conventions mid-operation
 - Gracefully handle missing fields in models
 
 ### 6. Use the Journal
+
 - Record decisions and their rationale
 - Log errors and how you fixed them
 - Future agents (including you after compaction) benefit
