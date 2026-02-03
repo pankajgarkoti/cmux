@@ -268,10 +268,11 @@ cleanup() {
         printf "  ${GREEN}✓${NC} FastAPI server stopped\n"
     fi
 
-    # Kill all cmux sessions (main + spawned)
-    for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep "^cmux" || true); do
-        tmux kill-session -t "$sess" 2>/dev/null && printf "  ${GREEN}✓${NC} Killed session: $sess\n"
-    done
+    # Kill only THIS cmux session (not other cmux-* sessions from different instances)
+    # This prevents accidentally destroying workers from parallel cmux runs
+    if tmux has-session -t "$CMUX_SESSION" 2>/dev/null; then
+        tmux kill-session -t "$CMUX_SESSION" 2>/dev/null && printf "  ${GREEN}✓${NC} Killed session: $CMUX_SESSION\n"
+    fi
 
     printf "${GREEN}Shutdown complete${NC}\n"
 }
