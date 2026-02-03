@@ -33,6 +33,7 @@ import { useAgentStore } from '@/stores/agentStore';
 import { useViewerStore } from '@/stores/viewerStore';
 import { useFilesystem, buildFileTree } from '@/hooks/useFilesystem';
 import { FileTree, type FileTreeItem } from './FileTree';
+import { JournalTree } from './JournalTree';
 import { api } from '@/lib/api';
 import type { Agent, AgentStatus } from '@/types/agent';
 import type { SessionStatus } from '@/types/session';
@@ -137,7 +138,7 @@ export function Explorer() {
     return [...result, ...otherSessions];
   }, [agents]);
 
-  // Build file tree and separate mailbox
+  // Build file tree and separate mailbox and journal
   // buildFileTree already returns the full recursive structure - pass it directly
   // to FileTree which handles recursive rendering via FileTreeNode
   const allItems: FileTreeItem[] = filesystemData?.items
@@ -145,7 +146,8 @@ export function Explorer() {
     : [];
 
   const mailboxItem = allItems.find(item => item.name === 'mailbox');
-  const fileTree = allItems.filter(item => item.name !== 'mailbox');
+  const journalFolder = allItems.find(item => item.name === 'journal' && item.type === 'directory');
+  const fileTree = allItems.filter(item => item.name !== 'mailbox' && item.name !== 'journal');
 
   const handleFileSelect = (item: FileTreeItem) => {
     if (item.type === 'file') {
@@ -369,16 +371,29 @@ export function Explorer() {
                   <Skeleton className="h-5 w-3/4" />
                   <Skeleton className="h-5 w-1/2" />
                 </div>
-              ) : fileTree.length === 0 ? (
+              ) : !journalFolder && fileTree.length === 0 ? (
                 <p className="px-2 text-xs text-muted-foreground">
                   No .cmux directory found
                 </p>
               ) : (
-                <FileTree
-                  items={fileTree}
-                  onFileSelect={handleFileSelect}
-                  selectedPath={selectedFile?.path}
-                />
+                <div className="space-y-1">
+                  {/* Journal section with specialized tree */}
+                  {journalFolder && (
+                    <JournalTree
+                      journalFolder={journalFolder}
+                      onFileSelect={handleFileSelect}
+                      selectedPath={selectedFile?.path}
+                    />
+                  )}
+                  {/* Other memory files */}
+                  {fileTree.length > 0 && (
+                    <FileTree
+                      items={fileTree}
+                      onFileSelect={handleFileSelect}
+                      selectedPath={selectedFile?.path}
+                    />
+                  )}
+                </div>
               )}
             </CollapsibleContent>
           </Collapsible>
