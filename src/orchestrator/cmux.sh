@@ -216,17 +216,28 @@ cmd_logs() {
     fi
 }
 
+cmd_detached_restart() {
+    # Pass all arguments to detached-restart.sh
+    exec "${SCRIPT_DIR}/detached-restart.sh" "$@"
+}
+
 cmd_help() {
     printf "${BOLD}Usage:${NC} cmux.sh <command>\n"
     echo ""
     printf "${BOLD}Commands:${NC}\n"
-    printf "  ${CYAN}start${NC}     Start the cmux system (creates tmux session)\n"
-    printf "  ${CYAN}stop${NC}      Stop the cmux system\n"
-    printf "  ${CYAN}restart${NC}   Restart the cmux system\n"
-    printf "  ${CYAN}status${NC}    Show system status\n"
-    printf "  ${CYAN}attach${NC}    Attach to tmux session\n"
-    printf "  ${CYAN}logs${NC}      Tail the server logs\n"
-    printf "  ${CYAN}help${NC}      Show this help\n"
+    printf "  ${CYAN}start${NC}              Start the cmux system (creates tmux session)\n"
+    printf "  ${CYAN}stop${NC}               Stop the cmux system\n"
+    printf "  ${CYAN}restart${NC}            Restart the cmux system\n"
+    printf "  ${CYAN}status${NC}             Show system status\n"
+    printf "  ${CYAN}attach${NC}             Attach to tmux session\n"
+    printf "  ${CYAN}logs${NC}               Tail the server logs\n"
+    printf "  ${CYAN}detached-restart${NC}   Restart server in detached mode (safe for agents)\n"
+    printf "  ${CYAN}help${NC}               Show this help\n"
+    echo ""
+    printf "${BOLD}Detached restart options:${NC}\n"
+    printf "  --restart              Restart the FastAPI server only\n"
+    printf "  --rollback [commit]    Rollback to commit and restart\n"
+    printf "  --detach               Run in background (for agent use)\n"
     echo ""
     printf "${BOLD}tmux shortcuts:${NC}\n"
     printf "  Ctrl+b n/p    Switch between windows\n"
@@ -246,6 +257,7 @@ main() {
         status)  cmd_status ;;
         attach)  cmd_attach ;;
         logs)    cmd_logs ;;
+        detached-restart) shift; cmd_detached_restart "$@" ;;
         help|-h|--help) cmd_help ;;
         *)
             printf "${RED}Unknown command: %s${NC}\n" "$1"
