@@ -34,6 +34,23 @@ async def list_agents():
     return AgentList(agents=agents, total=len(agents))
 
 
+# IMPORTANT: /archived routes must come BEFORE /{agent_id} to avoid
+# FastAPI matching "archived" as an agent_id
+@router.get("/archived", response_model=List[ArchivedAgentSummary])
+async def list_archived_agents():
+    """List all archived agents."""
+    return conversation_store.get_archived_agents()
+
+
+@router.get("/archived/{archive_id}", response_model=ArchivedAgent)
+async def get_archived_agent(archive_id: str):
+    """Get a specific archived agent with terminal output."""
+    archive = conversation_store.get_archive(archive_id)
+    if not archive:
+        raise HTTPException(status_code=404, detail="Archive not found")
+    return archive
+
+
 @router.get("/{agent_id}", response_model=Agent)
 async def get_agent(agent_id: str):
     """Get details of a specific agent."""
@@ -143,21 +160,6 @@ async def archive_agent(agent_id: str, lines: int = 2000):
         "agent_id": agent_id,
         "agent_name": agent.name,
     }
-
-
-@router.get("/archived", response_model=List[ArchivedAgentSummary])
-async def list_archived_agents():
-    """List all archived agents."""
-    return conversation_store.get_archived_agents()
-
-
-@router.get("/archived/{archive_id}", response_model=ArchivedAgent)
-async def get_archived_agent(archive_id: str):
-    """Get a specific archived agent with terminal output."""
-    archive = conversation_store.get_archive(archive_id)
-    if not archive:
-        raise HTTPException(status_code=404, detail="Archive not found")
-    return archive
 
 
 @router.websocket("/ws")

@@ -40,18 +40,22 @@ class ConnectionManager:
         logger.info("All WebSocket connections closed")
 
     async def broadcast(self, event: str, data: dict):
-        message = json.dumps({
-            "event": event,
-            "data": data,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
+        message = json.dumps(
+            {
+                "event": event,
+                "data": data,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         async with self._lock:
             disconnected = []
             for client_id, connection in self.active_connections.items():
                 try:
                     await connection.send_text(message)
                 except Exception as e:
-                    logger.warning(f"Failed to send to {client_id}, marking for disconnect: {e}")
+                    logger.warning(
+                        f"Failed to send to {client_id}, marking for disconnect: {e}"
+                    )
                     disconnected.append(client_id)
             for client_id in disconnected:
                 del self.active_connections[client_id]
@@ -59,11 +63,13 @@ class ConnectionManager:
 
     async def send_to(self, client_id: str, event: str, data: dict):
         if client_id in self.active_connections:
-            message = json.dumps({
-                "event": event,
-                "data": data,
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            })
+            message = json.dumps(
+                {
+                    "event": event,
+                    "data": data,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
             try:
                 await self.active_connections[client_id].send_text(message)
             except Exception as e:
@@ -88,11 +94,13 @@ class ConnectionManager:
 
     async def _send_ping(self):
         """Send ping to all connections and clean up dead ones."""
-        message = json.dumps({
-            "event": "ping",
-            "data": {},
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
+        message = json.dumps(
+            {
+                "event": "ping",
+                "data": {},
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         async with self._lock:
             disconnected = []
             connection_count = len(self.active_connections)

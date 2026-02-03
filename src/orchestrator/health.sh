@@ -162,18 +162,20 @@ notify_supervisor_of_rollback() {
 
     local message="SYSTEM ALERT: Auto-rollback occurred. The server failed health checks after 3 retries and was rolled back to commit ${target_commit}. Error context: ${error_context}. Please check the journal at .cmux/journal/$(date +%Y-%m-%d)/ for full details and investigate what caused the failure. Your changes were stashed and can be recovered with 'git stash list'."
 
-    # Send via mailbox
-    cat >> .cmux/mailbox << EOF
---- MESSAGE ---
-timestamp: $(date -Iseconds)
-from: system:health
-to: supervisor
-type: error
-id: rollback-$(date +%s)
----
+    # Send via mailbox (single-line format)
+    local timestamp
+    timestamp=$(date -Iseconds)
+    local attachments_dir
+    attachments_dir=".cmux/journal/$(date +%Y-%m-%d)/attachments"
+    mkdir -p "$attachments_dir"
+    local body_path
+    body_path="${attachments_dir}/rollback-$(date +%s).md"
+    cat > "$body_path" << EOF
+# Auto-Rollback Alert
+
 ${message}
----
 EOF
+    echo "[${timestamp}] system:health -> ${CMUX_SESSION}:supervisor: [ERROR] Auto-rollback occurred (body: ${body_path})" >> .cmux/mailbox
 
     # Also send directly to tmux for immediate attention
     if tmux_window_exists "$CMUX_SESSION" "supervisor"; then
