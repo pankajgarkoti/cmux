@@ -10,10 +10,16 @@
 #   - transcript_path: full conversation JSONL file
 #   - stop_hook_active: boolean indicating hook is running
 
+# Debug log
+DEBUG_LOG="/tmp/cmux_hook_debug.log"
+
 # Exit early if not running as a CMUX-managed agent
 [[ "${CMUX_AGENT:-}" != "true" ]] && exit 0
 
 set -euo pipefail
+
+echo "=== $(date) ===" >> "$DEBUG_LOG"
+echo "CMUX_AGENT_NAME=$CMUX_AGENT_NAME" >> "$DEBUG_LOG"
 
 # Configuration
 CMUX_WEBHOOK_URL="${CMUX_WEBHOOK_URL:-http://localhost:8000/api/agent-events}"
@@ -21,6 +27,9 @@ AGENT_NAME="${CMUX_AGENT_NAME:-unknown}"
 
 # Read JSON from stdin
 input=$(cat)
+
+# Log raw input from Claude Code
+echo "RAW_INPUT=$(echo "$input" | jq -c '.')" >> "$DEBUG_LOG"
 
 # Extract session_id as backup identifier
 session_id=$(echo "$input" | jq -r '.session_id // empty')
@@ -33,21 +42,42 @@ fi
 # Extract transcript_path and read the agent's response content
 transcript_path=$(echo "$input" | jq -r '.transcript_path // empty')
 
+# Small delay to ensure transcript is fully written
+sleep 0.2
+
+echo "transcript_path=$transcript_path" >> "$DEBUG_LOG"
+echo "file_exists=$(test -f "$transcript_path" && echo yes || echo no)" >> "$DEBUG_LOG"
+
 response_content=""
 if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
     # Transcript format: each line is JSON with {type, message}
     # type can be "user", "assistant", etc.
-    # message is either a string or object with content[0].text
+    # message.content is an array that may contain text, thinking, or tool_use blocks
+    # We want the text from the MOST RECENT assistant entry that has text content
     response_content=$(tail -100 "$transcript_path" | \
         jq -rs '
-            [.[] | select(.type == "assistant")] | last |
-            if . == null then ""
-            elif .message | type == "string" then .message
-            elif .message.content then
-                [.message.content[] | select(.type == "text") | .text] | join("")
-            else ""
-            end
+            # Get all assistant entries, newest last
+            [.[] | select(.type == "assistant")] |
+            # Reverse so newest is first
+            reverse |
+            # Find the first entry that has text content
+            [.[] |
+                # Get text content from this entry
+                [.message.content[]? | select(.type == "text") | .text] |
+                # Only keep if non-empty
+                select(length > 0) |
+                # Join multiple text blocks
+                join("\n")
+            ] |
+            # Return first (newest) non-empty text
+            if length > 0 then .[0] else "" end
         ' 2>/dev/null || echo "")
+
+    echo "response_content_len=${#response_content}" >> "$DEBUG_LOG"
+    echo "response_preview=${response_content:0:80}" >> "$DEBUG_LOG"
+
+    # Also log all text entries found
+    tail -50 "$transcript_path" | jq -c 'select(.type == "assistant") | [.message.content[]? | select(.type == "text") | .text[0:40]]' 2>/dev/null | tail -5 >> "$DEBUG_LOG"
 fi
 
 # Build event payload - use CMUX_AGENT_NAME for agent_id

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Alert utility for the supervisor agent
+# Usage:
+#   ./tools/alert sound              - Play notification sound
+#   ./tools/alert say "message"      - Speak a message via TTS
+#   ./tools/alert both "message"     - Sound + speak
+#   ./tools/alert ping               - Quick short ping sound
+#   ./tools/alert nuke "message"     - LOUD, obnoxious, repeating 20x
+
+SOUND="/System/Library/Sounds/Glass.aiff"
+PING_SOUND="/System/Library/Sounds/Ping.aiff"
+VOICE="Samantha"
+RATE=180  # normal speech rate
+
+case "${1:-sound}" in
+  sound)
+    afplay -v 2 "$SOUND" &
+    ;;
+  ping)
+    afplay -v 2 "$PING_SOUND" &
+    ;;
+  say)
+    shift
+    say -v "$VOICE" -r "$RATE" "$*" &
+    ;;
+  both)
+    shift
+    afplay -v 2 "$SOUND" &
+    say -v "$VOICE" -r "$RATE" "$*" &
+    ;;
+  nuke)
+    shift
+    MSG="${*:-Hey! Pay attention!}"
+    for i in $(seq 1 20); do
+      afplay -v 5 /System/Library/Sounds/Sosumi.aiff &
+      afplay -v 5 /System/Library/Sounds/Funk.aiff &
+      say -v "$VOICE" -r 180 "$MSG"
+      sleep 0.3
+    done
+    ;;
+  *)
+    echo "Usage: alert {sound|ping|say <msg>|both <msg>|nuke <msg>}"
+    exit 1
+    ;;
+esac

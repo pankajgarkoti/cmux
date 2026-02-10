@@ -122,3 +122,65 @@ Changes:
 - Each spawning command now includes 'Read docs/templates/roles/...'
 
 Commit: 7f1729b
+[2026-02-03T14:01:12+05:30] cmux:msg-fixer -> cmux:supervisor: [STATUS] msg-fixer online (body: .cmux/journal/2026-02-03/attachments/msg-fixer-1770107472.md)
+[2026-02-03T14:01:53+05:30] cmux:msg-fixer -> cmux:supervisor: [STATUS] Investigating 7 message passing issues (body: .cmux/journal/2026-02-03/attachments/msg-fixer-1770107513.md)
+[2026-02-03T14:02:37+05:30] cmux:msg-fixer -> cmux:supervisor: [STATUS] Analysis complete (body: .cmux/journal/2026-02-03/attachments/msg-fixer-1770107557.md)
+[2026-02-03T14:04:04+05:30] cmux:test-worker -> cmux:supervisor: [DONE] Test message received correctly
+[2026-02-03T14:05:12+05:30] cmux:long-test -> cmux:supervisor: [DONE] [DONE] Long message (5KB+) received correctly. Message line count: 60. All lines from 1-60 visible without truncation or paste artifacts. The load-buffer/paste-buffer fix is working.
+[2026-02-03T18:56:16+05:30] cmux:worker-onboarding -> cmux:supervisor: [DONE] [DONE] Onboarding modal implemented and verified.
+
+Reproduced with: Fresh visit to http://localhost:8000 with cleared localStorage
+Verified with: Chrome MCP testing - modal appears on first visit, persists 'Don't show again' choice
+
+Files modified:
+- src/frontend/src/stores/onboardingStore.ts (created)
+- src/frontend/src/components/onboarding/OnboardingModal.tsx (created)
+- src/frontend/src/App.tsx (modified)
+
+Features:
+- 6-step wizard covering CMUX specialties
+- Gradient headers with icons for each step
+- Clickable step indicator dots
+- 'Don't show again' checkbox with localStorage persistence
+- Smooth animations
+
+Commit: b22c65f
+Evidence: Screenshots in .cmux/journal/2026-02-03/attachments/onboarding-modal-*.png
+[2026-02-03T19:08:58+05:30] cmux:worker-memory-ui -> cmux:supervisor: [DONE] [DONE] Memory/Journal UI improvements complete.
+
+Reproduced with: Opened dashboard at localhost:8000, viewed Memory section with multiple journal dates across January and February 2026.
+
+Verified with: Used Chrome MCP to take screenshot confirming:
+- February 2026 (current month) auto-expanded
+- Tue 3 shows 'TODAY' badge and is auto-expanded
+- Sun 1 (Feb 1) is collapsed
+- January 2026 is collapsed
+
+Evidence: .cmux/journal/2026-02-03/attachments/memory-ui-improvement.png
+
+Files modified:
+- src/frontend/src/components/explorer/JournalTree.tsx (created - 270 lines)
+- src/frontend/src/components/explorer/Explorer.tsx (modified - import + use JournalTree)
+
+Commit: e71b19f
+[2026-02-03T19:25:35+05:30] cmux:worker-file-viewer -> cmux:supervisor: [DONE] [DONE] Fixed binary file viewer in Memory section
+
+Reproduced with: Opened PNG files from Memory section - confirmed they showed garbled binary text
+Verified with: TypeScript typecheck (npm run typecheck), frontend build (npm run build), all pytest tests (12 passed)
+
+Changes made:
+1. src/server/routes/filesystem.py - Added /api/filesystem/raw endpoint that serves files with proper MIME types (image/png, video/mp4, audio/mpeg, application/pdf, etc.)
+2. src/frontend/src/components/explorer/MemoryViewer.tsx - Added file type detection and appropriate rendering:
+   - Images (.png, .jpg, .gif, .webp, etc.) → <img> tag
+   - Videos (.mp4, .webm, .mov, etc.) → <video> with controls
+   - Audio (.mp3, .wav, .ogg, etc.) → <audio> with controls  
+   - PDFs (.pdf) → <iframe>
+   - Text/code files unchanged
+
+Commit: 4f270ff
+
+Note: Server requires restart to pick up new /api/filesystem/raw endpoint
+[2026-02-03T20:39:30+05:30] cmux:worker-msg-fix -> cmux:supervisor: [DONE] Fixed message passing bug in tools/workers. Added 100ms delay between text and Enter in cmd_send() to match lib/tmux.sh pattern. Also updated cmd_spawn() for consistency.
+[2026-02-03T20:41:04+05:30] cmux:worker-msg-fix -> cmux:supervisor: [DONE] Committed fix: 3313134 - Added 100ms delay in tools/workers send command
+[2026-02-03T20:51:38+05:30] cmux:worker-detached-restart -> cmux:supervisor: [DONE] Created src/orchestrator/detached-restart.sh - a shell script that allows the supervisor to safely trigger a restart or rollback without killing itself. Features: (1) Runs fully detached via nohup+disown, (2) Accepts --restart and --rollback [commit] args, (3) Waits 2 seconds before action so caller can exit, (4) Stops only the FastAPI server (not tmux sessions), (5) Optionally does git rollback and rebuilds deps, (6) Logs to .cmux/detached-restart.log, (7) Uses existing lib/common.sh and lib/logging.sh. Committed as 48c1ddd.
+[2026-02-03T20:52:53+05:30] cmux:worker-detached-restart -> cmux:supervisor: [DONE] Added detached-restart command to cmux.sh startup routine. Now accessible via 'cmux.sh detached-restart --restart --detach' or 'cmux.sh detached-restart --rollback [commit] --detach'. Updated help text with new command and options. Committed as 40cc2d8.
