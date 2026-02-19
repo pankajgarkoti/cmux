@@ -13,12 +13,15 @@ import { MessageActions } from './MessageActions';
 import { Bot, User, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ToolCallGroup } from './ToolCallGroup';
+import { ThoughtGroup } from './ThoughtGroup';
 import type { Message } from '@/types/message';
 import type { Activity } from '@/types/activity';
+import type { Thought } from '@/stores/thoughtStore';
 
 interface ChatMessageProps {
   message: Message;
   toolCalls?: Activity[];
+  thoughts?: Thought[];
 }
 
 const COLLAPSE_THRESHOLD = 500;
@@ -52,7 +55,7 @@ function getPreviewContent(content: string): string {
   return truncated;
 }
 
-export function ChatMessage({ message, toolCalls }: ChatMessageProps) {
+export function ChatMessage({ message, toolCalls, thoughts }: ChatMessageProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const isUser = message.type === 'user' || message.from_agent === 'user';
@@ -142,6 +145,11 @@ export function ChatMessage({ message, toolCalls }: ChatMessageProps) {
             )}
           />
         </div>
+
+        {/* Agent thoughts that led to this response */}
+        {!isUser && thoughts && thoughts.length > 0 && (
+          <ThoughtGroup thoughts={thoughts} />
+        )}
 
         {/* Tool calls that produced this response */}
         {!isUser && toolCalls && toolCalls.length > 0 && (

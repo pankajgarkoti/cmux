@@ -6,6 +6,7 @@ import { MessageSquare, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useActivityStore } from '@/stores/activityStore';
+import { useThoughtStore, type Thought } from '@/stores/thoughtStore';
 import { api } from '@/lib/api';
 import type { Message } from '@/types/message';
 import type { Activity } from '@/types/activity';
@@ -30,6 +31,7 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
   const [unreadCount, setUnreadCount] = useState(0);
   const prevMessageCountRef = useRef(messages.length);
   const { activities } = useActivityStore();
+  const { thoughts } = useThoughtStore();
 
   // Memoize sorted messages to prevent re-sorting on every render
   const sortedMessages = useMemo(
@@ -127,6 +129,45 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
 
     return map;
   }, [sortedMessages, activities, persistedEvents]);
+
+  // Build thoughts map: correlate thoughts to messages by timestamp window
+  const thoughtsByMessage = useMemo(() => {
+    const map = new Map<string, Thought[]>();
+    if (thoughts.length === 0) return map;
+
+    const sortedThoughts = [...thoughts].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+
+    for (let i = 0; i < sortedMessages.length; i++) {
+      const msg = sortedMessages[i];
+      const isUser = msg.type === 'user' || msg.from_agent === 'user';
+      if (isUser) continue;
+
+      const prevMsg = sortedMessages[i - 1];
+      const startTs = prevMsg ? new Date(prevMsg.timestamp).getTime() : 0;
+      const endTs = new Date(msg.timestamp).getTime();
+
+      const relevant = sortedThoughts.filter((t) => {
+        const tTs = new Date(t.timestamp).getTime();
+        if (tTs <= startTs || tTs > endTs) return false;
+        // Match by agent name if available
+        if (msg.from_agent && msg.from_agent !== 'user') {
+          return (
+            t.agent_name === msg.from_agent ||
+            t.agent_name.toLowerCase().includes(msg.from_agent.toLowerCase())
+          );
+        }
+        return true;
+      });
+
+      if (relevant.length > 0) {
+        map.set(msg.id, relevant);
+      }
+    }
+
+    return map;
+  }, [sortedMessages, thoughts]);
 
   // Track scroll position to determine if user is near bottom
   const handleScroll = useCallback(() => {
@@ -230,6 +271,7 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
               key={message.id}
               message={message}
               toolCalls={toolCallsByMessage.get(message.id)}
+              thoughts={thoughtsByMessage.get(message.id)}
             />
           ))}
           <div ref={bottomRef} />
