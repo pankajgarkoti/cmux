@@ -15,7 +15,7 @@ from contextlib import contextmanager
 from pydantic import BaseModel
 
 from ..config import settings
-from ..models.message import Message, MessageType
+from ..models.message import Message, MessageType, TaskStatus
 
 
 class ArchivedAgent(BaseModel):
@@ -56,7 +56,8 @@ class ConversationStore:
                     to_agent TEXT NOT NULL,
                     type TEXT NOT NULL,
                     content TEXT NOT NULL,
-                    metadata TEXT
+                    metadata TEXT,
+                    task_status TEXT
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_messages_from_agent ON messages(from_agent);
@@ -92,6 +93,11 @@ class ConversationStore:
                 CREATE INDEX IF NOT EXISTS idx_agent_events_message ON agent_events(message_id);
                 CREATE INDEX IF NOT EXISTS idx_agent_events_timestamp ON agent_events(timestamp);
             """)
+            # Migration: add task_status column to existing databases
+            columns = [row[1] for row in conn.execute("PRAGMA table_info(messages)").fetchall()]
+            if "task_status" not in columns:
+                conn.execute("ALTER TABLE messages ADD COLUMN task_status TEXT")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_task_status ON messages(task_status)")
 
     @contextmanager
     def _get_connection(self):
@@ -112,8 +118,8 @@ class ConversationStore:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO messages
-                (id, timestamp, from_agent, to_agent, type, content, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (id, timestamp, from_agent, to_agent, type, content, metadata, task_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     message.id,
@@ -123,6 +129,7 @@ class ConversationStore:
                     message.type.value,
                     message.content,
                     json.dumps(message.metadata) if message.metadata else None,
+                    message.task_status.value if message.task_status else None,
                 )
             )
 
@@ -164,6 +171,59 @@ class ConversationStore:
                     type=MessageType(row["type"]),
                     content=row["content"],
                     metadata=json.loads(row["metadata"]) if row["metadata"] else None,
+                    task_status=TaskStatus(row["task_status"]) if row["task_status"] else None,
+                ))
+            return messages
+
+    def update_message_status(self, message_id: str, status: TaskStatus) -> bool:
+        """Update the task_status of a message. Returns True if a row was updated."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "UPDATE messages SET task_status = ? WHERE id = ?",
+                (status.value, message_id),
+            )
+            return cursor.rowcount > 0
+
+    def get_tasks(
+        self,
+        status: Optional[TaskStatus] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Message]:
+        """Get messages that have a task_status, optionally filtered by status."""
+        with self._get_connection() as conn:
+            if status:
+                cursor = conn.execute(
+                    """
+                    SELECT * FROM messages
+                    WHERE task_status IS NOT NULL AND task_status = ?
+                    ORDER BY timestamp DESC
+                    LIMIT ? OFFSET ?
+                    """,
+                    (status.value, limit, offset),
+                )
+            else:
+                cursor = conn.execute(
+                    """
+                    SELECT * FROM messages
+                    WHERE task_status IS NOT NULL
+                    ORDER BY timestamp DESC
+                    LIMIT ? OFFSET ?
+                    """,
+                    (limit, offset),
+                )
+
+            messages = []
+            for row in cursor.fetchall():
+                messages.append(Message(
+                    id=row["id"],
+                    timestamp=datetime.fromisoformat(row["timestamp"]),
+                    from_agent=row["from_agent"],
+                    to_agent=row["to_agent"],
+                    type=MessageType(row["type"]),
+                    content=row["content"],
+                    metadata=json.loads(row["metadata"]) if row["metadata"] else None,
+                    task_status=TaskStatus(row["task_status"]) if row["task_status"] else None,
                 ))
             return messages
 

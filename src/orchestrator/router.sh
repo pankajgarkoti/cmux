@@ -78,7 +78,8 @@ get_cmux_sessions() {
 #-------------------------------------------------------------------------------
 
 # Parse a single JSONL line and extract fields
-# Returns: timestamp|from|to|subject|body_path
+# Returns: id|timestamp|from|to|subject|body_path|status
+# For status_update records, returns: _status_update|id|status
 # Uses jq for reliable JSON parsing - no regex, no ambiguity
 parse_line() {
     local line="$1"
@@ -86,23 +87,35 @@ parse_line() {
     # Skip empty/whitespace-only lines
     [[ -z "${line// /}" ]] && return 1
 
+    # Check if this is a status_update record
+    local line_type
+    line_type=$(echo "$line" | jq -r '.type // ""' 2>/dev/null)
+    if [[ "$line_type" == "status_update" ]]; then
+        local update_parsed
+        if update_parsed=$(echo "$line" | jq -r '[.id // "", .status // ""] | join("|")' 2>/dev/null); then
+            echo "_status_update|$update_parsed"
+            return 0
+        fi
+        return 1
+    fi
+
     # Validate JSON and extract fields in one jq call
     local parsed
-    if ! parsed=$(echo "$line" | jq -r '[.ts // "", .from // "", .to // "", .subject // "", .body // ""] | join("|")' 2>/dev/null); then
+    if ! parsed=$(echo "$line" | jq -r '[.id // "", .ts // "", .from // "", .to // "", .subject // "", .body // "", .status // ""] | join("|")' 2>/dev/null); then
         log_route "PARSE_FAIL" "unknown" "unknown" "invalid JSON: ${line:0:60}"
         return 1
     fi
 
     # Verify we got required fields
-    local timestamp from to subject body_path
-    IFS='|' read -r timestamp from to subject body_path <<< "$parsed"
+    local msg_id timestamp from to subject body_path status
+    IFS='|' read -r msg_id timestamp from to subject body_path status <<< "$parsed"
 
     if [[ -z "$from" ]] || [[ -z "$to" ]] || [[ -z "$subject" ]]; then
         log_route "PARSE_FAIL" "${from:-unknown}" "${to:-unknown}" "missing required fields"
         return 1
     fi
 
-    log_route "PARSED" "$from" "$to" "subject=${subject:0:40}"
+    log_route "PARSED" "$from" "$to" "id=${msg_id:0:8} subject=${subject:0:40}"
     echo "$parsed"
     return 0
 }
@@ -116,22 +129,50 @@ store_message_via_api() {
     local to="$2"
     local content="$3"
     local msg_type="${4:-mailbox}"
+    local task_status="${5:-}"
 
     # Extract agent name from session:agent format
     local from_agent="${from##*:}"
     local to_agent="${to##*:}"
     [[ "$to" == "user" ]] && to_agent="user"
 
-    # Call internal API to store message and broadcast to WebSocket
-    curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/internal" \
-        -H "Content-Type: application/json" \
-        -d "{
+    # Build JSON payload
+    local payload
+    if [[ -n "$task_status" ]]; then
+        payload="{
+            \"from_agent\": \"$from_agent\",
+            \"to_agent\": \"$to_agent\",
+            \"content\": $(echo "$content" | jq -Rs .),
+            \"type\": \"$msg_type\",
+            \"task_status\": \"$task_status\"
+        }"
+    else
+        payload="{
             \"from_agent\": \"$from_agent\",
             \"to_agent\": \"$to_agent\",
             \"content\": $(echo "$content" | jq -Rs .),
             \"type\": \"$msg_type\"
-        }" >/dev/null 2>&1 || {
+        }"
+    fi
+
+    # Call internal API to store message and broadcast to WebSocket
+    curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/internal" \
+        -H "Content-Type: application/json" \
+        -d "$payload" >/dev/null 2>&1 || {
             log_route "WARN" "$from" "$to" "failed to store in DB (API unavailable)"
+        }
+}
+
+# Update a message's task status via API
+update_status_via_api() {
+    local msg_id="$1"
+    local new_status="$2"
+
+    curl -sf -X PATCH "http://localhost:${CMUX_PORT}/api/messages/${msg_id}/status" \
+        -H "Content-Type: application/json" \
+        -d "{\"status\": \"$new_status\"}" \
+        >/dev/null 2>&1 || {
+            log_route "WARN" "router" "api" "failed to update status for $msg_id"
         }
 }
 
@@ -140,17 +181,19 @@ store_message_via_api() {
 #-------------------------------------------------------------------------------
 
 route_message() {
-    local from="$1"
-    local to="$2"
-    local subject="$3"
-    local body_path="$4"
+    local msg_id="$1"
+    local from="$2"
+    local to="$3"
+    local subject="$4"
+    local body_path="$5"
+    local status="${6:-}"
 
     # Build content for storage
     local content="$subject"
     [[ -n "$body_path" ]] && content="$subject (see: $body_path)"
 
-    # Store in DB + broadcast to frontend
-    store_message_via_api "$from" "$to" "$content" "mailbox"
+    # Store in DB + broadcast to frontend (with task_status if present)
+    store_message_via_api "$from" "$to" "$content" "mailbox" "$status"
 
     # Route to user via API (handles both "user" and "cmux:user" / "session:user")
     local to_agent_name="${to##*:}"
@@ -212,6 +255,12 @@ route_message() {
         return 1
     fi
 
+    # Update task status to "working" after successful delivery
+    if [[ -n "$msg_id" ]]; then
+        update_status_via_api "$msg_id" "working"
+        log_route "STATUS" "$from" "$to" "id=${msg_id:0:8} -> working"
+    fi
+
     return 0
 }
 
@@ -268,9 +317,18 @@ process_mailbox() {
         # Parse JSONL line
         local parsed
         if parsed=$(parse_line "$line"); then
-            IFS='|' read -r timestamp from to subject body_path <<< "$parsed"
-            log_info "Routing: $from -> $to: $subject"
-            route_message "$from" "$to" "$subject" "$body_path"
+            # Check if this is a status_update record
+            if [[ "$parsed" == _status_update* ]]; then
+                local update_id update_status
+                IFS='|' read -r _ update_id update_status <<< "$parsed"
+                log_info "Status update: $update_id -> $update_status"
+                update_status_via_api "$update_id" "$update_status"
+            else
+                local msg_id timestamp from to subject body_path status
+                IFS='|' read -r msg_id timestamp from to subject body_path status <<< "$parsed"
+                log_info "Routing: $from -> $to: $subject"
+                route_message "$msg_id" "$from" "$to" "$subject" "$body_path" "$status"
+            fi
         else
             log_route "SKIP" "unknown" "unknown" "invalid line: ${line:0:50}..."
         fi

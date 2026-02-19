@@ -13,6 +13,14 @@ class MessageType(str, Enum):
     MAILBOX = "mailbox"  # Agent-to-agent messages routed via mailbox
 
 
+class TaskStatus(str, Enum):
+    SUBMITTED = "submitted"
+    WORKING = "working"
+    INPUT_REQUIRED = "input-required"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
 class Message(BaseModel):
     id: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
@@ -21,6 +29,7 @@ class Message(BaseModel):
     type: MessageType
     content: str
     metadata: Optional[dict] = None
+    task_status: Optional[TaskStatus] = None
 
 
 class MessageList(BaseModel):
@@ -40,3 +49,9 @@ class InternalMessage(BaseModel):
     content: str
     type: MessageType = MessageType.MAILBOX
     metadata: Optional[dict] = None
+    task_status: Optional[TaskStatus] = None
+
+
+class StatusUpdateRequest(BaseModel):
+    """Request to update a message's task lifecycle status."""
+    status: TaskStatus

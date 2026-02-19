@@ -3,13 +3,14 @@
 # mailbox - Send messages to other agents or the user
 #
 # Usage:
-#   mailbox send <to> "<subject>" "<body>"   - Send with body file attached
-#   mailbox quick <to> "<subject>"           - Quick notification (no body)
-#   mailbox done "<summary>"                 - Tell supervisor complete
-#   mailbox blocked "<issue>"                - Tell supervisor blocked
+#   mailbox send <to> "<subject>" "<body>"         - Send with body file attached
+#   mailbox quick <to> "<subject>"                 - Quick notification (no body)
+#   mailbox done "<summary>"                       - Tell supervisor complete
+#   mailbox blocked "<issue>"                      - Tell supervisor blocked
+#   mailbox update <message-id> <new-status>       - Update task lifecycle status
 #
 # Mailbox Format (JSONL - one JSON object per line):
-#   {"ts":"...","from":"cmux:worker","to":"cmux:supervisor","subject":"...","body":"path"}
+#   {"id":"...","ts":"...","from":"cmux:worker","to":"cmux:supervisor","subject":"...","status":"submitted","body":"path"}
 #
 # Recipients:
 #   supervisor, worker-name      - Adds cmux: prefix automatically
@@ -73,6 +74,26 @@ ensure_mailbox() {
     touch "$CMUX_MAILBOX"
 }
 
+# Generate a UUID (portable: uses uuidgen or Python fallback)
+generate_uuid() {
+    if command -v uuidgen &>/dev/null; then
+        uuidgen | tr '[:upper:]' '[:lower:]'
+    else
+        python3 -c "import uuid; print(uuid.uuid4())"
+    fi
+}
+
+# Valid task statuses
+VALID_STATUSES="submitted working input-required completed failed"
+
+validate_status() {
+    local status="$1"
+    for valid in $VALID_STATUSES; do
+        [[ "$status" == "$valid" ]] && return 0
+    done
+    return 1
+}
+
 # Build a JSONL mailbox line using jq (safe for any content)
 build_mailbox_line() {
     local from="$1"
@@ -80,15 +101,18 @@ build_mailbox_line() {
     local subject="$3"
     local body="${4:-}"
 
-    local ts
+    local ts msg_id
     ts=$(date -Iseconds)
+    msg_id=$(generate_uuid)
 
     if [[ -n "$body" ]]; then
-        jq -cn --arg ts "$ts" --arg from "$from" --arg to "$to" --arg subject "$subject" --arg body "$body" \
-            '{ts: $ts, from: $from, to: $to, subject: $subject, body: $body}'
+        jq -cn --arg id "$msg_id" --arg ts "$ts" --arg from "$from" --arg to "$to" \
+            --arg subject "$subject" --arg body "$body" --arg status "submitted" \
+            '{id: $id, ts: $ts, from: $from, to: $to, subject: $subject, body: $body, status: $status}'
     else
-        jq -cn --arg ts "$ts" --arg from "$from" --arg to "$to" --arg subject "$subject" \
-            '{ts: $ts, from: $from, to: $to, subject: $subject}'
+        jq -cn --arg id "$msg_id" --arg ts "$ts" --arg from "$from" --arg to "$to" \
+            --arg subject "$subject" --arg status "submitted" \
+            '{id: $id, ts: $ts, from: $from, to: $to, subject: $subject, status: $status}'
     fi
 }
 
@@ -221,6 +245,41 @@ cmd_read() {
     done
 }
 
+cmd_update() {
+    local msg_id="${1:-}"
+    local new_status="${2:-}"
+
+    [[ -z "$msg_id" ]] && die "usage: mailbox update <message-id> <new-status>"
+    [[ -z "$new_status" ]] && die "usage: mailbox update <message-id> <new-status>"
+
+    if ! validate_status "$new_status"; then
+        die "invalid status: $new_status (valid: $VALID_STATUSES)"
+    fi
+
+    local from=$(get_from_address)
+    local ts
+    ts=$(date -Iseconds)
+
+    # Append a status update record to the mailbox
+    local update_line
+    update_line=$(jq -cn --arg id "$msg_id" --arg ts "$ts" --arg from "$from" \
+        --arg status "$new_status" \
+        '{type: "status_update", id: $id, ts: $ts, from: $from, status: $status}')
+
+    ensure_mailbox
+    mailbox_lock
+    echo "$update_line" >> "$CMUX_MAILBOX"
+    mailbox_unlock
+
+    # Also update via API if server is running
+    curl -sf -X PATCH "http://localhost:${CMUX_PORT}/api/messages/${msg_id}/status" \
+        -H "Content-Type: application/json" \
+        -d "{\"status\": \"$new_status\"}" \
+        >/dev/null 2>&1 || true
+
+    ok "Updated $msg_id -> $new_status"
+}
+
 cmd_help() {
     cat << 'EOF'
 mailbox - Send messages to other agents or the user
@@ -229,13 +288,21 @@ USAGE:
     mailbox <command> [arguments]
 
 COMMANDS:
-    send <to> "<subject>" "<body>"   Send with body file attached
-    quick <to> "<subject>"           Quick notification (no body)
-    done "<summary>"                 Tell supervisor: [DONE] summary
-    blocked "<issue>"                Tell supervisor: [BLOCKED] issue
-    status "<update>"                Tell supervisor: [STATUS] update
-    read [lines]                     Show recent mailbox entries
-    help                             Show this help message
+    send <to> "<subject>" "<body>"       Send with body file attached
+    quick <to> "<subject>"               Quick notification (no body)
+    done "<summary>"                     Tell supervisor: [DONE] summary
+    blocked "<issue>"                    Tell supervisor: [BLOCKED] issue
+    status "<update>"                    Tell supervisor: [STATUS] update
+    update <message-id> <new-status>     Update task lifecycle status
+    read [lines]                         Show recent mailbox entries
+    help                                 Show this help message
+
+TASK STATUSES:
+    submitted       Message sent, awaiting pickup (default)
+    working         Being actively worked on
+    input-required  Blocked, needs input from sender
+    completed       Task finished successfully
+    failed          Task failed
 
 RECIPIENTS:
     supervisor, worker-auth          Adds session prefix automatically
@@ -258,15 +325,22 @@ EXAMPLES:
     # Progress update
     mailbox status "Implementing token refresh logic"
 
+    # Update task lifecycle
+    mailbox update abc-123 working
+    mailbox update abc-123 completed
+
     # Message to user
     mailbox send user "Bug Fixed" "Changed token.py line 42..."
 
 MAILBOX FORMAT:
     JSONL (one JSON object per line):
-    {"ts":"...","from":"cmux:worker","to":"cmux:supervisor","subject":"..."}
+    {"id":"...","ts":"...","from":"cmux:worker","to":"cmux:supervisor","subject":"...","status":"submitted"}
 
     With body:
-    {"ts":"...","from":"...","to":"...","subject":"...","body":"path/to/file.md"}
+    {"id":"...","ts":"...","from":"...","to":"...","subject":"...","body":"path/to/file.md","status":"submitted"}
+
+    Status update record:
+    {"type":"status_update","id":"...","ts":"...","from":"...","status":"working"}
 
 ENVIRONMENT:
     CMUX_MAILBOX        Path to mailbox file (default: .cmux/mailbox)
@@ -290,6 +364,7 @@ main() {
         done)    cmd_done "$@" ;;
         blocked) cmd_blocked "$@" ;;
         status)  cmd_status "$@" ;;
+        update)  cmd_update "$@" ;;
         read)    cmd_read "$@" ;;
         help|--help|-h) cmd_help ;;
         *)       die "unknown command: $cmd (try 'mailbox help')" ;;

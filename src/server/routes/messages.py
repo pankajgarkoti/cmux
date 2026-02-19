@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from datetime import datetime, timezone
 from typing import Optional
 import uuid
 
-from ..models.message import Message, MessageList, UserMessage, InternalMessage, MessageType
+from ..models.message import Message, MessageList, UserMessage, InternalMessage, MessageType, TaskStatus, StatusUpdateRequest
 from ..services.mailbox import mailbox_service
+from ..services.conversation_store import conversation_store
 from ..websocket.manager import ws_manager
 
 router = APIRouter()
@@ -23,6 +24,31 @@ async def get_messages(
         agent_id=agent_id
     )
     return MessageList(messages=messages, total=len(messages))
+
+
+@router.get("/tasks", response_model=MessageList)
+async def get_tasks(
+    status: Optional[TaskStatus] = Query(default=None, description="Filter by task status"),
+    limit: int = Query(default=50, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    """Get all messages with task lifecycle status, optionally filtered by status."""
+    messages = conversation_store.get_tasks(status=status, limit=limit, offset=offset)
+    return MessageList(messages=messages, total=len(messages))
+
+
+@router.patch("/{message_id}/status")
+async def update_message_status(message_id: str, body: StatusUpdateRequest):
+    """Update a message's task lifecycle status."""
+    updated = mailbox_service.update_message_status(message_id, body.status)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Message not found")
+    # Broadcast status change to frontend
+    await ws_manager.broadcast("task_status_update", {
+        "message_id": message_id,
+        "status": body.status.value,
+    })
+    return {"status": "updated", "message_id": message_id, "task_status": body.status.value}
 
 
 @router.post("/user")
@@ -68,7 +94,8 @@ async def store_internal_message(data: InternalMessage):
         to_agent=data.to_agent,
         content=data.content,
         type=data.type,
-        metadata=data.metadata
+        metadata=data.metadata,
+        task_status=data.task_status,
     )
 
     # Store in memory + SQLite

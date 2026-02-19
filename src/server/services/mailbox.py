@@ -8,7 +8,7 @@ import json
 import uuid
 
 from ..config import settings
-from ..models.message import Message
+from ..models.message import Message, TaskStatus
 from .conversation_store import conversation_store
 
 
@@ -71,11 +71,13 @@ class MailboxService:
 
         # Write JSONL mailbox entry (with cross-process file lock)
         entry = json.dumps({
+            "id": message_id,
             "ts": timestamp,
             "from": from_addr,
             "to": to_addr,
             "subject": subject,
             "body": str(body_path),
+            "status": "submitted",
         }, separators=(",", ":"))
 
         async with self._lock:
@@ -120,10 +122,12 @@ class MailboxService:
 
         # Build JSONL entry
         entry_data = {
+            "id": message_id,
             "ts": timestamp,
             "from": from_addr,
             "to": to_addr,
             "subject": subject,
+            "status": "submitted",
         }
 
         if body:
@@ -157,6 +161,20 @@ class MailboxService:
         self._messages.append(message)
         # Write-through to SQLite for persistence
         conversation_store.store_message(message)
+
+    def update_message_status(self, message_id: str, status: TaskStatus) -> bool:
+        """Update a message's task lifecycle status.
+
+        Updates both the in-memory cache and the SQLite store.
+        Returns True if the message was found and updated.
+        """
+        # Update in-memory
+        for msg in self._messages:
+            if msg.id == message_id:
+                msg.task_status = status
+                break
+        # Update in SQLite (source of truth)
+        return conversation_store.update_message_status(message_id, status)
 
     async def get_messages(
         self,
