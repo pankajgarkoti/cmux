@@ -252,10 +252,11 @@ start_compact() {
 #───────────────────────────────────────────────────────────────────────────────
 
 SUPERVISOR_HEARTBEAT_FILE="${CMUX_HEARTBEAT_FILE:-.cmux/.supervisor-heartbeat}"
-HEARTBEAT_WARN_THRESHOLD=${CMUX_HEARTBEAT_WARN:-600}    # seconds before warning (env: CMUX_HEARTBEAT_WARN)
-HEARTBEAT_PING_THRESHOLD=${CMUX_HEARTBEAT_PING:-900}    # seconds before sending ping (env: CMUX_HEARTBEAT_PING)
-HEARTBEAT_KILL_WAIT=${CMUX_HEARTBEAT_KILL:-300}          # seconds after ping before kill/respawn (env: CMUX_HEARTBEAT_KILL)
-HEARTBEAT_PING_SENT_AT=0        # timestamp when ping was sent (0 = not sent)
+HEARTBEAT_WARN_THRESHOLD=${CMUX_HEARTBEAT_WARN:-600}     # seconds idle before first nudge
+HEARTBEAT_NUDGE_INTERVAL=${CMUX_HEARTBEAT_NUDGE:-120}    # seconds to wait after each nudge for response
+HEARTBEAT_MAX_NUDGES=${CMUX_HEARTBEAT_MAX_NUDGES:-3}     # failed nudges before considering sentry
+NUDGE_COUNT=0               # how many consecutive nudges sent without heartbeat response
+NUDGE_SENT_AT=0             # timestamp when last nudge was sent (0 = not sent)
 
 # Sentry agent state
 SENTRY_ACTIVE=${SENTRY_ACTIVE:-false}
@@ -287,40 +288,114 @@ check_supervisor_heartbeat() {
 
     staleness=$((now - last_beat))
 
+    # If heartbeat updated since our last nudge, supervisor responded — reset
+    if ((NUDGE_SENT_AT > 0 && last_beat > NUDGE_SENT_AT)); then
+        NUDGE_COUNT=0
+        NUDGE_SENT_AT=0
+    fi
+
     if ((staleness < HEARTBEAT_WARN_THRESHOLD)); then
-        # Healthy
+        # Healthy — active within threshold
         printf "  Heartbeat:  ${GREEN}●${NC} ${staleness}s ago\n"
-        HEARTBEAT_PING_SENT_AT=0
+        NUDGE_COUNT=0
+        NUDGE_SENT_AT=0
         return
     fi
 
-    if ((staleness < HEARTBEAT_PING_THRESHOLD)); then
-        # Warning zone
-        printf "  Heartbeat:  ${YELLOW}●${NC} stale (${staleness}s ago)\n"
-        HEARTBEAT_PING_SENT_AT=0
+    # Past warn threshold — supervisor has been idle a while
+    # If no nudge sent yet, or enough time passed since last nudge, send one
+    if ((NUDGE_SENT_AT == 0)); then
+        # First nudge
+        NUDGE_COUNT=1
+        NUDGE_SENT_AT=$now
+        printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - sending productivity nudge (#${NUDGE_COUNT})\n"
+        log_status "HEARTBEAT" "Supervisor idle (${staleness}s), sending nudge #${NUDGE_COUNT}"
+        tmux_send_keys "$CMUX_SESSION" "supervisor" "You have been idle for ${staleness}s. Check your mailbox for pending messages, review active workers with './tools/workers list', consult the journal for pending items, or find proactive work to do."
         return
     fi
 
-    # Past ping threshold
-    if ((HEARTBEAT_PING_SENT_AT == 0)); then
-        # Send ping to supervisor
-        printf "  Heartbeat:  ${RED}●${NC} stale (${staleness}s) - sending ping\n"
-        tmux_send_keys "$CMUX_SESSION" "supervisor" "Are you still there? Please respond with a status update."
-        HEARTBEAT_PING_SENT_AT=$now
+    local since_nudge=$((now - NUDGE_SENT_AT))
+
+    if ((since_nudge < HEARTBEAT_NUDGE_INTERVAL)); then
+        # Still waiting for response to the last nudge
+        printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - waiting for nudge #${NUDGE_COUNT} response (${since_nudge}s/${HEARTBEAT_NUDGE_INTERVAL}s)\n"
         return
     fi
 
-    # Ping was already sent - check if enough time has passed
-    local since_ping=$((now - HEARTBEAT_PING_SENT_AT))
-    if ((since_ping < HEARTBEAT_KILL_WAIT)); then
-        printf "  Heartbeat:  ${RED}●${NC} stale (${staleness}s) - waiting for ping response (${since_ping}s/${HEARTBEAT_KILL_WAIT}s)\n"
+    # Nudge response window expired without heartbeat update
+    if ((NUDGE_COUNT < HEARTBEAT_MAX_NUDGES)); then
+        # Send another nudge
+        ((NUDGE_COUNT++))
+        NUDGE_SENT_AT=$now
+        printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - sending productivity nudge (#${NUDGE_COUNT}/${HEARTBEAT_MAX_NUDGES})\n"
+        log_status "HEARTBEAT" "Supervisor idle (${staleness}s), sending nudge #${NUDGE_COUNT}/${HEARTBEAT_MAX_NUDGES}"
+        tmux_send_keys "$CMUX_SESSION" "supervisor" "Nudge #${NUDGE_COUNT}: You have been idle for ${staleness}s with no tool activity. Please check for pending work — mailbox, worker status, journal TODOs — or report your status."
         return
     fi
 
-    # Still no heartbeat after ping + wait - spawn sentry for smart recovery
-    printf "  Heartbeat:  ${RED}●${NC} supervisor unresponsive (${staleness}s) - spawning sentry\n"
-    log_warn "Supervisor heartbeat expired after ping. Spawning sentry agent..."
+    # All nudges exhausted — perform hybrid liveness check before sentry.
+    # An idle supervisor at prompt with a live process is not stuck, just quiet.
+    if is_supervisor_process_alive && is_supervisor_at_prompt; then
+        printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - alive at prompt after ${NUDGE_COUNT} nudges (not stuck)\n"
+        log_status "HEARTBEAT" "Supervisor idle (${staleness}s) after ${NUDGE_COUNT} nudges, but process alive + at prompt — not stuck"
+        # Reset nudge cycle so we'll nudge again next round
+        NUDGE_COUNT=0
+        NUDGE_SENT_AT=0
+        return
+    fi
+
+    # Supervisor is genuinely stuck or dead — spawn sentry as last resort
+    printf "  Heartbeat:  ${RED}●${NC} supervisor unresponsive (${staleness}s, ${NUDGE_COUNT} nudges failed) - spawning sentry\n"
+    log_warn "Supervisor unresponsive after ${NUDGE_COUNT} nudges and liveness check failed. Spawning sentry."
+    NUDGE_COUNT=0
+    NUDGE_SENT_AT=0
     spawn_sentry
+}
+
+#───────────────────────────────────────────────────────────────────────────────
+# Supervisor Hybrid Liveness Helpers
+#───────────────────────────────────────────────────────────────────────────────
+
+# Check if a claude process is running inside the supervisor tmux pane.
+# Gets the pane's shell PID, then walks its process tree for a claude process.
+# Returns 0 if alive, 1 if dead.
+is_supervisor_process_alive() {
+    local pane_pid
+    pane_pid=$(tmux list-panes -t "${CMUX_SESSION}:supervisor" -F '#{pane_pid}' 2>/dev/null) || return 1
+    [[ -z "$pane_pid" ]] && return 1
+
+    # Check if the pane PID or any descendant is a claude process
+    # pgrep -P walks child processes; we also check the pane PID itself
+    if pgrep -a "claude" -P "$pane_pid" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    # Also check grandchildren (claude may be a child of the shell which is
+    # a child of the pane pid)
+    local child_pids
+    child_pids=$(pgrep -P "$pane_pid" 2>/dev/null) || return 1
+    local cpid
+    for cpid in $child_pids; do
+        if pgrep -a "claude" -P "$cpid" >/dev/null 2>&1; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# Check if the supervisor pane is showing an idle prompt (same pattern as
+# compact.sh's is_agent_idle). Returns 0 if at prompt, 1 if busy.
+is_supervisor_at_prompt() {
+    local pane_output
+    pane_output=$(tmux_capture_pane "$CMUX_SESSION" "supervisor" 20 2>/dev/null) || return 1
+
+    # Look for Claude Code prompt indicators (consistent with compact.sh)
+    if echo "$pane_output" | grep -qE '❯|bypass permissions|^> '; then
+        return 0
+    fi
+
+    return 1
 }
 
 #───────────────────────────────────────────────────────────────────────────────
