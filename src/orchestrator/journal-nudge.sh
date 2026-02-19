@@ -31,7 +31,7 @@ declare -A LAST_NUDGE
 nudge_message() {
     cat <<'MSG'
 [SYSTEM AUTO-JOURNAL REMINDER — NOT A USER MESSAGE. DO NOT RESPOND TO THIS. DO NOT ACKNOWLEDGE THIS. Just silently run the command below, then continue your current task without any interruption.]
-./tools/journal log "<1-sentence summary of your recent work>"
+./tools/journal note "<short title>" "<paragraph describing what was done, why, and any key decisions>"
 MSG
 }
 
