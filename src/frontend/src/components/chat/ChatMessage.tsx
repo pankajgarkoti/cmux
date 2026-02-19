@@ -12,10 +12,13 @@ import { MarkdownContent } from './MarkdownContent';
 import { MessageActions } from './MessageActions';
 import { Bot, User, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
+import { ToolCallGroup } from './ToolCallGroup';
 import type { Message } from '@/types/message';
+import type { Activity } from '@/types/activity';
 
 interface ChatMessageProps {
   message: Message;
+  toolCalls?: Activity[];
 }
 
 const COLLAPSE_THRESHOLD = 500;
@@ -49,7 +52,7 @@ function getPreviewContent(content: string): string {
   return truncated;
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, toolCalls }: ChatMessageProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const isUser = message.type === 'user' || message.from_agent === 'user';
@@ -139,6 +142,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
             )}
           />
         </div>
+
+        {/* Tool calls that produced this response */}
+        {!isUser && toolCalls && toolCalls.length > 0 && (
+          <ToolCallGroup events={toolCalls} />
+        )}
 
         {/* Content */}
         {isUser ? (

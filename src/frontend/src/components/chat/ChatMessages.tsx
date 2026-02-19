@@ -4,7 +4,9 @@ import { ChatMessage } from './ChatMessage';
 import { MessageSquare, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useActivityStore } from '@/stores/activityStore';
 import type { Message } from '@/types/message';
+import type { Activity } from '@/types/activity';
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -25,6 +27,7 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
   const prevMessageCountRef = useRef(messages.length);
+  const { activities } = useActivityStore();
 
   // Memoize sorted messages to prevent re-sorting on every render
   const sortedMessages = useMemo(
@@ -34,6 +37,45 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
       ),
     [messages]
   );
+
+  // Map each agent message to the tool calls that produced it.
+  // For each non-user message, collect tool_call activities between
+  // the previous message's timestamp and this message's timestamp.
+  const toolCallsByMessage = useMemo(() => {
+    const toolCalls = activities
+      .filter((a) => a.type === 'tool_call')
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    const map = new Map<string, Activity[]>();
+
+    for (let i = 0; i < sortedMessages.length; i++) {
+      const msg = sortedMessages[i];
+      const isUser = msg.type === 'user' || msg.from_agent === 'user';
+      if (isUser) continue;
+
+      const prevMsg = sortedMessages[i - 1];
+      const startTs = prevMsg ? new Date(prevMsg.timestamp).getTime() : 0;
+      const endTs = new Date(msg.timestamp).getTime();
+
+      // Find tool calls in the window, optionally matching agent
+      const relevant = toolCalls.filter((tc) => {
+        const tcTs = new Date(tc.timestamp).getTime();
+        if (tcTs <= startTs || tcTs > endTs) return false;
+        // If message is from a specific agent, prefer matching tool calls
+        if (msg.from_agent && msg.from_agent !== 'user') {
+          return tc.agent_id === msg.from_agent ||
+            tc.agent_id.toLowerCase().includes(msg.from_agent.toLowerCase());
+        }
+        return true;
+      });
+
+      if (relevant.length > 0) {
+        map.set(msg.id, relevant);
+      }
+    }
+
+    return map;
+  }, [sortedMessages, activities]);
 
   // Track scroll position to determine if user is near bottom
   const handleScroll = useCallback(() => {
@@ -133,7 +175,11 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
       >
         <div className="p-4 space-y-4">
           {sortedMessages.map((message) => (
-            <ChatMessage key={message.id} message={message} />
+            <ChatMessage
+              key={message.id}
+              message={message}
+              toolCalls={toolCallsByMessage.get(message.id)}
+            />
           ))}
           <div ref={bottomRef} />
         </div>
