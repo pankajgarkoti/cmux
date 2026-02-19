@@ -18,6 +18,38 @@ CHECK_INTERVAL=10
 MAX_FAILURES=3
 failure_count=0
 
+# Timeout constants (seconds)
+TIMEOUT_GIT_RESET=30
+TIMEOUT_CMD=120          # Per-command timeout for npm ci, uv sync, npm run build
+TIMEOUT_ROLLBACK=300     # Overall rollback timeout (5 minutes)
+
+# Portable timeout wrapper (macOS lacks GNU 'timeout')
+# Returns 0 on success, 124 on timeout, or the command's exit code on failure
+run_with_timeout() {
+    local timeout_secs="$1"
+    shift
+
+    "$@" &
+    local cmd_pid=$!
+
+    ( sleep "$timeout_secs" && kill -TERM "$cmd_pid" 2>/dev/null ) &
+    local watchdog_pid=$!
+
+    local exit_code=0
+    wait "$cmd_pid" 2>/dev/null || exit_code=$?
+
+    # Clean up watchdog
+    kill "$watchdog_pid" 2>/dev/null || true
+    wait "$watchdog_pid" 2>/dev/null || true
+
+    # 143 = 128 + 15 (SIGTERM) means the watchdog killed the process
+    if ((exit_code == 143)); then
+        return 124
+    fi
+
+    return "$exit_code"
+}
+
 check_server_health() {
     if curl -sf "http://localhost:${CMUX_PORT}/api/webhooks/health" >/dev/null 2>&1; then
         return 0
@@ -186,6 +218,50 @@ EOF
     log_info "Supervisor notified of rollback"
 }
 
+# Rebuild dependencies with per-command timeouts
+# Returns 0 if all succeeded, 1 if any step failed/timed out
+rebuild_deps() {
+    local had_failure=0
+
+    # Python dependencies (timeout 120s)
+    log_info "Running uv sync (timeout ${TIMEOUT_CMD}s)..."
+    if ! run_with_timeout "$TIMEOUT_CMD" uv sync; then
+        local uv_exit=$?
+        if ((uv_exit == 124)); then
+            log_status "BLOCKED" "uv sync timed out after ${TIMEOUT_CMD}s, skipping..."
+        else
+            log_status "BLOCKED" "uv sync failed (exit $uv_exit), skipping..."
+        fi
+        had_failure=1
+    fi
+
+    # Frontend: install dependencies (timeout 120s)
+    log_info "Running npm ci (timeout ${TIMEOUT_CMD}s)..."
+    if ! run_with_timeout "$TIMEOUT_CMD" bash -c "cd '${CMUX_PROJECT_ROOT}/src/frontend' && npm ci"; then
+        local npm_exit=$?
+        if ((npm_exit == 124)); then
+            log_status "BLOCKED" "npm ci timed out after ${TIMEOUT_CMD}s, skipping..."
+        else
+            log_status "BLOCKED" "npm ci failed (exit $npm_exit), skipping..."
+        fi
+        had_failure=1
+    fi
+
+    # Frontend: build (timeout 120s)
+    log_info "Running npm run build (timeout ${TIMEOUT_CMD}s)..."
+    if ! run_with_timeout "$TIMEOUT_CMD" bash -c "cd '${CMUX_PROJECT_ROOT}/src/frontend' && npm run build"; then
+        local build_exit=$?
+        if ((build_exit == 124)); then
+            log_status "BLOCKED" "npm run build timed out after ${TIMEOUT_CMD}s, skipping..."
+        else
+            log_status "BLOCKED" "npm run build failed (exit $build_exit), skipping..."
+        fi
+        had_failure=1
+    fi
+
+    return "$had_failure"
+}
+
 rollback_and_restart() {
     local target_commit="$1"
     log_status "IN_PROGRESS" "Rolling back to commit ${target_commit}"
@@ -195,23 +271,56 @@ rollback_and_restart() {
     # Stash any changes (preserves work for later recovery)
     git stash push -m "cmux-auto-rollback-$(date +%s)" 2>/dev/null || true
 
-    # Reset to target commit
-    git reset --hard "$target_commit"
+    # Reset to target commit (timeout 30s)
+    log_info "Running git reset --hard (timeout ${TIMEOUT_GIT_RESET}s)..."
+    if ! run_with_timeout "$TIMEOUT_GIT_RESET" git reset --hard "$target_commit"; then
+        local git_exit=$?
+        if ((git_exit == 124)); then
+            log_status "FAILED" "git reset --hard timed out after ${TIMEOUT_GIT_RESET}s"
+        else
+            log_status "FAILED" "git reset --hard failed (exit $git_exit)"
+        fi
+        return 1
+    fi
 
-    # Rebuild and restart
+    # Rebuild dependencies with timeouts
     log_info "Rebuilding after rollback..."
-
-    # Reinstall Python dependencies
-    uv sync
-
-    # Rebuild frontend
-    (cd src/frontend && npm install && npm run build)
+    rebuild_deps || log_status "BLOCKED" "Some rebuild steps failed, continuing with restart..."
 
     # Restart server only (keep tmux sessions alive!)
     stop_server
     start_server
 
     log_status "COMPLETE" "Rollback to ${target_commit} complete"
+}
+
+# Wrapper that enforces an overall timeout on rollback_and_restart
+# If the entire operation exceeds TIMEOUT_ROLLBACK, logs CRITICAL and notifies supervisor
+rollback_and_restart_timed() {
+    local target_commit="$1"
+
+    rollback_and_restart "$target_commit" &
+    local func_pid=$!
+
+    ( sleep "$TIMEOUT_ROLLBACK" && kill -TERM "$func_pid" 2>/dev/null ) &
+    local watchdog_pid=$!
+
+    local exit_code=0
+    wait "$func_pid" 2>/dev/null || exit_code=$?
+
+    # Clean up watchdog
+    kill "$watchdog_pid" 2>/dev/null || true
+    wait "$watchdog_pid" 2>/dev/null || true
+
+    if ((exit_code == 143)); then
+        log_status "FAILED" "CRITICAL: rollback_and_restart exceeded ${TIMEOUT_ROLLBACK}s timeout"
+        local timestamp
+        timestamp=$(date -Iseconds)
+        echo "[${timestamp}] system:health -> ${CMUX_SESSION}:supervisor: [ERROR] CRITICAL: Rollback to ${target_commit} timed out after ${TIMEOUT_ROLLBACK}s. Manual intervention required." >> .cmux/mailbox
+        return 1
+    fi
+
+    return "$exit_code"
 }
 
 stop_server() {
@@ -286,7 +395,7 @@ attempt_recovery() {
 
     # Rollback to healthy commit
     log_info "Rolling back to last healthy commit: $target_commit"
-    rollback_and_restart "$target_commit"
+    rollback_and_restart_timed "$target_commit"
 
     sleep "$CMUX_RECOVERY_WAIT"
 
@@ -309,7 +418,7 @@ attempt_recovery() {
         commit_hash=$(echo "$line" | cut -d' ' -f1)
 
         log_info "Trying rollback to $commit_hash..."
-        rollback_and_restart "$commit_hash"
+        rollback_and_restart_timed "$commit_hash"
 
         sleep "$CMUX_RECOVERY_WAIT"
 
@@ -338,6 +447,12 @@ main() {
                 mark_healthy
             fi
             failure_count=0
+
+            # Server is up — also verify frontend is healthy
+            if ! check_frontend_health; then
+                log_status "BLOCKED" "Frontend health check failed, attempting recovery..."
+                attempt_frontend_recovery || log_status "FAILED" "Frontend recovery failed"
+            fi
         else
             ((failure_count++))
             log_status "BLOCKED" "Server health check failed (${failure_count}/${MAX_FAILURES})"
