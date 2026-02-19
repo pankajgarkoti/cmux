@@ -5,6 +5,7 @@ import { useActivityStore } from '../stores/activityStore';
 import { useAgentEventStore } from '../stores/agentEventStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { useAgentStore } from '../stores/agentStore';
+import { useThoughtStore } from '../stores/thoughtStore';
 import { WS_URL, RECONNECT_DELAY_BASE, RECONNECT_DELAY_MAX } from '../lib/constants';
 import type { Activity } from '../types/activity';
 import type { AgentEvent } from '../types/agent_event';
@@ -20,6 +21,7 @@ export function useWebSocket() {
   const { addEvent } = useAgentEventStore();
   const { addSession, removeSession, updateSession } = useSessionStore();
   const { addArchivedAgent, viewArchive, selectedAgentId } = useAgentStore();
+  const { addThought } = useThoughtStore();
 
   // Calculate delay with exponential backoff
   const getReconnectDelay = useCallback(() => {
@@ -74,6 +76,20 @@ export function useWebSocket() {
             timestamp: data.data.timestamp || data.timestamp,
           };
           addEvent(agentEvent);
+        }
+
+        // Handle agent thought stream
+        if (data.event === 'agent_thought') {
+          addThought({
+            id: crypto.randomUUID(),
+            agent_name: data.data.agent_name,
+            thought_type: data.data.thought_type,
+            content: data.data.content,
+            tool_name: data.data.tool_name,
+            tool_input: data.data.tool_input,
+            tool_response: data.data.tool_response,
+            timestamp: data.data.timestamp || data.timestamp,
+          });
         }
 
         // Handle new messages for chat UI
@@ -151,7 +167,7 @@ export function useWebSocket() {
     };
 
     wsRef.current = ws;
-  }, [setConnected, setReconnecting, addActivity, addEvent, queryClient, getReconnectDelay, sendPong, addSession, removeSession, updateSession, addArchivedAgent, viewArchive, selectedAgentId]);
+  }, [setConnected, setReconnecting, addActivity, addEvent, addThought, queryClient, getReconnectDelay, sendPong, addSession, removeSession, updateSession, addArchivedAgent, viewArchive, selectedAgentId]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {

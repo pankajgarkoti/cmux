@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# PreToolUse hook: Stream agent reasoning to the CMUX dashboard
+# Extracts the last assistant reasoning from the transcript and POSTs it
+# as a live thought event. Async — must not block tool execution.
+
+[[ "${CMUX_AGENT:-}" != "true" ]] && exit 0
+
+set -uo pipefail
+
+AGENT_NAME="${CMUX_AGENT_NAME:-unknown}"
+THOUGHTS_URL="${CMUX_THOUGHTS_URL:-http://localhost:8000/api/thoughts}"
+
+# Read hook JSON from stdin
+input=$(cat)
+
+tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+tool_input=$(echo "$input" | jq -r '.tool_input // empty' | head -c 500)
+transcript_path=$(echo "$input" | jq -r '.transcript_path // empty')
+
+# Try to extract last assistant reasoning from transcript
+thought=""
+if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
+    thought=$(tail -5 "$transcript_path" 2>/dev/null \
+        | jq -r 'select(.type=="assistant") | .message.content[] | select(.type=="text") | .text' 2>/dev/null \
+        | tail -1 \
+        | head -c 500)
+fi
+
+# POST thought event (fail silently)
+curl -sf -X POST "$THOUGHTS_URL" \
+    -H "Content-Type: application/json" \
+    -d "$(jq -n \
+        --arg agent_name "$AGENT_NAME" \
+        --arg thought_type "reasoning" \
+        --arg content "$thought" \
+        --arg tool_name "$tool_name" \
+        --arg tool_input "$tool_input" \
+        '{
+            agent_name: $agent_name,
+            thought_type: $thought_type,
+            content: (if $content == "" then null else $content end),
+            tool_name: $tool_name,
+            tool_input: (if $tool_input == "" then null else $tool_input end)
+        }')" \
+    --max-time 5 \
+    >/dev/null 2>&1 || true
