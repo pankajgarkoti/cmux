@@ -233,6 +233,21 @@ start_journal_nudge() {
 }
 
 #───────────────────────────────────────────────────────────────────────────────
+# Compact Daemon (runs in background)
+#───────────────────────────────────────────────────────────────────────────────
+
+start_compact() {
+    if [[ -n "${COMPACT_PID:-}" ]] && kill -0 "$COMPACT_PID" 2>/dev/null; then
+        return 0  # Already running
+    fi
+
+    log_step "Starting compact daemon..."
+    "${SCRIPT_DIR}/compact.sh" &
+    COMPACT_PID=$!
+    log_ok "Compact daemon started (PID: $COMPACT_PID)"
+}
+
+#───────────────────────────────────────────────────────────────────────────────
 # Health Monitor Dashboard
 #───────────────────────────────────────────────────────────────────────────────
 
@@ -261,6 +276,11 @@ cleanup() {
     # Kill journal nudge daemon
     if [[ -n "${JOURNAL_NUDGE_PID:-}" ]]; then
         kill "$JOURNAL_NUDGE_PID" 2>/dev/null && printf "  ${GREEN}✓${NC} Journal nudge stopped\n"
+    fi
+
+    # Kill compact daemon
+    if [[ -n "${COMPACT_PID:-}" ]]; then
+        kill "$COMPACT_PID" 2>/dev/null && printf "  ${GREEN}✓${NC} Compact daemon stopped\n"
     fi
 
     # Kill FastAPI server with SIGTERM → SIGKILL escalation
@@ -368,6 +388,14 @@ run_dashboard() {
             start_journal_nudge
         fi
 
+        # Compact daemon status - restart if dead
+        if [[ -n "${COMPACT_PID:-}" ]] && kill -0 "$COMPACT_PID" 2>/dev/null; then
+            printf "  Compact:    ${GREEN}●${NC} running (PID: ${COMPACT_PID})\n"
+        else
+            printf "  Compact:    ${YELLOW}●${NC} restarting...\n"
+            start_compact
+        fi
+
         # Supervisor status
         if tmux_window_exists "$CMUX_SESSION" "supervisor"; then
             printf "  Supervisor: ${GREEN}●${NC} running\n"
@@ -460,7 +488,11 @@ main() {
     start_journal_nudge
     echo ""
 
-    # Phase 6: Run health dashboard (foreground)
+    # Phase 6: Start compact daemon
+    start_compact
+    echo ""
+
+    # Phase 7: Run health dashboard (foreground)
     log_ok "Entering dashboard mode..."
     sleep 2
     run_dashboard
