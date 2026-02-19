@@ -19,6 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 source "${SCRIPT_DIR}/lib/tmux.sh"
 source "${SCRIPT_DIR}/lib/logging.sh"
+source "${SCRIPT_DIR}/lib/filelock.sh"
 
 CMUX_SESSION="${CMUX_SESSION:-cmux}"
 CMUX_MAILBOX="${CMUX_MAILBOX:-.cmux/mailbox}"
@@ -238,12 +239,29 @@ process_mailbox() {
         return 0
     fi
 
-    # Process each new line (including lines without trailing newline)
-    local line_num=$((last_line + 1))
-    local lines_processed=0
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        lines_processed=$((lines_processed + 1))
+    # Lock mailbox during read + line marker update to prevent reading partial writes
+    mailbox_lock
 
+    # Re-check line count under lock (may have changed)
+    current_line=$(wc -l < "$CMUX_MAILBOX" | xargs)
+    if ((current_line <= last_line)); then
+        mailbox_unlock
+        return 0
+    fi
+
+    # Snapshot the new lines while holding the lock
+    local line_num=$((last_line + 1))
+    local new_lines
+    new_lines=$(tail -n +"$line_num" "$CMUX_MAILBOX")
+    local lines_processed=0
+    lines_processed=$(echo "$new_lines" | wc -l | xargs)
+
+    # Update line marker while still holding lock
+    save_line $((last_line + lines_processed))
+    mailbox_unlock
+
+    # Process lines outside the lock (routing can take time)
+    while IFS= read -r line || [[ -n "$line" ]]; do
         # Skip empty lines
         [[ -z "$line" ]] && continue
 
@@ -256,10 +274,7 @@ process_mailbox() {
         else
             log_route "SKIP" "unknown" "unknown" "invalid line: ${line:0:50}..."
         fi
-    done < <(tail -n +"$line_num" "$CMUX_MAILBOX")
-
-    # Save actual position based on lines processed (avoids TOCTOU duplicates)
-    save_line $((last_line + lines_processed))
+    done <<< "$new_lines"
 }
 
 #-------------------------------------------------------------------------------

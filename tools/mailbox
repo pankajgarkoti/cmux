@@ -19,6 +19,10 @@
 
 set -euo pipefail
 
+# Source portable file locking
+TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${TOOLS_DIR}/../src/orchestrator/lib/filelock.sh"
+
 CMUX_MAILBOX="${CMUX_MAILBOX:-.cmux/mailbox}"
 CMUX_PORT="${CMUX_PORT:-8000}"
 CMUX_SESSION="${CMUX_SESSION:-cmux}"
@@ -137,9 +141,11 @@ EOF
         return 0
     fi
 
-    # Append JSONL entry to mailbox
+    # Append JSONL entry to mailbox (with cross-process file lock)
     ensure_mailbox
+    mailbox_lock
     build_mailbox_line "$from" "$to_addr" "$subject" "$filepath" >> "$CMUX_MAILBOX"
+    mailbox_unlock
     ok "Sent: $subject -> $to"
     echo -e "${DIM}Body: $filepath${NC}"
 }
@@ -167,9 +173,11 @@ cmd_quick() {
         return 0
     fi
 
-    # JSONL entry without body
+    # JSONL entry without body (with cross-process file lock)
     ensure_mailbox
+    mailbox_lock
     build_mailbox_line "$from" "$to_addr" "$subject" >> "$CMUX_MAILBOX"
+    mailbox_unlock
     ok "Sent: $subject -> $to"
 }
 

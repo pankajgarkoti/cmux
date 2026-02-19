@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 source "${SCRIPT_DIR}/lib/logging.sh"
+source "${SCRIPT_DIR}/lib/filelock.sh"
 
 CMUX_SESSION="${CMUX_SESSION:-cmux}"
 CMUX_MAILBOX="${CMUX_MAILBOX:-.cmux/mailbox}"
@@ -145,7 +146,9 @@ analyze_log() {
 $errors
 \`\`\`
 EOF
+            mailbox_lock
             echo "[$timestamp] system:log-watcher -> cmux:supervisor: $summary (body: $alert_file)" >> "$CMUX_MAILBOX"
+            mailbox_unlock
             log_info "Reported $error_count errors from $(basename "$log_file")"
         fi
     fi
@@ -176,7 +179,9 @@ check_agent_discrepancies() {
         if ! echo "$actual_windows" | grep -q "^${window_name}$"; then
             local timestamp
             timestamp=$(date -Iseconds)
+            mailbox_lock
             echo "[$timestamp] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent '$agent' missing from tmux" >> "$CMUX_MAILBOX"
+            mailbox_unlock
         fi
     done <<< "$registered_agents"
 }

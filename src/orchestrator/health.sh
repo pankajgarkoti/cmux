@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 source "${SCRIPT_DIR}/lib/tmux.sh"
 source "${SCRIPT_DIR}/lib/logging.sh"
+source "${SCRIPT_DIR}/lib/filelock.sh"
 
 CMUX_PORT="${CMUX_PORT:-8000}"
 CMUX_SESSION="${CMUX_SESSION:-cmux}"
@@ -207,7 +208,9 @@ notify_supervisor_of_rollback() {
 
 ${message}
 EOF
+    mailbox_lock
     echo "[${timestamp}] system:health -> ${CMUX_SESSION}:supervisor: [ERROR] Auto-rollback occurred (body: ${body_path})" >> .cmux/mailbox
+    mailbox_unlock
 
     # Also send directly to tmux for immediate attention
     if tmux_window_exists "$CMUX_SESSION" "supervisor"; then

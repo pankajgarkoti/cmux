@@ -1,5 +1,6 @@
 import asyncio
 import aiofiles
+import fcntl
 from datetime import datetime, timezone
 from typing import List, Optional
 from collections import deque
@@ -9,6 +10,9 @@ import uuid
 from ..config import settings
 from ..models.message import Message
 from .conversation_store import conversation_store
+
+
+MAILBOX_LOCK_PATH = "/tmp/cmux-mailbox.lock"
 
 
 class MailboxService:
@@ -65,7 +69,7 @@ class MailboxService:
         async with aiofiles.open(body_path, "w") as f:
             await f.write(json.dumps(payload, indent=2, default=str))
 
-        # Write JSONL mailbox entry
+        # Write JSONL mailbox entry (with cross-process file lock)
         entry = json.dumps({
             "ts": timestamp,
             "from": from_addr,
@@ -75,8 +79,14 @@ class MailboxService:
         }, separators=(",", ":"))
 
         async with self._lock:
-            async with aiofiles.open(self.mailbox_path, "a") as f:
-                await f.write(entry + "\n")
+            lock_file = open(MAILBOX_LOCK_PATH, "w")
+            try:
+                fcntl.flock(lock_file, fcntl.LOCK_EX)
+                async with aiofiles.open(self.mailbox_path, "a") as f:
+                    await f.write(entry + "\n")
+            finally:
+                fcntl.flock(lock_file, fcntl.LOCK_UN)
+                lock_file.close()
 
     async def send_mailbox_message(
         self,
@@ -131,8 +141,14 @@ class MailboxService:
         entry = json.dumps(entry_data, separators=(",", ":"))
 
         async with self._lock:
-            async with aiofiles.open(self.mailbox_path, "a") as f:
-                await f.write(entry + "\n")
+            lock_file = open(MAILBOX_LOCK_PATH, "w")
+            try:
+                fcntl.flock(lock_file, fcntl.LOCK_EX)
+                async with aiofiles.open(self.mailbox_path, "a") as f:
+                    await f.write(entry + "\n")
+            finally:
+                fcntl.flock(lock_file, fcntl.LOCK_UN)
+                lock_file.close()
 
         return message_id
 
