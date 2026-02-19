@@ -10,12 +10,60 @@ import {
 } from '@/components/ui/tooltip';
 import { MarkdownContent } from './MarkdownContent';
 import { MessageActions } from './MessageActions';
-import { Bot, User, ChevronDown, ChevronUp } from 'lucide-react';
+import { Bot, User, ChevronDown, ChevronUp, HeartPulse, ShieldAlert, Radio } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { InterleavedTimeline } from './InterleavedTimeline';
 import type { Message } from '@/types/message';
 import type { Activity } from '@/types/activity';
 import type { Thought } from '@/stores/thoughtStore';
+
+// System notification patterns for heartbeat pings, sentry briefings, health alerts
+const SYSTEM_PATTERNS = [
+  { test: (c: string) => c.startsWith('SENTRY BRIEFING'), label: 'Sentry Recovery', icon: 'shield' as const },
+  { test: (c: string) => c.startsWith('SYSTEM ALERT'), label: 'System Alert', icon: 'shield' as const },
+  { test: (c: string) => c.startsWith('Are you still there? Please respond'), label: 'Heartbeat Ping', icon: 'heartbeat' as const },
+  { test: (c: string) => /^\[SYSTEM AUTO-JOURNAL/i.test(c), label: 'Journal Reminder', icon: 'radio' as const },
+] as const;
+
+const SYSTEM_AGENTS = new Set(['health', 'monitor', 'system']);
+
+type SystemIcon = 'heartbeat' | 'shield' | 'radio';
+
+function getSystemNotificationInfo(message: Message): { label: string; icon: SystemIcon; summary: string } | null {
+  const content = message.content.trim();
+
+  // Check from_agent for system sources
+  if (SYSTEM_AGENTS.has(message.from_agent)) {
+    if (content.includes('rollback') || content.includes('SYSTEM ALERT')) {
+      return { label: 'System Alert', icon: 'shield', summary: getFirstSentence(content) };
+    }
+    return { label: 'System Message', icon: 'radio', summary: getFirstSentence(content) };
+  }
+
+  // Check content patterns
+  for (const pattern of SYSTEM_PATTERNS) {
+    if (pattern.test(content)) {
+      return { label: pattern.label, icon: pattern.icon, summary: getFirstSentence(content) };
+    }
+  }
+
+  return null;
+}
+
+function getFirstSentence(content: string): string {
+  // Get the first meaningful sentence, max 120 chars
+  const cleaned = content.replace(/^(SENTRY BRIEFING:|SYSTEM ALERT:|---\s*MESSAGE\s*---[\s\S]*?---\s*)/i, '').trim();
+  const firstLine = cleaned.split(/[.\n]/)[0]?.trim() || cleaned;
+  return firstLine.length > 120 ? firstLine.slice(0, 117) + '...' : firstLine;
+}
+
+const SystemIconComponent = ({ icon }: { icon: SystemIcon }) => {
+  switch (icon) {
+    case 'heartbeat': return <HeartPulse className="h-3 w-3" />;
+    case 'shield': return <ShieldAlert className="h-3 w-3" />;
+    case 'radio': return <Radio className="h-3 w-3" />;
+  }
+};
 
 interface ChatMessageProps {
   message: Message;
@@ -54,8 +102,60 @@ function getPreviewContent(content: string): string {
   return truncated;
 }
 
+function SystemNotification({ message, info }: { message: Message; info: { label: string; icon: SystemIcon; summary: string } }) {
+  const [expanded, setExpanded] = useState(false);
+  const messageDate = new Date(message.timestamp);
+  const relativeTime = formatDistanceToNow(messageDate, { addSuffix: true });
+  const preciseTime = format(messageDate, 'MMM d, yyyy h:mm:ss a');
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2 py-1 max-w-full">
+        <div className="flex-1 h-px bg-border/40" />
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 hover:text-muted-foreground transition-colors px-2 py-0.5 rounded-full hover:bg-muted/50 shrink-0"
+        >
+          <SystemIconComponent icon={info.icon} />
+          <span className="font-medium">{info.label}</span>
+          {!expanded && (
+            <span className="max-w-[200px] truncate opacity-60">
+              {info.summary}
+            </span>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="opacity-50 whitespace-nowrap">{relativeTime}</span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">
+              {preciseTime}
+            </TooltipContent>
+          </Tooltip>
+          {expanded ? (
+            <ChevronUp className="h-2.5 w-2.5 opacity-50" />
+          ) : (
+            <ChevronDown className="h-2.5 w-2.5 opacity-50" />
+          )}
+        </button>
+        <div className="flex-1 h-px bg-border/40" />
+      </div>
+      {expanded && (
+        <div className="mx-8 bg-muted/30 border border-border/50 rounded-lg px-3 py-2 text-xs text-muted-foreground">
+          <MarkdownContent content={message.content} className="text-xs [&_p]:mb-1 [&_p]:last:mb-0" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ChatMessage({ message, toolCalls, thoughts }: ChatMessageProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Check if this is a system notification (heartbeat ping, sentry briefing, etc.)
+  const systemInfo = getSystemNotificationInfo(message);
+  if (systemInfo) {
+    return <SystemNotification message={message} info={systemInfo} />;
+  }
 
   const isUser = message.type === 'user' || message.from_agent === 'user';
   const messageDate = new Date(message.timestamp);
