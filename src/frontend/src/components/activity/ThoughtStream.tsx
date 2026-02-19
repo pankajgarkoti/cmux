@@ -64,7 +64,7 @@ export function ThoughtStream() {
 
   if (thoughts.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center p-4">
+      <div className="h-full flex items-center justify-center p-4">
         <div className="text-center">
           <Brain className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
           <p className="text-xs text-muted-foreground">
@@ -76,7 +76,7 @@ export function ThoughtStream() {
   }
 
   return (
-    <ScrollArea className="flex-1" viewportRef={viewportRef}>
+    <ScrollArea className="h-full" viewportRef={viewportRef}>
       <div className="py-1">
         {thoughts.map((thought) => (
           <ThoughtItem key={thought.id} thought={thought} />
