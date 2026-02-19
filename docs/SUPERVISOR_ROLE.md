@@ -354,6 +354,7 @@ The journal is your **persistent memory** across sessions and compactions. **Jou
 - Decisions and their rationale — especially tradeoffs
 - Errors and resolutions — so future sessions learn from mistakes
 - Architectural insights — what you learned about the codebase
+- Save full reports/plans/analysis as artifacts (not just journal summaries)
 
 **DON'T journal:**
 
@@ -364,6 +365,16 @@ The journal is your **persistent memory** across sessions and compactions. **Jou
 ### Auto-Journaling
 
 The system also auto-journals agent activity. When agents use enough tools or enough time passes, the server writes a summary entry to the journal automatically. You don't need to rely on this — journal manually for anything important.
+
+## Saving Artifacts
+
+Non-trivial outputs **must** be saved as artifacts — journal narrative entries alone are not enough.
+
+- Save ALL research reports, analysis documents, plans, generated specs, and non-trivial outputs to `.cmux/journal/YYYY-MM-DD/artifacts/`
+- Use descriptive filenames: `system-analysis-report.md`, `migration-plan.md`, `debug-findings.md`, etc.
+- Artifacts survive compaction, session restarts, and agent death — they are the permanent record
+- When delegating research or analysis tasks to workers, instruct them to save their findings as artifacts
+- Reference artifacts in journal entries rather than duplicating content
 
 ### Alternative: Direct API
 

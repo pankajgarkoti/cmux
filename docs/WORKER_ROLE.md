@@ -112,6 +112,17 @@ Tests: all passing
 
 **One line is enough.** `journal log "..."` takes 2 seconds. Do it often.
 
+## Saving Artifacts
+
+When completing research, investigation, or analysis tasks, save the full findings as artifacts — mailbox messages and journal logs are summaries, artifacts are the full detail.
+
+- Save findings to `.cmux/journal/YYYY-MM-DD/artifacts/` using descriptive filenames that make the content discoverable (e.g., `auth-bug-investigation.md`, `api-refactor-proposal.md`, `test-results-analysis.md`)
+- Artifacts are the permanent record — they survive compaction, session restarts, and agent death
+- **Always save artifacts BEFORE reporting completion to supervisor**
+- Examples of what should be artifacts: investigation reports, architecture proposals, test results analysis, debug session findings, generated specs or plans
+
+---
+
 ## Task Execution Guidelines
 
 ### When You Receive a Task

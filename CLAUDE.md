@@ -155,7 +155,7 @@ Agent events (from Claude Code hooks): `PostToolUse`, `Stop` - tracked in `route
 
 - `mailbox` - Message queue file
 - `status.log` - System status log
-- `journal/YYYY-MM-DD/` - Daily journals with artifacts
+- `journal/YYYY-MM-DD/` - Daily journals, rollback records, and `artifacts/` (research reports, plans, analysis docs, generated specs, debug findings — any non-trivial output that must survive compaction)
 
 ## API Structure
 
