@@ -1,9 +1,11 @@
-import { Terminal, Sun, Moon, GitBranch } from 'lucide-react';
+import { useState } from 'react';
+import { Terminal, Sun, Moon, GitBranch, Heart } from 'lucide-react';
 import { useThemeStore } from '../../stores/themeStore';
 import { Button } from '../ui/button';
 
 export function Header() {
   const { theme, toggleTheme } = useThemeStore();
+  const [hearted, setHearted] = useState(false);
 
   return (
     <header className="h-12 border-b border-border/50 flex items-center justify-between px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -29,6 +31,19 @@ export function Header() {
         <span className="text-xs text-muted-foreground font-mono hidden sm:inline">
           multi-agent orchestrator
         </span>
+
+        {/* Heart toggle */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setHearted(!hearted)}
+          className="h-8 w-8"
+        >
+          <Heart
+            className={`h-4 w-4 transition-colors ${hearted ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`}
+          />
+          <span className="sr-only">Toggle heart</span>
+        </Button>
 
         {/* Dark mode toggle */}
         <Button
