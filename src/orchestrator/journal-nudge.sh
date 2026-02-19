@@ -25,8 +25,9 @@ TOOL_THRESHOLD=15                # nudge after this many tool calls
 CHECK_INTERVAL=30                # seconds between checks
 MIN_NUDGE_INTERVAL=300           # minimum seconds between nudges for same agent
 
-# Track last nudge time per agent (agent_id -> epoch)
-declare -A LAST_NUDGE
+# Track last nudge time per agent using parallel arrays (bash 3.x compatible)
+NUDGE_AGENT_IDS=()
+NUDGE_AGENT_TIMES=()
 
 nudge_message() {
     cat <<'MSG'
@@ -78,12 +79,39 @@ get_agent_total_recent() {
 SQL
 }
 
+_get_last_nudge() {
+    local agent_id="$1"
+    local i
+    for ((i=0; i<${#NUDGE_AGENT_IDS[@]}; i++)); do
+        if [[ "${NUDGE_AGENT_IDS[$i]}" == "$agent_id" ]]; then
+            echo "${NUDGE_AGENT_TIMES[$i]}"
+            return
+        fi
+    done
+    echo "0"
+}
+
+_set_last_nudge() {
+    local agent_id="$1"
+    local ts="$2"
+    local i
+    for ((i=0; i<${#NUDGE_AGENT_IDS[@]}; i++)); do
+        if [[ "${NUDGE_AGENT_IDS[$i]}" == "$agent_id" ]]; then
+            NUDGE_AGENT_TIMES[$i]="$ts"
+            return
+        fi
+    done
+    NUDGE_AGENT_IDS+=("$agent_id")
+    NUDGE_AGENT_TIMES+=("$ts")
+}
+
 should_nudge() {
     local agent_id="$1"
     local now
     now=$(date +%s)
 
-    local last="${LAST_NUDGE[$agent_id]:-0}"
+    local last
+    last=$(_get_last_nudge "$agent_id")
     local elapsed=$((now - last))
 
     if ((elapsed < MIN_NUDGE_INTERVAL)); then
@@ -102,7 +130,7 @@ send_nudge() {
         local msg
         msg=$(nudge_message)
         tmux_send_keys "$CMUX_SESSION" "$agent_id" "$msg"
-        LAST_NUDGE[$agent_id]=$(date +%s)
+        _set_last_nudge "$agent_id" "$(date +%s)"
         log_info "Journal nudge sent to ${agent_id}"
         return 0
     fi
@@ -115,7 +143,7 @@ send_nudge() {
             local msg
             msg=$(nudge_message)
             tmux_send_keys "$session" "$agent_id" "$msg"
-            LAST_NUDGE[$agent_id]=$(date +%s)
+            _set_last_nudge "$agent_id" "$(date +%s)"
             log_info "Journal nudge sent to ${agent_id} in session ${session}"
             return 0
         fi

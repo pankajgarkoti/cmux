@@ -675,7 +675,13 @@ run_dashboard() {
             start_compact
         fi
 
-        # Sentry status
+        # Sentry status - sync from lockfile before checking
+        if [[ -f "$SENTRY_ACTIVE_FILE" ]]; then
+            SENTRY_ACTIVE=true
+        else
+            SENTRY_ACTIVE=false
+        fi
+
         if [[ "$SENTRY_ACTIVE" == "true" ]] || tmux_window_exists "$CMUX_SESSION" "sentry"; then
             if tmux_window_exists "$CMUX_SESSION" "sentry"; then
                 local sentry_age=0
