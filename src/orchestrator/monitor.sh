@@ -258,10 +258,10 @@ HEARTBEAT_KILL_WAIT=60          # seconds after ping before kill/respawn
 HEARTBEAT_PING_SENT_AT=0        # timestamp when ping was sent (0 = not sent)
 
 # Sentry agent state
-SENTRY_ACTIVE=false
-SENTRY_ACTIVE_FILE=".cmux/.sentry-active"
-SENTRY_TIMEOUT=300              # seconds before force-killing sentry
-SENTRY_STARTED_AT=0             # timestamp when sentry was spawned
+SENTRY_ACTIVE=${SENTRY_ACTIVE:-false}
+SENTRY_ACTIVE_FILE="${SENTRY_ACTIVE_FILE:-.cmux/.sentry-active}"
+SENTRY_TIMEOUT=${SENTRY_TIMEOUT:-300}              # seconds before force-killing sentry
+SENTRY_STARTED_AT=${SENTRY_STARTED_AT:-0}           # timestamp when sentry was spawned
 
 check_supervisor_heartbeat() {
     # Only check if supervisor window exists
@@ -699,6 +699,8 @@ run_dashboard() {
                 SENTRY_STARTED_AT=0
                 rm -f "$SENTRY_ACTIVE_FILE"
             fi
+        else
+            printf "  Sentry:     ${DIM}●${NC} inactive\n"
         fi
 
         # Supervisor status with sentry-aware auto-relaunch
