@@ -12,8 +12,7 @@ import { MarkdownContent } from './MarkdownContent';
 import { MessageActions } from './MessageActions';
 import { Bot, User, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
-import { ToolCallGroup } from './ToolCallGroup';
-import { ThoughtGroup } from './ThoughtGroup';
+import { InterleavedTimeline } from './InterleavedTimeline';
 import type { Message } from '@/types/message';
 import type { Activity } from '@/types/activity';
 import type { Thought } from '@/stores/thoughtStore';
@@ -146,14 +145,12 @@ export function ChatMessage({ message, toolCalls, thoughts }: ChatMessageProps) 
           />
         </div>
 
-        {/* Agent thoughts that led to this response */}
-        {!isUser && thoughts && thoughts.length > 0 && (
-          <ThoughtGroup thoughts={thoughts} />
-        )}
-
-        {/* Tool calls that produced this response */}
-        {!isUser && toolCalls && toolCalls.length > 0 && (
-          <ToolCallGroup events={toolCalls} />
+        {/* Interleaved thoughts + tool calls timeline */}
+        {!isUser && ((thoughts && thoughts.length > 0) || (toolCalls && toolCalls.length > 0)) && (
+          <InterleavedTimeline
+            thoughts={thoughts || []}
+            toolCalls={toolCalls || []}
+          />
         )}
 
         {/* Content */}
