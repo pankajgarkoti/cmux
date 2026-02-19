@@ -67,6 +67,7 @@ export function useWebSocket() {
             id: data.data.id || crypto.randomUUID(),
             event_type: data.data.event_type,
             session_id: data.data.session_id,
+            agent_id: data.data.agent_id,
             tool_name: data.data.tool_name,
             tool_input: data.data.tool_input,
             tool_output: data.data.tool_output,

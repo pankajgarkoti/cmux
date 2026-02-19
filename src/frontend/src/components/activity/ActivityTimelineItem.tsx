@@ -15,8 +15,15 @@ import {
   User,
   ChevronRight,
   Mail,
+  FileText,
+  FileEdit,
+  FolderSearch,
+  Search,
+  Play,
+  Globe,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { getToolSummary, getToolInputDetails, getToolOutputSummary } from '@/lib/toolSummary';
 import type { Activity, ActivityType } from '@/types/activity';
 
 interface ActivityTimelineItemProps {
@@ -72,12 +79,29 @@ const typeConfig: Record<
   },
 };
 
+// Map tool names to specific icons for more visual distinction
+const toolIcons: Record<string, typeof Terminal> = {
+  Read: FileText,
+  Write: FileEdit,
+  Edit: FileEdit,
+  Bash: Play,
+  Glob: FolderSearch,
+  Grep: Search,
+  WebFetch: Globe,
+  WebSearch: Globe,
+};
+
 export function ActivityTimelineItem({ activity, isLast }: ActivityTimelineItemProps) {
   const [isOpen, setIsOpen] = useState(false);
   const config = typeConfig[activity.type];
-  const Icon = config.icon;
   const time = formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true });
   const hasDetails = activity.data && Object.keys(activity.data).length > 0;
+
+  // For tool calls, use a tool-specific icon
+  const toolName = activity.data?.tool_name as string | undefined;
+  const ToolIcon = (activity.type === 'tool_call' && toolName)
+    ? (toolIcons[toolName] || Terminal)
+    : config.icon;
 
   return (
     <div className="relative pl-6">
@@ -93,7 +117,7 @@ export function ActivityTimelineItem({ activity, isLast }: ActivityTimelineItemP
           config.bgColor
         )}
       >
-        <Icon className={cn('h-3 w-3', config.color)} />
+        <ToolIcon className={cn('h-3 w-3', config.color)} />
       </div>
 
       {/* Content */}
@@ -116,7 +140,7 @@ export function ActivityTimelineItem({ activity, isLast }: ActivityTimelineItemP
                     variant="secondary"
                     className={cn('text-[10px] h-4 px-1', config.color)}
                   >
-                    {config.label}
+                    {activity.type === 'tool_call' && toolName ? toolName : config.label}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground truncate">
@@ -142,10 +166,18 @@ export function ActivityTimelineItem({ activity, isLast }: ActivityTimelineItemP
 
         {hasDetails && (
           <CollapsibleContent>
-            <div className="mt-1 ml-2 p-2 rounded bg-muted/50 text-xs">
-              <pre className="whitespace-pre-wrap text-muted-foreground font-mono overflow-x-auto">
-                {JSON.stringify(activity.data, null, 2)}
-              </pre>
+            <div className="mt-1 ml-2 rounded bg-muted/50 text-xs overflow-hidden">
+              {activity.type === 'tool_call' && toolName ? (
+                <ToolCallDetails
+                  toolName={toolName}
+                  toolInput={activity.data?.tool_input}
+                  toolOutput={activity.data?.tool_output}
+                />
+              ) : (
+                <pre className="whitespace-pre-wrap text-muted-foreground font-mono overflow-x-auto p-2">
+                  {JSON.stringify(activity.data, null, 2)}
+                </pre>
+              )}
             </div>
           </CollapsibleContent>
         )}
@@ -154,12 +186,74 @@ export function ActivityTimelineItem({ activity, isLast }: ActivityTimelineItemP
   );
 }
 
+/** Structured view for tool call details instead of raw JSON */
+function ToolCallDetails({
+  toolName,
+  toolInput,
+  toolOutput,
+}: {
+  toolName: string;
+  toolInput?: unknown;
+  toolOutput?: unknown;
+}) {
+  const [showOutput, setShowOutput] = useState(false);
+  const inputDetails = getToolInputDetails(toolName, toolInput);
+  const outputSummary = getToolOutputSummary(toolOutput);
+
+  return (
+    <div className="divide-y divide-border/50">
+      {/* Input details */}
+      {inputDetails.length > 0 && (
+        <div className="p-2 space-y-1">
+          {inputDetails.map((detail, i) => (
+            <div key={i} className="flex gap-2">
+              <span className="text-muted-foreground/70 flex-shrink-0 w-16 text-right">
+                {detail.label}:
+              </span>
+              <span className="text-foreground/80 font-mono break-all">
+                {detail.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Output (collapsed by default) */}
+      {outputSummary && (
+        <div>
+          <button
+            onClick={() => setShowOutput(!showOutput)}
+            className="w-full px-2 py-1 text-left text-muted-foreground/70 hover:text-muted-foreground hover:bg-muted/30 transition-colors flex items-center gap-1"
+          >
+            <ChevronRight className={cn('h-3 w-3 transition-transform', showOutput && 'rotate-90')} />
+            Output
+          </button>
+          {showOutput && (
+            <pre className="px-2 pb-2 whitespace-pre-wrap text-muted-foreground font-mono overflow-x-auto max-h-48 overflow-y-auto">
+              {outputSummary}
+            </pre>
+          )}
+        </div>
+      )}
+
+      {/* Fallback if no structured details */}
+      {inputDetails.length === 0 && !outputSummary && (
+        <pre className="p-2 whitespace-pre-wrap text-muted-foreground font-mono overflow-x-auto">
+          {JSON.stringify({ tool_input: toolInput, tool_output: toolOutput }, null, 2)}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 function getActivitySummary(activity: Activity): string {
   switch (activity.type) {
-    case 'tool_call':
-      return activity.data?.tool_name
-        ? `Tool: ${activity.data.tool_name}`
-        : 'Tool executed';
+    case 'tool_call': {
+      const toolName = activity.data?.tool_name as string | undefined;
+      const toolInput = activity.data?.tool_input;
+      if (toolName) return getToolSummary(toolName, toolInput);
+      return 'Tool executed';
+    }
     case 'user_message':
       return String(activity.data?.content || 'Message sent').slice(0, 100);
     case 'message_sent':
@@ -168,7 +262,7 @@ function getActivitySummary(activity: Activity): string {
       const from = activity.data?.from_agent || 'unknown';
       const to = activity.data?.to_agent || 'unknown';
       const content = String(activity.data?.content || '').slice(0, 60);
-      return `${from} → ${to}: ${content}`;
+      return `${from} \u2192 ${to}: ${content}`;
     }
     case 'webhook_received':
       return `From: ${activity.data?.source || 'external'}`;
