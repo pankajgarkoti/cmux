@@ -92,6 +92,20 @@ class ConversationStore:
                 CREATE INDEX IF NOT EXISTS idx_agent_events_agent ON agent_events(agent_id);
                 CREATE INDEX IF NOT EXISTS idx_agent_events_message ON agent_events(message_id);
                 CREATE INDEX IF NOT EXISTS idx_agent_events_timestamp ON agent_events(timestamp);
+
+                CREATE TABLE IF NOT EXISTS thoughts (
+                    id TEXT PRIMARY KEY,
+                    agent_name TEXT NOT NULL,
+                    thought_type TEXT NOT NULL,
+                    content TEXT,
+                    tool_name TEXT,
+                    tool_input TEXT,
+                    tool_response TEXT,
+                    timestamp TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_thoughts_agent_name ON thoughts(agent_name);
+                CREATE INDEX IF NOT EXISTS idx_thoughts_timestamp ON thoughts(timestamp);
             """)
             # Migration: add task_status column to existing databases
             columns = [row[1] for row in conn.execute("PRAGMA table_info(messages)").fetchall()]
@@ -464,6 +478,71 @@ class ConversationStore:
                 }
                 for row in cursor.fetchall()
             ]
+
+    # --- Thoughts ---
+
+    def store_thought(self, thought_data: dict) -> None:
+        """Store an agent thought."""
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO thoughts
+                (id, agent_name, thought_type, content, tool_name, tool_input, tool_response, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    thought_data["id"],
+                    thought_data["agent_name"],
+                    thought_data["thought_type"],
+                    thought_data.get("content"),
+                    thought_data.get("tool_name"),
+                    thought_data.get("tool_input"),
+                    thought_data.get("tool_response"),
+                    thought_data["timestamp"],
+                ),
+            )
+
+    def get_thoughts(
+        self,
+        agent_name: Optional[str] = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Get recent thoughts with optional agent_name filter."""
+        with self._get_connection() as conn:
+            conditions = []
+            params: list = []
+
+            if agent_name:
+                conditions.append("agent_name = ?")
+                params.append(agent_name)
+
+            where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+            params.append(limit)
+
+            cursor = conn.execute(
+                f"""
+                SELECT * FROM thoughts
+                {where}
+                ORDER BY timestamp DESC
+                LIMIT ?
+                """,
+                params,
+            )
+            return [self._row_to_thought(row) for row in cursor.fetchall()]
+
+    @staticmethod
+    def _row_to_thought(row: sqlite3.Row) -> dict:
+        """Convert a database row to a thought dict."""
+        return {
+            "id": row["id"],
+            "agent_name": row["agent_name"],
+            "thought_type": row["thought_type"],
+            "content": row["content"],
+            "tool_name": row["tool_name"],
+            "tool_input": row["tool_input"],
+            "tool_response": row["tool_response"],
+            "timestamp": row["timestamp"],
+        }
 
     @staticmethod
     def _row_to_event(row: sqlite3.Row) -> dict:
