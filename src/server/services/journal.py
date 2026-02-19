@@ -1,5 +1,5 @@
 from pathlib import Path
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 import aiofiles
 import aiofiles.os
 import re
@@ -50,14 +50,15 @@ class JournalService:
         journal_date = journal_date or date.today()
         await self.ensure_day_exists(journal_date)
 
+        now_local = datetime.now().astimezone()
         entry = JournalEntry(
             title=title,
             content=content,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=now_local,
         )
 
         journal_file = self._get_journal_file(journal_date)
-        time_str = entry.timestamp.strftime("%H:%M")
+        time_str = now_local.strftime("%H:%M")
 
         # Only append content body if non-empty (quick logs have no body)
         if content and content.strip():

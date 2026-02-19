@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from datetime import datetime, date, timezone
+from datetime import datetime, date
 from typing import Optional
 
 
@@ -8,7 +8,7 @@ class JournalEntry(BaseModel):
 
     title: str
     content: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now().astimezone())
 
 
 class JournalEntryCreate(BaseModel):
