@@ -54,6 +54,7 @@ export function ActivityTimeline() {
         title="Activity"
         actions={
           <div className="flex items-center gap-1">
+            <ActivityFilters activeFilters={filters} onFiltersChange={setFilters} />
             <Button
               variant="ghost"
               size="icon"
@@ -76,10 +77,7 @@ export function ActivityTimeline() {
         </div>
 
         <TabsContent value="activity" className="flex-1 overflow-hidden mt-0">
-          <div className="px-3 pt-1 pb-1">
-            <ActivityFilters activeFilters={filters} onFiltersChange={setFilters} />
-          </div>
-          <ScrollArea className="flex-1 h-[calc(100%-2rem)]">
+          <ScrollArea className="flex-1 h-full">
             <div className="p-3 pt-0 space-y-2">
               {displayedActivities.length === 0 ? (
                 <div className="text-center py-12">
