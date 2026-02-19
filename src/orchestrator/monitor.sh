@@ -218,6 +218,21 @@ start_log_watcher() {
 }
 
 #───────────────────────────────────────────────────────────────────────────────
+# Journal Nudge Daemon (runs in background)
+#───────────────────────────────────────────────────────────────────────────────
+
+start_journal_nudge() {
+    if [[ -n "${JOURNAL_NUDGE_PID:-}" ]] && kill -0 "$JOURNAL_NUDGE_PID" 2>/dev/null; then
+        return 0  # Already running
+    fi
+
+    log_step "Starting journal nudge daemon..."
+    "${SCRIPT_DIR}/journal-nudge.sh" &
+    JOURNAL_NUDGE_PID=$!
+    log_ok "Journal nudge daemon started (PID: $JOURNAL_NUDGE_PID)"
+}
+
+#───────────────────────────────────────────────────────────────────────────────
 # Health Monitor Dashboard
 #───────────────────────────────────────────────────────────────────────────────
 
@@ -241,6 +256,11 @@ cleanup() {
     # Kill log watcher background process
     if [[ -n "${LOG_WATCHER_PID:-}" ]]; then
         kill "$LOG_WATCHER_PID" 2>/dev/null && printf "  ${GREEN}✓${NC} Log watcher stopped\n"
+    fi
+
+    # Kill journal nudge daemon
+    if [[ -n "${JOURNAL_NUDGE_PID:-}" ]]; then
+        kill "$JOURNAL_NUDGE_PID" 2>/dev/null && printf "  ${GREEN}✓${NC} Journal nudge stopped\n"
     fi
 
     # Kill FastAPI server with SIGTERM → SIGKILL escalation
@@ -340,6 +360,14 @@ run_dashboard() {
             start_router
         fi
 
+        # Journal nudge status - restart if dead
+        if [[ -n "${JOURNAL_NUDGE_PID:-}" ]] && kill -0 "$JOURNAL_NUDGE_PID" 2>/dev/null; then
+            printf "  J-Nudge:    ${GREEN}●${NC} running (PID: ${JOURNAL_NUDGE_PID})\n"
+        else
+            printf "  J-Nudge:    ${YELLOW}●${NC} restarting...\n"
+            start_journal_nudge
+        fi
+
         # Supervisor status
         if tmux_window_exists "$CMUX_SESSION" "supervisor"; then
             printf "  Supervisor: ${GREEN}●${NC} running\n"
@@ -428,7 +456,11 @@ main() {
     start_log_watcher
     echo ""
 
-    # Phase 5: Run health dashboard (foreground)
+    # Phase 5: Start journal nudge daemon
+    start_journal_nudge
+    echo ""
+
+    # Phase 6: Run health dashboard (foreground)
     log_ok "Entering dashboard mode..."
     sleep 2
     run_dashboard
