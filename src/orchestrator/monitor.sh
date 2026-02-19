@@ -248,6 +248,84 @@ start_compact() {
 }
 
 #───────────────────────────────────────────────────────────────────────────────
+# Supervisor Heartbeat Monitor
+#───────────────────────────────────────────────────────────────────────────────
+
+SUPERVISOR_HEARTBEAT_FILE=".cmux/.supervisor-heartbeat"
+HEARTBEAT_WARN_THRESHOLD=120    # seconds before warning
+HEARTBEAT_PING_THRESHOLD=300    # seconds before sending ping
+HEARTBEAT_KILL_WAIT=60          # seconds after ping before kill/respawn
+HEARTBEAT_PING_SENT_AT=0        # timestamp when ping was sent (0 = not sent)
+
+check_supervisor_heartbeat() {
+    # Only check if supervisor window exists
+    if ! tmux_window_exists "$CMUX_SESSION" "supervisor"; then
+        return
+    fi
+
+    # If no heartbeat file yet, supervisor may still be starting up
+    if [[ ! -f "$SUPERVISOR_HEARTBEAT_FILE" ]]; then
+        printf "  Heartbeat:  ${DIM}●${NC} waiting for first heartbeat\n"
+        return
+    fi
+
+    local now last_beat staleness
+    now=$(date +%s)
+    last_beat=$(cat "$SUPERVISOR_HEARTBEAT_FILE" 2>/dev/null || echo 0)
+
+    # Guard against empty or non-numeric content
+    if ! [[ "$last_beat" =~ ^[0-9]+$ ]]; then
+        printf "  Heartbeat:  ${YELLOW}●${NC} invalid heartbeat data\n"
+        return
+    fi
+
+    staleness=$((now - last_beat))
+
+    if ((staleness < HEARTBEAT_WARN_THRESHOLD)); then
+        # Healthy
+        printf "  Heartbeat:  ${GREEN}●${NC} ${staleness}s ago\n"
+        HEARTBEAT_PING_SENT_AT=0
+        return
+    fi
+
+    if ((staleness < HEARTBEAT_PING_THRESHOLD)); then
+        # Warning zone
+        printf "  Heartbeat:  ${YELLOW}●${NC} stale (${staleness}s ago)\n"
+        HEARTBEAT_PING_SENT_AT=0
+        return
+    fi
+
+    # Past ping threshold
+    if ((HEARTBEAT_PING_SENT_AT == 0)); then
+        # Send ping to supervisor
+        printf "  Heartbeat:  ${RED}●${NC} stale (${staleness}s) - sending ping\n"
+        tmux_send_keys "$CMUX_SESSION" "supervisor" "Are you still there? Please respond with a status update."
+        HEARTBEAT_PING_SENT_AT=$now
+        return
+    fi
+
+    # Ping was already sent - check if enough time has passed
+    local since_ping=$((now - HEARTBEAT_PING_SENT_AT))
+    if ((since_ping < HEARTBEAT_KILL_WAIT)); then
+        printf "  Heartbeat:  ${RED}●${NC} stale (${staleness}s) - waiting for ping response (${since_ping}s/${HEARTBEAT_KILL_WAIT}s)\n"
+        return
+    fi
+
+    # Still no heartbeat after ping + wait - kill and respawn
+    printf "  Heartbeat:  ${RED}●${NC} supervisor unresponsive (${staleness}s) - respawning\n"
+    log_warn "Supervisor heartbeat expired after ping. Killing and respawning..."
+
+    # Kill the supervisor window
+    tmux kill-window -t "${CMUX_SESSION}:supervisor" 2>/dev/null || true
+    rm -f "$SUPERVISOR_HEARTBEAT_FILE"
+    HEARTBEAT_PING_SENT_AT=0
+
+    # Wait briefly then relaunch
+    sleep 2
+    launch_supervisor
+}
+
+#───────────────────────────────────────────────────────────────────────────────
 # Health Monitor Dashboard
 #───────────────────────────────────────────────────────────────────────────────
 
@@ -402,6 +480,9 @@ run_dashboard() {
         else
             printf "  Supervisor: ${RED}●${NC} not found\n"
         fi
+
+        # Supervisor heartbeat check
+        check_supervisor_heartbeat
 
         echo ""
 
