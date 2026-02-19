@@ -77,6 +77,23 @@ export const api = {
     return res.json();
   },
 
+  async getEventsByMessage(messageId: string): Promise<AgentEventsResponse> {
+    const res = await fetch(`${API_BASE}/api/agent-events/by-message/${encodeURIComponent(messageId)}`);
+    if (!res.ok) throw new Error('Failed to fetch events for message');
+    return res.json();
+  },
+
+  async getEventsByMessages(messageIds: string[]): Promise<Record<string, AgentEventsResponse['events']>> {
+    const res = await fetch(`${API_BASE}/api/agent-events/by-messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_ids: messageIds }),
+    });
+    if (!res.ok) throw new Error('Failed to fetch events for messages');
+    const data = await res.json();
+    return data.events_by_message;
+  },
+
   async getJournal(date?: string): Promise<JournalDayResponse> {
     const params = date ? `?date=${date}` : '';
     const res = await fetch(`${API_BASE}/api/journal${params}`);

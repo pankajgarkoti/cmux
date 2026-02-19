@@ -1,10 +1,12 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChatMessage } from './ChatMessage';
 import { MessageSquare, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useActivityStore } from '@/stores/activityStore';
+import { api } from '@/lib/api';
 import type { Message } from '@/types/message';
 import type { Activity } from '@/types/activity';
 
@@ -38,33 +40,79 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
     [messages]
   );
 
-  // Map each agent message to the tool calls that produced it.
-  // For each non-user message, collect tool_call activities between
-  // the previous message's timestamp and this message's timestamp.
+  // Collect non-user message IDs for bulk API fetch
+  const agentMessageIds = useMemo(
+    () =>
+      sortedMessages
+        .filter((m) => m.type !== 'user' && m.from_agent !== 'user')
+        .map((m) => m.id),
+    [sortedMessages]
+  );
+
+  // Fetch persisted tool calls from SQLite, keyed by message_id
+  const { data: persistedEvents } = useQuery({
+    queryKey: ['events-by-messages', agentMessageIds],
+    queryFn: () => api.getEventsByMessages(agentMessageIds),
+    enabled: agentMessageIds.length > 0,
+    staleTime: 30_000, // refetch every 30s to pick up newly-linked events
+    refetchOnWindowFocus: false,
+  });
+
+  // Build tool calls map: merge persisted (SQLite) + live (activity store)
   const toolCallsByMessage = useMemo(() => {
-    const toolCalls = activities
+    const map = new Map<string, Activity[]>();
+
+    // 1) Persisted events from SQLite (these have message_id set)
+    if (persistedEvents) {
+      for (const [msgId, events] of Object.entries(persistedEvents)) {
+        if (events && events.length > 0) {
+          map.set(
+            msgId,
+            events.map((e) => ({
+              id: e.id,
+              timestamp: e.timestamp,
+              type: 'tool_call' as const,
+              agent_id: e.agent_id || '',
+              data: {
+                tool_name: e.tool_name,
+                tool_input: e.tool_input,
+                tool_output: e.tool_output,
+              },
+            }))
+          );
+        }
+      }
+    }
+
+    // 2) Live events from activity store (for the most recent message
+    //    where events haven't been linked to a message_id yet)
+    const liveToolCalls = activities
       .filter((a) => a.type === 'tool_call')
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-    const map = new Map<string, Activity[]>();
-
-    for (let i = 0; i < sortedMessages.length; i++) {
+    // Only supplement the last agent message with live events
+    // (earlier messages should already have persisted events)
+    for (let i = sortedMessages.length - 1; i >= 0; i--) {
       const msg = sortedMessages[i];
       const isUser = msg.type === 'user' || msg.from_agent === 'user';
       if (isUser) continue;
 
+      // If this message already has persisted events, we're done
+      if (map.has(msg.id) && map.get(msg.id)!.length > 0) break;
+
+      // Find live tool calls in the timestamp window
       const prevMsg = sortedMessages[i - 1];
       const startTs = prevMsg ? new Date(prevMsg.timestamp).getTime() : 0;
       const endTs = new Date(msg.timestamp).getTime();
 
-      // Find tool calls in the window, optionally matching agent
-      const relevant = toolCalls.filter((tc) => {
+      const relevant = liveToolCalls.filter((tc) => {
         const tcTs = new Date(tc.timestamp).getTime();
         if (tcTs <= startTs || tcTs > endTs) return false;
-        // If message is from a specific agent, prefer matching tool calls
         if (msg.from_agent && msg.from_agent !== 'user') {
-          return tc.agent_id === msg.from_agent ||
-            tc.agent_id.toLowerCase().includes(msg.from_agent.toLowerCase());
+          return (
+            tc.agent_id === msg.from_agent ||
+            tc.agent_id.toLowerCase().includes(msg.from_agent.toLowerCase())
+          );
         }
         return true;
       });
@@ -72,10 +120,13 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
       if (relevant.length > 0) {
         map.set(msg.id, relevant);
       }
+
+      // Only do this for the last few messages
+      break;
     }
 
     return map;
-  }, [sortedMessages, activities]);
+  }, [sortedMessages, activities, persistedEvents]);
 
   // Track scroll position to determine if user is near bottom
   const handleScroll = useCallback(() => {

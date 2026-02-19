@@ -1,4 +1,4 @@
-"""SQLite-based persistent storage for messages and archived agents.
+"""SQLite-based persistent storage for messages, agent events, and archived agents.
 
 Provides durability across server restarts and archives worker conversations
 before they are killed.
@@ -74,6 +74,23 @@ class ConversationStore:
 
                 CREATE INDEX IF NOT EXISTS idx_archives_agent_id ON agent_archives(agent_id);
                 CREATE INDEX IF NOT EXISTS idx_archives_archived_at ON agent_archives(archived_at);
+
+                CREATE TABLE IF NOT EXISTS agent_events (
+                    id TEXT PRIMARY KEY,
+                    event_type TEXT NOT NULL,
+                    session_id TEXT NOT NULL,
+                    agent_id TEXT NOT NULL,
+                    tool_name TEXT,
+                    tool_input TEXT,
+                    tool_output TEXT,
+                    timestamp TEXT NOT NULL,
+                    message_id TEXT
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_agent_events_session ON agent_events(session_id);
+                CREATE INDEX IF NOT EXISTS idx_agent_events_agent ON agent_events(agent_id);
+                CREATE INDEX IF NOT EXISTS idx_agent_events_message ON agent_events(message_id);
+                CREATE INDEX IF NOT EXISTS idx_agent_events_timestamp ON agent_events(timestamp);
             """)
 
     @contextmanager
@@ -254,6 +271,152 @@ class ConversationStore:
     def get_messages_for_agent(self, agent_id: str, limit: int = 200) -> List[Message]:
         """Get all messages involving a specific agent."""
         return self.get_messages(limit=limit, agent_id=agent_id)
+
+    # --- Agent Events ---
+
+    def store_event(self, event_data: dict) -> None:
+        """Store an agent event."""
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO agent_events
+                (id, event_type, session_id, agent_id, tool_name, tool_input, tool_output, timestamp, message_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event_data["id"],
+                    event_data["event_type"],
+                    event_data["session_id"],
+                    event_data["agent_id"],
+                    event_data.get("tool_name"),
+                    json.dumps(event_data.get("tool_input")) if event_data.get("tool_input") is not None else None,
+                    json.dumps(event_data.get("tool_output")) if event_data.get("tool_output") is not None else None,
+                    event_data["timestamp"],
+                    event_data.get("message_id"),
+                ),
+            )
+
+    def link_events_to_message(self, agent_id: str, message_id: str, since_event_id: Optional[str] = None) -> int:
+        """Link unlinked tool call events for an agent to a message.
+
+        Finds all events for this agent that have no message_id set
+        (i.e. tool calls between the last Stop and this Stop) and sets their message_id.
+
+        Returns the number of events linked.
+        """
+        with self._get_connection() as conn:
+            if since_event_id:
+                # Link events after a specific event ID
+                cursor = conn.execute(
+                    """
+                    UPDATE agent_events
+                    SET message_id = ?
+                    WHERE agent_id = ?
+                      AND message_id IS NULL
+                      AND event_type = 'PostToolUse'
+                      AND timestamp >= (SELECT timestamp FROM agent_events WHERE id = ?)
+                    """,
+                    (message_id, agent_id, since_event_id),
+                )
+            else:
+                # Link all unlinked tool call events for this agent
+                cursor = conn.execute(
+                    """
+                    UPDATE agent_events
+                    SET message_id = ?
+                    WHERE agent_id = ?
+                      AND message_id IS NULL
+                      AND event_type = 'PostToolUse'
+                    """,
+                    (message_id, agent_id),
+                )
+            return cursor.rowcount
+
+    def get_events_by_message(self, message_id: str) -> list[dict]:
+        """Get all agent events linked to a specific message."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT * FROM agent_events
+                WHERE message_id = ?
+                ORDER BY timestamp ASC
+                """,
+                (message_id,),
+            )
+            return [self._row_to_event(row) for row in cursor.fetchall()]
+
+    def get_events(
+        self,
+        session_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Get recent agent events with optional filters."""
+        with self._get_connection() as conn:
+            conditions = []
+            params: list = []
+
+            if session_id:
+                conditions.append("session_id = ?")
+                params.append(session_id)
+            if agent_id:
+                conditions.append("agent_id = ?")
+                params.append(agent_id)
+
+            where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+            params.append(limit)
+
+            cursor = conn.execute(
+                f"""
+                SELECT * FROM agent_events
+                {where}
+                ORDER BY timestamp DESC
+                LIMIT ?
+                """,
+                params,
+            )
+            return [self._row_to_event(row) for row in cursor.fetchall()]
+
+    def get_event_sessions(self) -> list[dict]:
+        """List all sessions that have sent events."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT session_id,
+                       COUNT(*) as event_count,
+                       MAX(timestamp) as last_event,
+                       (SELECT event_type FROM agent_events e2
+                        WHERE e2.session_id = e1.session_id
+                        ORDER BY timestamp DESC LIMIT 1) as last_event_type
+                FROM agent_events e1
+                GROUP BY session_id
+                ORDER BY last_event DESC
+                """
+            )
+            return [
+                {
+                    "session_id": row["session_id"],
+                    "event_count": row["event_count"],
+                    "last_event": row["last_event"],
+                    "last_event_type": row["last_event_type"],
+                }
+                for row in cursor.fetchall()
+            ]
+
+    @staticmethod
+    def _row_to_event(row: sqlite3.Row) -> dict:
+        """Convert a database row to an event dict."""
+        return {
+            "id": row["id"],
+            "event_type": row["event_type"],
+            "session_id": row["session_id"],
+            "agent_id": row["agent_id"],
+            "tool_name": row["tool_name"],
+            "tool_input": json.loads(row["tool_input"]) if row["tool_input"] else None,
+            "tool_output": json.loads(row["tool_output"]) if row["tool_output"] else None,
+            "timestamp": row["timestamp"],
+            "message_id": row["message_id"],
+        }
 
 
 # Singleton instance

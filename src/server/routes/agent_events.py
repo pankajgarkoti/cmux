@@ -1,5 +1,4 @@
 from fastapi import APIRouter, BackgroundTasks
-from collections import deque
 from datetime import datetime, timezone
 from typing import Any
 import uuid
@@ -7,32 +6,22 @@ import logging
 
 from ..models.agent_event import AgentEvent, AgentEventResponse, AgentEventType
 from ..models.message import Message, MessageType
+from ..services.conversation_store import conversation_store
 from ..services.mailbox import mailbox_service
 from ..services.tmux_service import tmux_service
 from ..websocket.manager import ws_manager
-from ..config import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# In-memory event buffer per session (limited size)
-_event_buffers: dict[str, deque] = {}
-
-# Track tool usage per agent for journal nudging
+# Track tool usage per agent for journal nudging (lightweight, OK in-memory)
 _agent_tool_counts: dict[str, int] = {}
 _agent_last_nudge: dict[str, datetime] = {}
 
 # Nudge agent to journal after this many tool uses or this many seconds
 JOURNAL_NUDGE_TOOL_THRESHOLD = 15
 JOURNAL_NUDGE_TIME_SECONDS = 300  # 5 minutes
-
-
-def _get_buffer(session_id: str) -> deque:
-    """Get or create event buffer for a session."""
-    if session_id not in _event_buffers:
-        _event_buffers[session_id] = deque(maxlen=settings.event_buffer_size)
-    return _event_buffers[session_id]
 
 
 @router.post("", response_model=AgentEventResponse)
@@ -44,15 +33,15 @@ async def receive_agent_event(event: AgentEvent, background_tasks: BackgroundTas
     - PostToolUse: After a tool (Bash, Write, Edit, Read) is executed
     - Stop: When the agent completes a response
 
-    Auto-journals agent activity based on tool usage frequency and time thresholds.
+    Events are persisted to SQLite. On Stop events, all preceding unlinked
+    tool calls for the agent are linked to the resulting message via message_id.
     """
     event_id = str(uuid.uuid4())[:8]
 
     # Use agent_id if available, fallback to session_id
     display_agent_id = event.agent_id if event.agent_id and event.agent_id != "unknown" else event.session_id
 
-    # Store in buffer
-    buffer = _get_buffer(event.session_id)
+    # Build event data
     event_data = {
         "id": event_id,
         "event_type": event.event_type.value,
@@ -62,8 +51,11 @@ async def receive_agent_event(event: AgentEvent, background_tasks: BackgroundTas
         "tool_input": _truncate_content(event.tool_input),
         "tool_output": _truncate_content(event.tool_output),
         "timestamp": event.timestamp.isoformat(),
+        "message_id": None,
     }
-    buffer.append(event_data)
+
+    # Persist to SQLite
+    conversation_store.store_event(event_data)
 
     # Broadcast agent_event to WebSocket clients
     await ws_manager.broadcast("agent_event", event_data)
@@ -84,6 +76,11 @@ async def receive_agent_event(event: AgentEvent, background_tasks: BackgroundTas
         )
         # Store in mailbox service for retrieval via /api/messages
         mailbox_service.store_message(msg)
+
+        # Link all unlinked tool call events for this agent to this message
+        linked = conversation_store.link_events_to_message(display_agent_id, msg.id)
+        logger.debug(f"Linked {linked} tool call events to message {msg.id}")
+
         # Broadcast to frontend so it appears in the chat
         await ws_manager.broadcast("new_message", msg.model_dump(mode="json"))
 
@@ -127,11 +124,14 @@ async def _maybe_nudge_journal(agent_id: str):
     except Exception:
         return
 
-    # Inject the nudge into the agent's tmux window
+    # Inject the nudge into the agent's tmux window.
+    # IMPORTANT: This must NOT look like a user message. It must be clearly
+    # an automated system directive so the agent doesn't stop to acknowledge it.
     nudge = (
-        f'Quickly journal your recent work with: '
-        f'./tools/journal log "<brief summary of what you just did and why>" '
-        f'then continue working on your current task.'
+        f'[SYSTEM AUTO-JOURNAL REMINDER — NOT A USER MESSAGE. DO NOT RESPOND TO THIS. '
+        f'DO NOT ACKNOWLEDGE THIS. Just silently run the command below, then continue '
+        f'your current task without any interruption.]\n'
+        f'./tools/journal log "<1-sentence summary of your recent work>"'
     )
     try:
         await tmux_service.send_input(agent_id, nudge)
@@ -146,42 +146,52 @@ async def _maybe_nudge_journal(agent_id: str):
 
 
 @router.get("")
-async def list_agent_events(session_id: str | None = None, limit: int = 50):
+async def list_agent_events(
+    session_id: str | None = None,
+    agent_id: str | None = None,
+    limit: int = 50,
+):
     """
-    List recent agent events.
+    List recent agent events from SQLite.
 
     Args:
         session_id: Filter by session ID (optional)
+        agent_id: Filter by agent ID (optional)
         limit: Maximum number of events to return
     """
-    if session_id:
-        buffer = _get_buffer(session_id)
-        events = list(buffer)[-limit:]
-    else:
-        # Combine all buffers
-        all_events = []
-        for buf in _event_buffers.values():
-            all_events.extend(buf)
-        # Sort by timestamp descending
-        all_events.sort(key=lambda e: e["timestamp"], reverse=True)
-        events = all_events[:limit]
-
+    events = conversation_store.get_events(
+        session_id=session_id,
+        agent_id=agent_id,
+        limit=limit,
+    )
     return {"events": events, "total": len(events)}
+
+
+@router.get("/by-message/{message_id}")
+async def get_events_by_message(message_id: str):
+    """Get all agent events (tool calls) linked to a specific message."""
+    events = conversation_store.get_events_by_message(message_id)
+    return {"events": events, "total": len(events)}
+
+
+@router.post("/by-messages")
+async def get_events_by_messages(payload: dict):
+    """Get agent events for multiple messages at once.
+
+    Expects: {"message_ids": ["id1", "id2", ...]}
+    Returns: {"events_by_message": {"id1": [...], "id2": [...]}}
+    """
+    message_ids = payload.get("message_ids", [])
+    result: dict[str, list] = {}
+    for mid in message_ids:
+        result[mid] = conversation_store.get_events_by_message(mid)
+    return {"events_by_message": result}
 
 
 @router.get("/sessions")
 async def list_sessions():
     """List all sessions that have sent events."""
-    sessions = []
-    for session_id, buffer in _event_buffers.items():
-        if buffer:
-            latest = buffer[-1]
-            sessions.append({
-                "session_id": session_id,
-                "event_count": len(buffer),
-                "last_event": latest["timestamp"],
-                "last_event_type": latest["event_type"],
-            })
+    sessions = conversation_store.get_event_sessions()
     return {"sessions": sessions}
 
 
