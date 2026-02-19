@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Terminal, Sun, Moon, GitBranch, Heart } from 'lucide-react';
+import { Terminal, Sun, Moon, GitBranch, Heart, Star } from 'lucide-react';
 import { useThemeStore } from '../../stores/themeStore';
 import { Button } from '../ui/button';
 
+type HeartPhase = 'default' | 'red' | 'beating' | 'shining' | 'star';
+
 export function Header() {
   const { theme, toggleTheme } = useThemeStore();
-  const [heartState, setHeartState] = useState<0 | 1 | 2>(0); // 0=default, 1=red, 2=red+beating
+  const [phase, setPhase] = useState<HeartPhase>('default');
 
   return (
     <header className="h-12 border-b border-border/50 flex items-center justify-between px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -32,18 +34,30 @@ export function Header() {
           multi-agent orchestrator
         </span>
 
-        {/* Heart toggle: default → red → red+beating → default */}
+        {/* Heart toggle: default → red → beating(5x) → shining star → static star → default */}
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setHeartState(((heartState + 1) % 3) as 0 | 1 | 2)}
+          onClick={() => {
+            if (phase === 'default') setPhase('red');
+            else if (phase === 'red') setPhase('beating');
+            else if (phase === 'star') setPhase('default');
+          }}
           className="h-8 w-8"
         >
-          <Heart
-            className={`h-4 w-4 transition-colors ${
-              heartState >= 1 ? 'fill-red-500 text-red-500' : 'text-muted-foreground'
-            } ${heartState === 2 ? 'animate-heartbeat' : ''}`}
-          />
+          {phase === 'shining' || phase === 'star' ? (
+            <Star
+              className={`h-4 w-4 fill-yellow-400 text-yellow-400 ${phase === 'shining' ? 'animate-star-shine' : ''}`}
+              onAnimationEnd={() => setPhase('star')}
+            />
+          ) : (
+            <Heart
+              className={`h-4 w-4 transition-colors ${
+                phase !== 'default' ? 'fill-red-500 text-red-500' : 'text-muted-foreground'
+              } ${phase === 'beating' ? 'animate-heartbeat' : ''}`}
+              onAnimationEnd={() => setPhase('shining')}
+            />
+          )}
           <span className="sr-only">Toggle heart</span>
         </Button>
 

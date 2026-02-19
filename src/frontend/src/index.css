@@ -109,5 +109,17 @@
 }
 
 .animate-heartbeat {
-  animation: heartbeat 1s ease-in-out infinite;
+  animation: heartbeat 1s ease-in-out 5;
+}
+
+@keyframes star-shine {
+  0%   { filter: drop-shadow(0 0 0px transparent); transform: scale(0.5) rotate(-90deg); opacity: 0; }
+  30%  { filter: drop-shadow(0 0 6px #facc15); transform: scale(1.2) rotate(0deg); opacity: 1; }
+  60%  { filter: drop-shadow(0 0 10px #fbbf24) drop-shadow(0 0 20px #f59e0b); transform: scale(1.1) rotate(10deg); }
+  80%  { filter: drop-shadow(0 0 4px #facc15); transform: scale(1.05) rotate(-5deg); }
+  100% { filter: drop-shadow(0 0 0px transparent); transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.animate-star-shine {
+  animation: star-shine 0.8s ease-out 1 forwards;
 }
