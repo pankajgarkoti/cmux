@@ -286,10 +286,10 @@ function JournalFileItem({
 }: JournalFileItemProps) {
   const [isOpen, setIsOpen] = useState(false);
   const isSelected = selectedPath === item.path;
-  const hasChildren = item.type === 'directory' && item.children && item.children.length > 0;
+  const isDirectory = item.type === 'directory';
   const indent = 24 + level * 12; // Base indent + level offset
 
-  if (item.type === 'directory' && hasChildren) {
+  if (isDirectory) {
     return (
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger asChild>
