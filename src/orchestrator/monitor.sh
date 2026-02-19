@@ -251,10 +251,10 @@ start_compact() {
 # Supervisor Heartbeat Monitor
 #───────────────────────────────────────────────────────────────────────────────
 
-SUPERVISOR_HEARTBEAT_FILE=".cmux/.supervisor-heartbeat"
-HEARTBEAT_WARN_THRESHOLD=120    # seconds before warning
-HEARTBEAT_PING_THRESHOLD=300    # seconds before sending ping
-HEARTBEAT_KILL_WAIT=60          # seconds after ping before kill/respawn
+SUPERVISOR_HEARTBEAT_FILE="${CMUX_HEARTBEAT_FILE:-.cmux/.supervisor-heartbeat}"
+HEARTBEAT_WARN_THRESHOLD=${CMUX_HEARTBEAT_WARN:-600}    # seconds before warning (env: CMUX_HEARTBEAT_WARN)
+HEARTBEAT_PING_THRESHOLD=${CMUX_HEARTBEAT_PING:-900}    # seconds before sending ping (env: CMUX_HEARTBEAT_PING)
+HEARTBEAT_KILL_WAIT=${CMUX_HEARTBEAT_KILL:-300}          # seconds after ping before kill/respawn (env: CMUX_HEARTBEAT_KILL)
 HEARTBEAT_PING_SENT_AT=0        # timestamp when ping was sent (0 = not sent)
 
 # Sentry agent state
