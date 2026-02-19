@@ -53,10 +53,10 @@ function FileTreeNode({ item, onFileSelect, selectedPath, level }: FileTreeNodeP
   const [isOpen, setIsOpen] = useState(level < 2);
   const Icon = getFileIcon(item.name, item.type);
   const isSelected = selectedPath === item.path;
-  const hasChildren = item.type === 'directory' && item.children && item.children.length > 0;
+  const isDirectory = item.type === 'directory';
   const indent = level * 12;
 
-  if (item.type === 'directory' && hasChildren) {
+  if (isDirectory) {
     return (
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger asChild>
