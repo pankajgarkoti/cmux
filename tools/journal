@@ -37,9 +37,9 @@ cmd_log() {
     local entry="${1:-}"
     [[ -z "$entry" ]] && die "usage: journal log \"<what you did>\""
 
-    local content="**${CMUX_AGENT_NAME}**: ${entry}"
+    # Title becomes the heading; no body needed for quick logs
     local payload
-    payload=$(jq -n --arg title "$entry" --arg content "$content" \
+    payload=$(jq -n --arg title "${entry}" --arg content "" \
         '{title: $title, content: $content}')
 
     if curl -sf -X POST "${API}/entry" \
@@ -57,10 +57,8 @@ cmd_note() {
     [[ -z "$title" ]] && die "usage: journal note \"<title>\" \"<detail>\""
     [[ -z "$detail" ]] && die "usage: journal note \"<title>\" \"<detail>\""
 
-    local content
-    content=$(printf '**%s**\n\n%s' "$CMUX_AGENT_NAME" "$detail")
     local payload
-    payload=$(jq -n --arg title "$title" --arg content "$content" \
+    payload=$(jq -n --arg title "$title" --arg content "$detail" \
         '{title: $title, content: $content}')
 
     if curl -sf -X POST "${API}/entry" \
@@ -78,8 +76,7 @@ cmd_decision() {
     [[ -z "$what" ]] && die "usage: journal decision \"<what>\" \"<why>\""
     [[ -z "$why" ]] && die "usage: journal decision \"<what>\" \"<why>\""
 
-    local content
-    content=$(printf '**%s** made a decision:\n\n**Decision:** %s\n\n**Rationale:** %s' "$CMUX_AGENT_NAME" "$what" "$why")
+    local content="**Decision:** ${what}\n\n**Rationale:** ${why}"
     local payload
     payload=$(jq -n --arg title "Decision: $what" --arg content "$content" \
         '{title: $title, content: $content}')

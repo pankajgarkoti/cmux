@@ -129,8 +129,9 @@ async def _maybe_nudge_journal(agent_id: str):
 
     # Inject the nudge into the agent's tmux window
     nudge = (
-        f'Write a journal entry about your recent work using: '
-        f'./tools/journal log "<brief summary of what you just did and why>"'
+        f'Quickly journal your recent work with: '
+        f'./tools/journal log "<brief summary of what you just did and why>" '
+        f'then continue working on your current task.'
     )
     try:
         await tmux_service.send_input(agent_id, nudge)

@@ -59,7 +59,11 @@ class JournalService:
         journal_file = self._get_journal_file(journal_date)
         time_str = entry.timestamp.strftime("%H:%M")
 
-        entry_text = f"\n## {time_str} - {title}\n{content}\n"
+        # Only append content body if non-empty (quick logs have no body)
+        if content and content.strip():
+            entry_text = f"\n## {time_str} - {title}\n{content}\n"
+        else:
+            entry_text = f"\n## {time_str} - {title}\n"
 
         async with aiofiles.open(journal_file, "a") as f:
             await f.write(entry_text)
