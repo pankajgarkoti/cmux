@@ -255,14 +255,23 @@ SUPERVISOR_HEARTBEAT_FILE="${CMUX_HEARTBEAT_FILE:-.cmux/.supervisor-heartbeat}"
 HEARTBEAT_WARN_THRESHOLD=${CMUX_HEARTBEAT_WARN:-600}     # seconds idle before first nudge
 HEARTBEAT_NUDGE_INTERVAL=${CMUX_HEARTBEAT_NUDGE:-120}    # seconds to wait after each nudge for response
 HEARTBEAT_MAX_NUDGES=${CMUX_HEARTBEAT_MAX_NUDGES:-3}     # failed nudges before considering sentry
+HEARTBEAT_OBSERVE_TIMEOUT=${CMUX_HEARTBEAT_OBSERVE_TIMEOUT:-1200}  # seconds to observe mid-task supervisor before escalating
 NUDGE_COUNT=0               # how many consecutive nudges sent without heartbeat response
 NUDGE_SENT_AT=0             # timestamp when last nudge was sent (0 = not sent)
+OBSERVE_STARTED_AT=0        # timestamp when observation mode began (0 = not observing)
 
 # Sentry agent state
 SENTRY_ACTIVE=${SENTRY_ACTIVE:-false}
 SENTRY_ACTIVE_FILE="${SENTRY_ACTIVE_FILE:-.cmux/.sentry-active}"
 SENTRY_TIMEOUT=${SENTRY_TIMEOUT:-300}              # seconds before force-killing sentry
 SENTRY_STARTED_AT=${SENTRY_STARTED_AT:-0}           # timestamp when sentry was spawned
+
+# Reset all heartbeat escalation state
+reset_heartbeat_state() {
+    NUDGE_COUNT=0
+    NUDGE_SENT_AT=0
+    OBSERVE_STARTED_AT=0
+}
 
 check_supervisor_heartbeat() {
     # Only check if supervisor window exists
@@ -288,22 +297,73 @@ check_supervisor_heartbeat() {
 
     staleness=$((now - last_beat))
 
-    # If heartbeat updated since our last nudge, supervisor responded — reset
-    if ((NUDGE_SENT_AT > 0 && last_beat > NUDGE_SENT_AT)); then
-        NUDGE_COUNT=0
-        NUDGE_SENT_AT=0
+    # If heartbeat updated since we started nudging or observing, supervisor is active — reset
+    if ((NUDGE_SENT_AT > 0 && last_beat > NUDGE_SENT_AT)) || \
+       ((OBSERVE_STARTED_AT > 0 && last_beat > OBSERVE_STARTED_AT)); then
+        reset_heartbeat_state
     fi
 
     if ((staleness < HEARTBEAT_WARN_THRESHOLD)); then
         # Healthy — active within threshold
         printf "  Heartbeat:  ${GREEN}●${NC} ${staleness}s ago\n"
-        NUDGE_COUNT=0
-        NUDGE_SENT_AT=0
+        reset_heartbeat_state
         return
     fi
 
-    # Past warn threshold — supervisor has been idle a while
-    # If no nudge sent yet, or enough time passed since last nudge, send one
+    # ── Past warn threshold — supervisor has been quiet a while ──
+    # Branch on whether supervisor is at prompt (idle) or mid-task (busy).
+
+    if ! is_supervisor_at_prompt; then
+        # ── MID-TASK PATH ──
+        # Supervisor is actively working (not at prompt). Do NOT nudge or
+        # interrupt. Enter observation mode and watch for recovery.
+
+        if ((OBSERVE_STARTED_AT == 0)); then
+            # Enter observation mode
+            OBSERVE_STARTED_AT=$now
+            # Clear any prior nudge state — don't nudge a busy supervisor
+            NUDGE_COUNT=0
+            NUDGE_SENT_AT=0
+            log_status "HEARTBEAT" "Supervisor mid-task (stale ${staleness}s, not at prompt), entering observation mode"
+        fi
+
+        local observe_elapsed=$((now - OBSERVE_STARTED_AT))
+
+        if ((observe_elapsed < HEARTBEAT_OBSERVE_TIMEOUT)); then
+            # Still within observation window — keep watching
+            printf "  Heartbeat:  ${CYAN}●${NC} mid-task (${staleness}s) - observing (${observe_elapsed}s/${HEARTBEAT_OBSERVE_TIMEOUT}s)\n"
+            return
+        fi
+
+        # Observation timeout — supervisor may be stuck in a loop
+        log_status "HEARTBEAT" "Observation timeout (${observe_elapsed}s) with no heartbeat update or prompt — likely stuck"
+        OBSERVE_STARTED_AT=0
+
+        # Final liveness gate before sentry
+        if is_supervisor_process_alive; then
+            printf "  Heartbeat:  ${RED}●${NC} possibly stuck (${staleness}s, observed ${observe_elapsed}s) - no heartbeat or prompt\n"
+            log_warn "Supervisor possibly stuck after ${observe_elapsed}s observation. Process alive but no heartbeat or prompt. Spawning sentry."
+        else
+            printf "  Heartbeat:  ${RED}●${NC} supervisor dead (${staleness}s) - spawning sentry\n"
+            log_warn "Supervisor process dead after ${observe_elapsed}s observation. Spawning sentry."
+        fi
+
+        reset_heartbeat_state
+        spawn_sentry
+        return
+    fi
+
+    # ── IDLE PATH ──
+    # Supervisor IS at prompt. If we were observing (mid-task → finished), reset.
+
+    if ((OBSERVE_STARTED_AT > 0)); then
+        log_status "HEARTBEAT" "Supervisor returned to prompt after observation, task completed — resetting"
+        reset_heartbeat_state
+        printf "  Heartbeat:  ${GREEN}●${NC} ${staleness}s ago (task just completed)\n"
+        return
+    fi
+
+    # Send productivity nudges to idle supervisor
     if ((NUDGE_SENT_AT == 0)); then
         # First nudge
         NUDGE_COUNT=1
@@ -333,22 +393,20 @@ check_supervisor_heartbeat() {
         return
     fi
 
-    # All nudges exhausted — perform hybrid liveness check before sentry.
+    # All nudges exhausted — liveness check before sentry.
     # An idle supervisor at prompt with a live process is not stuck, just quiet.
-    if is_supervisor_process_alive && is_supervisor_at_prompt; then
+    if is_supervisor_process_alive; then
         printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - alive at prompt after ${NUDGE_COUNT} nudges (not stuck)\n"
         log_status "HEARTBEAT" "Supervisor idle (${staleness}s) after ${NUDGE_COUNT} nudges, but process alive + at prompt — not stuck"
         # Reset nudge cycle so we'll nudge again next round
-        NUDGE_COUNT=0
-        NUDGE_SENT_AT=0
+        reset_heartbeat_state
         return
     fi
 
-    # Supervisor is genuinely stuck or dead — spawn sentry as last resort
-    printf "  Heartbeat:  ${RED}●${NC} supervisor unresponsive (${staleness}s, ${NUDGE_COUNT} nudges failed) - spawning sentry\n"
-    log_warn "Supervisor unresponsive after ${NUDGE_COUNT} nudges and liveness check failed. Spawning sentry."
-    NUDGE_COUNT=0
-    NUDGE_SENT_AT=0
+    # Supervisor process is dead while at prompt — spawn sentry as last resort
+    printf "  Heartbeat:  ${RED}●${NC} supervisor unresponsive (${staleness}s, ${NUDGE_COUNT} nudges failed, process dead) - spawning sentry\n"
+    log_warn "Supervisor unresponsive after ${NUDGE_COUNT} nudges and process not found. Spawning sentry."
+    reset_heartbeat_state
     spawn_sentry
 }
 
