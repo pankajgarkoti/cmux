@@ -46,7 +46,7 @@ class MailboxService:
     ):
         """Send a message to the supervisor agent via mailbox.
 
-        Uses single-line format: [timestamp] from -> to: subject (body: path)
+        Uses JSONL format: one JSON object per line.
         The payload is written to a body file for the full content.
         """
         await self._ensure_mailbox()
@@ -65,13 +65,18 @@ class MailboxService:
         async with aiofiles.open(body_path, "w") as f:
             await f.write(json.dumps(payload, indent=2, default=str))
 
-        # Write single-line mailbox entry
-        body_rel = str(body_path)
-        line = f"[{timestamp}] {from_addr} -> {to_addr}: {subject} (body: {body_rel})"
+        # Write JSONL mailbox entry
+        entry = json.dumps({
+            "ts": timestamp,
+            "from": from_addr,
+            "to": to_addr,
+            "subject": subject,
+            "body": str(body_path),
+        }, separators=(",", ":"))
 
         async with self._lock:
             async with aiofiles.open(self.mailbox_path, "a") as f:
-                await f.write(line + "\n")
+                await f.write(entry + "\n")
 
     async def send_mailbox_message(
         self,
@@ -82,7 +87,7 @@ class MailboxService:
     ) -> str:
         """Send a message between agents via mailbox.
 
-        Uses single-line format: [timestamp] from -> to: subject (body: path)
+        Uses JSONL format: one JSON object per line.
         If body is provided, it's written to a file.
         """
         await self._ensure_mailbox()
@@ -103,7 +108,14 @@ class MailboxService:
         else:
             to_addr = to_agent
 
-        # Build mailbox line
+        # Build JSONL entry
+        entry_data = {
+            "ts": timestamp,
+            "from": from_addr,
+            "to": to_addr,
+            "subject": subject,
+        }
+
         if body:
             # Write body to file
             date_str = datetime.now().strftime("%Y-%m-%d")
@@ -114,13 +126,13 @@ class MailboxService:
             async with aiofiles.open(body_path, "w") as f:
                 await f.write(f"# {subject}\n\n{body}")
 
-            line = f"[{timestamp}] {from_addr} -> {to_addr}: {subject} (body: {body_path})"
-        else:
-            line = f"[{timestamp}] {from_addr} -> {to_addr}: {subject}"
+            entry_data["body"] = str(body_path)
+
+        entry = json.dumps(entry_data, separators=(",", ":"))
 
         async with self._lock:
             async with aiofiles.open(self.mailbox_path, "a") as f:
-                await f.write(line + "\n")
+                await f.write(entry + "\n")
 
         return message_id
 

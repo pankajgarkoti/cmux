@@ -166,9 +166,20 @@ launch_supervisor() {
         -d '{"agent_id": "supervisor", "agent_type": "supervisor", "created_by": "monitor.sh"}' \
         >/dev/null 2>&1 || log_warn "Failed to register supervisor"
 
-    # Send role instructions
+    # Build startup instruction with journal context
     log_step "Sending role instructions..."
-    tmux_send_keys "$CMUX_SESSION" "supervisor" "Read docs/SUPERVISOR_ROLE.md to understand your role as the CMUX supervisor agent. This file contains your instructions for managing workers, using the journal system, and coordinating tasks."
+    local startup_instruction="Read docs/SUPERVISOR_ROLE.md to understand your role as the CMUX supervisor agent. This file contains your instructions for managing workers, using the journal system, and coordinating tasks."
+
+    # Find the most recent journal and include it for continuity
+    local latest_journal=""
+    latest_journal=$(find .cmux/journal -name "journal.md" -type f 2>/dev/null | sort -r | head -1)
+    if [[ -n "$latest_journal" ]]; then
+        local journal_date
+        journal_date=$(basename "$(dirname "$latest_journal")")
+        startup_instruction="${startup_instruction} Then read ${latest_journal} to catch up on recent activity from ${journal_date}."
+    fi
+
+    tmux_send_keys "$CMUX_SESSION" "supervisor" "$startup_instruction"
 
     log_ok "Supervisor agent launched"
 }

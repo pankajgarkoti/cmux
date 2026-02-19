@@ -3,14 +3,14 @@
 # router.sh - Message Router Daemon
 #
 # Routes messages from the mailbox to target agents or the user.
-# Watches .cmux/mailbox for new single-line messages and delivers them.
+# Watches .cmux/mailbox for new JSONL messages and delivers them.
 #
-# Mailbox Format (single line):
-#   [timestamp] from -> to: subject (body: path)
+# Mailbox Format (one JSON object per line):
+#   {"ts":"...","from":"cmux:worker","to":"cmux:supervisor","subject":"...","body":"path"}
 #
 # Examples:
-#   [2026-01-31T06:00:00Z] cmux:worker-auth -> cmux:supervisor: [DONE] JWT complete
-#   [2026-01-31T06:00:00Z] cmux:worker -> user: Bug fixed (body: path/to/file.md)
+#   {"ts":"2026-01-31T06:00:00Z","from":"cmux:worker-auth","to":"cmux:supervisor","subject":"[DONE] JWT complete"}
+#   {"ts":"2026-01-31T06:00:00Z","from":"cmux:worker","to":"user","subject":"Bug fixed","body":"path/to/file.md"}
 #===============================================================================
 
 set -euo pipefail
@@ -46,7 +46,15 @@ log_route() {
 
 get_last_line() {
     if [[ -f "$LINE_MARKER" ]]; then
-        cat "$LINE_MARKER"
+        local val
+        val=$(cat "$LINE_MARKER")
+        # Validate: must be a non-negative integer
+        if [[ "$val" =~ ^[0-9]+$ ]]; then
+            echo "$val"
+        else
+            log_route "WARN" "router" "self" "invalid line marker '$val', resetting to 0"
+            echo "0"
+        fi
     else
         echo "0"
     fi
@@ -65,49 +73,37 @@ get_cmux_sessions() {
 }
 
 #-------------------------------------------------------------------------------
-# Message Parsing (Single-Line Format)
+# Message Parsing (JSONL)
 #-------------------------------------------------------------------------------
 
-# Parse: [timestamp] from -> to: subject (body: path)
+# Parse a single JSONL line and extract fields
+# Returns: timestamp|from|to|subject|body_path
+# Uses jq for reliable JSON parsing - no regex, no ambiguity
 parse_line() {
     local line="$1"
 
-    # Regex: [timestamp] from -> to: subject (body: path)?
-    # Note on address format: supports "agent" or "session:agent" (one colon max)
-    # The "to" field uses alternation: ([^\ :]+:[^\ :]+|[^\ :]+)
-    #   - Either: session:agent (two parts separated by colon, neither contains space/colon)
-    #   - Or: just agent (single part with no colon)
-    # This ensures we match "cmux:supervisor" correctly, not just "cmux"
-    if [[ "$line" =~ ^\[([^\]]+)\]\ ([^\ ]+)\ -\>\ ([^\ :]+:[^\ :]+|[^\ :]+):\ (.+)$ ]]; then
-        local timestamp="${BASH_REMATCH[1]}"
-        local from="${BASH_REMATCH[2]}"
-        local to="${BASH_REMATCH[3]}"
-        local rest="${BASH_REMATCH[4]}"
+    # Skip empty/whitespace-only lines
+    [[ -z "${line// /}" ]] && return 1
 
-        # Extract body path if present: (body: path)
-        local subject body_path
-        if [[ "$rest" =~ \(body:\ (.+)\)$ ]]; then
-            body_path="${BASH_REMATCH[1]}"
-            # Remove (body: path) from subject
-            subject="${rest% (body:*}"
-        else
-            subject="$rest"
-            body_path=""
-        fi
-
-        # Log successful parse for debugging
-        log_route "PARSED" "$from" "$to" "subject=${subject:0:40}"
-
-        # Output: timestamp|from|to|subject|body_path
-        echo "$timestamp|$from|$to|$subject|$body_path"
-        return 0
+    # Validate JSON and extract fields in one jq call
+    local parsed
+    if ! parsed=$(echo "$line" | jq -r '[.ts // "", .from // "", .to // "", .subject // "", .body // ""] | join("|")' 2>/dev/null); then
+        log_route "PARSE_FAIL" "unknown" "unknown" "invalid JSON: ${line:0:60}"
+        return 1
     fi
 
-    # Log parse failure for debugging
-    log_route "PARSE_FAIL" "unknown" "unknown" "line=${line:0:60}"
+    # Verify we got required fields
+    local timestamp from to subject body_path
+    IFS='|' read -r timestamp from to subject body_path <<< "$parsed"
 
-    # No match
-    return 1
+    if [[ -z "$from" ]] || [[ -z "$to" ]] || [[ -z "$subject" ]]; then
+        log_route "PARSE_FAIL" "${from:-unknown}" "${to:-unknown}" "missing required fields"
+        return 1
+    fi
+
+    log_route "PARSED" "$from" "$to" "subject=${subject:0:40}"
+    echo "$parsed"
+    return 0
 }
 
 #-------------------------------------------------------------------------------
@@ -155,8 +151,9 @@ route_message() {
     # Store in DB + broadcast to frontend
     store_message_via_api "$from" "$to" "$content" "mailbox"
 
-    # Route to user via API (already handled by store, but also send direct)
-    if [[ "$to" == "user" ]]; then
+    # Route to user via API (handles both "user" and "cmux:user" / "session:user")
+    local to_agent_name="${to##*:}"
+    if [[ "$to" == "user" ]] || [[ "$to_agent_name" == "user" ]]; then
         local from_agent="${from##*:}"
         curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/user" \
             -H "Content-Type: application/json" \
@@ -231,28 +228,38 @@ process_mailbox() {
     last_line=$(get_last_line)
     current_line=$(wc -l < "$CMUX_MAILBOX" | xargs)
 
+    # Detect mailbox truncation/recreation: reset marker if file shrunk
+    if ((current_line < last_line)); then
+        log_route "WARN" "router" "self" "mailbox shrunk (${last_line} -> ${current_line}), resetting position"
+        last_line=0
+    fi
+
     if ((current_line <= last_line)); then
         return 0
     fi
 
-    # Process each new line
+    # Process each new line (including lines without trailing newline)
     local line_num=$((last_line + 1))
-    tail -n +"$line_num" "$CMUX_MAILBOX" | while IFS= read -r line; do
+    local lines_processed=0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        lines_processed=$((lines_processed + 1))
+
         # Skip empty lines
         [[ -z "$line" ]] && continue
 
-        # Parse the single-line format
+        # Parse JSONL line
         local parsed
         if parsed=$(parse_line "$line"); then
             IFS='|' read -r timestamp from to subject body_path <<< "$parsed"
             log_info "Routing: $from -> $to: $subject"
             route_message "$from" "$to" "$subject" "$body_path"
         else
-            log_route "SKIP" "unknown" "unknown" "invalid format: ${line:0:50}..."
+            log_route "SKIP" "unknown" "unknown" "invalid line: ${line:0:50}..."
         fi
-    done
+    done < <(tail -n +"$line_num" "$CMUX_MAILBOX")
 
-    save_line "$current_line"
+    # Save actual position based on lines processed (avoids TOCTOU duplicates)
+    save_line $((last_line + lines_processed))
 }
 
 #-------------------------------------------------------------------------------
@@ -260,14 +267,20 @@ process_mailbox() {
 #-------------------------------------------------------------------------------
 
 main() {
-    log_info "Message router started (single-line format)"
+    log_info "Message router started (JSONL format)"
 
     # Ensure directories exist
     mkdir -p "$(dirname "$LINE_MARKER")"
     mkdir -p "$(dirname "$CMUX_ROUTER_LOG")"
 
+    # Verify jq is available
+    if ! command -v jq &>/dev/null; then
+        log_route "FATAL" "router" "self" "jq is required but not installed"
+        exit 1
+    fi
+
     # Log startup
-    log_route "STARTUP" "router" "all" "Router daemon started (v2 - single-line format)"
+    log_route "STARTUP" "router" "all" "Router daemon started (v3 - JSONL format)"
 
     while true; do
         process_mailbox

@@ -17,7 +17,8 @@ tmux_create_session() {
 tmux_window_exists() {
     local session="$1"
     local window="$2"
-    tmux list-windows -t "$session" -F "#{window_name}" 2>/dev/null | grep -q "^${window}$"
+    # Use -xF for exact fixed-string match (prevents regex injection via window names)
+    tmux list-windows -t "$session" -F "#{window_name}" 2>/dev/null | grep -qxF "$window"
 }
 
 # Create a new tmux window

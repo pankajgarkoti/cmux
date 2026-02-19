@@ -8,8 +8,8 @@
 #   mailbox done "<summary>"                 - Tell supervisor complete
 #   mailbox blocked "<issue>"                - Tell supervisor blocked
 #
-# Mailbox Format (single line):
-#   [timestamp] from -> to: subject (body: path)
+# Mailbox Format (JSONL - one JSON object per line):
+#   {"ts":"...","from":"cmux:worker","to":"cmux:supervisor","subject":"...","body":"path"}
 #
 # Recipients:
 #   supervisor, worker-name      - Adds cmux: prefix automatically
@@ -69,6 +69,25 @@ ensure_mailbox() {
     touch "$CMUX_MAILBOX"
 }
 
+# Build a JSONL mailbox line using jq (safe for any content)
+build_mailbox_line() {
+    local from="$1"
+    local to="$2"
+    local subject="$3"
+    local body="${4:-}"
+
+    local ts
+    ts=$(date -Iseconds)
+
+    if [[ -n "$body" ]]; then
+        jq -cn --arg ts "$ts" --arg from "$from" --arg to "$to" --arg subject "$subject" --arg body "$body" \
+            '{ts: $ts, from: $from, to: $to, subject: $subject, body: $body}'
+    else
+        jq -cn --arg ts "$ts" --arg from "$from" --arg to "$to" --arg subject "$subject" \
+            '{ts: $ts, from: $from, to: $to, subject: $subject}'
+    fi
+}
+
 #-------------------------------------------------------------------------------
 # Commands
 #-------------------------------------------------------------------------------
@@ -118,9 +137,9 @@ EOF
         return 0
     fi
 
-    # Append single-line entry to mailbox
+    # Append JSONL entry to mailbox
     ensure_mailbox
-    echo "[$timestamp] $from -> $to_addr: $subject (body: $filepath)" >> "$CMUX_MAILBOX"
+    build_mailbox_line "$from" "$to_addr" "$subject" "$filepath" >> "$CMUX_MAILBOX"
     ok "Sent: $subject -> $to"
     echo -e "${DIM}Body: $filepath${NC}"
 }
@@ -134,7 +153,6 @@ cmd_quick() {
 
     local from=$(get_from_address)
     local to_addr=$(normalize_to "$to")
-    local timestamp=$(date -Iseconds)
 
     # Special case: user messages go to API
     if [[ "$to_addr" == "user" ]]; then
@@ -149,9 +167,9 @@ cmd_quick() {
         return 0
     fi
 
-    # Single-line entry without body
+    # JSONL entry without body
     ensure_mailbox
-    echo "[$timestamp] $from -> $to_addr: $subject" >> "$CMUX_MAILBOX"
+    build_mailbox_line "$from" "$to_addr" "$subject" >> "$CMUX_MAILBOX"
     ok "Sent: $subject -> $to"
 }
 
@@ -174,7 +192,7 @@ cmd_status() {
 }
 
 cmd_read() {
-    # Show recent mailbox entries
+    # Show recent mailbox entries (pretty-printed from JSONL)
     local lines="${1:-10}"
 
     if [[ ! -f "$CMUX_MAILBOX" ]]; then
@@ -185,7 +203,13 @@ cmd_read() {
     echo -e "${CYAN}Recent mailbox entries:${NC}"
     echo ""
     tail -n "$lines" "$CMUX_MAILBOX" | while IFS= read -r line; do
-        echo -e "${DIM}$line${NC}"
+        # Pretty-print JSONL lines, fall back to raw for non-JSON
+        local formatted
+        if formatted=$(echo "$line" | jq -r '"[\(.ts)] \(.from) -> \(.to): \(.subject)"' 2>/dev/null); then
+            echo -e "${DIM}$formatted${NC}"
+        else
+            echo -e "${DIM}$line${NC}"
+        fi
     done
 }
 
@@ -230,17 +254,17 @@ EXAMPLES:
     mailbox send user "Bug Fixed" "Changed token.py line 42..."
 
 MAILBOX FORMAT:
-    Single-line entries:
-    [timestamp] from -> to: subject (body: path)
+    JSONL (one JSON object per line):
+    {"ts":"...","from":"cmux:worker","to":"cmux:supervisor","subject":"..."}
 
-    Example:
-    [2026-01-31T06:00:00Z] cmux:worker-auth -> cmux:supervisor: [DONE] JWT complete
+    With body:
+    {"ts":"...","from":"...","to":"...","subject":"...","body":"path/to/file.md"}
 
 ENVIRONMENT:
     CMUX_MAILBOX        Path to mailbox file (default: .cmux/mailbox)
-    CMUX_SESSION        tmux session name (default: cmux)
+    CMUX_SESSION         tmux session name (default: cmux)
     CMUX_AGENT_NAME     This agent's name (default: unknown)
-    CMUX_PORT           API server port (default: 8000)
+    CMUX_PORT            API server port (default: 8000)
 EOF
 }
 

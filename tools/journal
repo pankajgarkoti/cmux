@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+#===============================================================================
+# journal - Quick journal entries for CMUX agents
+#
+# Usage:
+#   journal log "<what you did>"                 - Quick one-liner
+#   journal note "<title>" "<detail>"            - Titled entry with detail
+#   journal decision "<what>" "<why>"            - Record a decision
+#   journal read [date]                          - Read today's (or given date's) journal
+#   journal dates                                - List dates with entries
+#
+# Designed for agents to journal instinctively with minimal friction.
+# Every command is one line - no excuses not to journal.
+#===============================================================================
+
+set -euo pipefail
+
+CMUX_PORT="${CMUX_PORT:-8000}"
+CMUX_AGENT_NAME="${CMUX_AGENT_NAME:-unknown}"
+API="http://localhost:${CMUX_PORT}/api/journal"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+DIM='\033[2m'
+NC='\033[0m'
+
+die() { echo -e "${RED}error:${NC} $1" >&2; exit 1; }
+ok() { echo -e "${GREEN}✓${NC} $1"; }
+
+#-------------------------------------------------------------------------------
+# Commands
+#-------------------------------------------------------------------------------
+
+cmd_log() {
+    local entry="${1:-}"
+    [[ -z "$entry" ]] && die "usage: journal log \"<what you did>\""
+
+    local content="**${CMUX_AGENT_NAME}**: ${entry}"
+    local payload
+    payload=$(jq -n --arg title "$entry" --arg content "$content" \
+        '{title: $title, content: $content}')
+
+    if curl -sf -X POST "${API}/entry" \
+        -H "Content-Type: application/json" \
+        -d "$payload" >/dev/null 2>&1; then
+        ok "Logged: ${entry:0:60}"
+    else
+        die "Failed to write journal (API unavailable)"
+    fi
+}
+
+cmd_note() {
+    local title="${1:-}"
+    local detail="${2:-}"
+    [[ -z "$title" ]] && die "usage: journal note \"<title>\" \"<detail>\""
+    [[ -z "$detail" ]] && die "usage: journal note \"<title>\" \"<detail>\""
+
+    local content
+    content=$(printf '**%s**\n\n%s' "$CMUX_AGENT_NAME" "$detail")
+    local payload
+    payload=$(jq -n --arg title "$title" --arg content "$content" \
+        '{title: $title, content: $content}')
+
+    if curl -sf -X POST "${API}/entry" \
+        -H "Content-Type: application/json" \
+        -d "$payload" >/dev/null 2>&1; then
+        ok "Noted: $title"
+    else
+        die "Failed to write journal (API unavailable)"
+    fi
+}
+
+cmd_decision() {
+    local what="${1:-}"
+    local why="${2:-}"
+    [[ -z "$what" ]] && die "usage: journal decision \"<what>\" \"<why>\""
+    [[ -z "$why" ]] && die "usage: journal decision \"<what>\" \"<why>\""
+
+    local content
+    content=$(printf '**%s** made a decision:\n\n**Decision:** %s\n\n**Rationale:** %s' "$CMUX_AGENT_NAME" "$what" "$why")
+    local payload
+    payload=$(jq -n --arg title "Decision: $what" --arg content "$content" \
+        '{title: $title, content: $content}')
+
+    if curl -sf -X POST "${API}/entry" \
+        -H "Content-Type: application/json" \
+        -d "$payload" >/dev/null 2>&1; then
+        ok "Decision recorded: $what"
+    else
+        die "Failed to write journal (API unavailable)"
+    fi
+}
+
+cmd_read() {
+    local target_date="${1:-$(date +%Y-%m-%d)}"
+
+    local response
+    response=$(curl -sf "${API}?date=${target_date}" 2>/dev/null) || die "Failed to read journal (API unavailable)"
+
+    local content
+    content=$(echo "$response" | jq -r '.content // ""')
+
+    if [[ -z "$content" ]] || [[ "$content" == "null" ]]; then
+        echo -e "${DIM}No journal entries for ${target_date}${NC}"
+    else
+        echo -e "${CYAN}Journal - ${target_date}${NC}"
+        echo ""
+        echo "$content"
+    fi
+}
+
+cmd_dates() {
+    local response
+    response=$(curl -sf "${API}/dates" 2>/dev/null) || die "Failed to list dates (API unavailable)"
+
+    local dates
+    dates=$(echo "$response" | jq -r '.dates[]? // empty')
+
+    if [[ -z "$dates" ]]; then
+        echo -e "${DIM}No journal entries found${NC}"
+    else
+        echo -e "${CYAN}Journal dates:${NC}"
+        echo "$dates"
+    fi
+}
+
+cmd_help() {
+    cat << 'EOF'
+journal - Quick journal entries for CMUX agents
+
+USAGE:
+    journal <command> [arguments]
+
+COMMANDS:
+    log "<entry>"                   Quick one-liner (most common)
+    note "<title>" "<detail>"       Titled entry with body
+    decision "<what>" "<why>"       Record a decision with rationale
+    read [YYYY-MM-DD]               Read journal (default: today)
+    dates                           List dates with entries
+    help                            Show this help
+
+EXAMPLES:
+    # Quick log (use this most often - it's one line!)
+    journal log "Fixed auth bug in token.py, was using wrong timezone"
+    journal log "Spawned worker-frontend for dashboard redesign"
+    journal log "Tests passing after JWT refactor"
+
+    # Detailed note
+    journal note "Auth Investigation" "Found three issues:
+    1. Token expiry uses local time instead of UTC
+    2. Refresh endpoint missing rate limiting
+    3. Session store not cleaned up on logout"
+
+    # Decision record
+    journal decision "Use JSONL for mailbox" "Eliminates parsing ambiguity, keeps file-based resilience"
+
+    # Read today's journal
+    journal read
+
+    # Read a specific day
+    journal read 2026-02-18
+
+ENVIRONMENT:
+    CMUX_AGENT_NAME    This agent's name (shown in entries)
+    CMUX_PORT          API server port (default: 8000)
+EOF
+}
+
+#-------------------------------------------------------------------------------
+# Main
+#-------------------------------------------------------------------------------
+
+main() {
+    local cmd="${1:-help}"
+    shift || true
+
+    case "$cmd" in
+        log)      cmd_log "$@" ;;
+        note)     cmd_note "$@" ;;
+        decision) cmd_decision "$@" ;;
+        read)     cmd_read "$@" ;;
+        dates)    cmd_dates "$@" ;;
+        help|--help|-h) cmd_help ;;
+        *)        die "unknown command: $cmd (try 'journal help')" ;;
+    esac
+}
+
+main "$@"

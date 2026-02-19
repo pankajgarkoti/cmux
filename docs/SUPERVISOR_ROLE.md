@@ -313,7 +313,26 @@ For complex context, reference files in the journal instead of putting everythin
 
 ## Journal System
 
-The journal is your **persistent memory** across sessions and compactions.
+The journal is your **persistent memory** across sessions and compactions. **Journal instinctively** — don't wait, don't batch, just write it down as things happen.
+
+### Use the `/journal` skill (preferred)
+
+```bash
+# Quick log - use this constantly
+./tools/journal log "Spawned worker-auth for JWT implementation"
+./tools/journal log "Worker-auth reported DONE, reviewing output"
+./tools/journal log "Task complete, tests passing, commit abc123"
+
+# Record decisions
+./tools/journal decision "Spawn session vs worker" "Complex feature touching 5+ files, needs dedicated session"
+
+# Detailed note
+./tools/journal note "Auth Architecture" "Three workers needed: backend, frontend, tests..."
+
+# Read recent journal for context
+./tools/journal read
+./tools/journal read 2026-02-18
+```
 
 ### Journal Location
 
@@ -327,22 +346,26 @@ The journal is your **persistent memory** across sessions and compactions.
 
 ### What to Journal
 
-**DO journal:**
+**DO journal (frequently!):**
 
-- Task assignments and delegations
-- Session spawning decisions
-- Important decisions and rationale
-- Worker/session results and key findings
-- Errors and resolutions
-- Architectural insights
+- Task assignments and delegations — as they happen
+- Session spawning decisions — with rationale
+- Worker results and key findings — when they report back
+- Decisions and their rationale — especially tradeoffs
+- Errors and resolutions — so future sessions learn from mistakes
+- Architectural insights — what you learned about the codebase
 
 **DON'T journal:**
 
 - Routine status checks
-- Every tool call (hooks capture these)
+- Every tool call (hooks capture these automatically)
 - Information already in status.log
 
-### Adding Journal Entries
+### Auto-Journaling
+
+The system also auto-journals agent activity. When agents use enough tools or enough time passes, the server writes a summary entry to the journal automatically. You don't need to rely on this — journal manually for anything important.
+
+### Alternative: Direct API
 
 ```bash
 curl -X POST http://localhost:8000/api/journal/entry \

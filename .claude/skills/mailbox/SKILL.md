@@ -86,22 +86,22 @@ Send messages to other agents or the user via the mailbox.
 
 ## Mailbox Format
 
-Single-line entries in `.cmux/mailbox`:
-```
-[timestamp] from -> to: subject (body: path)
+JSONL (one JSON object per line) in `.cmux/mailbox`:
+```json
+{"ts":"...","from":"cmux:worker","to":"cmux:supervisor","subject":"[DONE] JWT complete","body":"path/to/file.md"}
 ```
 
 Example entries:
-```
-[2026-01-31T06:00:00Z] cmux:worker-auth -> cmux:supervisor: [DONE] JWT complete (body: .cmux/journal/2026-01-31/attachments/worker-auth-1706695200.md)
-[2026-01-31T06:05:00Z] cmux:supervisor -> cmux:worker-auth: [TASK] Add refresh tokens
+```json
+{"ts":"2026-01-31T06:00:00Z","from":"cmux:worker-auth","to":"cmux:supervisor","subject":"[DONE] JWT complete","body":".cmux/journal/2026-01-31/attachments/worker-auth-1706695200.md"}
+{"ts":"2026-01-31T06:05:00Z","from":"cmux:supervisor","to":"cmux:worker-auth","subject":"[TASK] Add refresh tokens"}
 ```
 
 ## How It Works
 
 1. `send` creates a body file in `.cmux/journal/YYYY-MM-DD/attachments/`
-2. Appends single-line entry to `.cmux/mailbox`
-3. Router daemon reads mailbox, delivers to target agent's tmux
+2. Appends a JSONL entry to `.cmux/mailbox`
+3. Router daemon reads mailbox, parses JSON with `jq`, delivers to target agent's tmux
 4. Messages to `user` go directly to dashboard API
 
 ## Common Workflow
