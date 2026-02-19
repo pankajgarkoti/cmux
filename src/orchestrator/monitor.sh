@@ -257,6 +257,12 @@ HEARTBEAT_PING_THRESHOLD=300    # seconds before sending ping
 HEARTBEAT_KILL_WAIT=60          # seconds after ping before kill/respawn
 HEARTBEAT_PING_SENT_AT=0        # timestamp when ping was sent (0 = not sent)
 
+# Sentry agent state
+SENTRY_ACTIVE=false
+SENTRY_ACTIVE_FILE=".cmux/.sentry-active"
+SENTRY_TIMEOUT=300              # seconds before force-killing sentry
+SENTRY_STARTED_AT=0             # timestamp when sentry was spawned
+
 check_supervisor_heartbeat() {
     # Only check if supervisor window exists
     if ! tmux_window_exists "$CMUX_SESSION" "supervisor"; then
@@ -311,18 +317,206 @@ check_supervisor_heartbeat() {
         return
     fi
 
-    # Still no heartbeat after ping + wait - kill and respawn
-    printf "  Heartbeat:  ${RED}●${NC} supervisor unresponsive (${staleness}s) - respawning\n"
-    log_warn "Supervisor heartbeat expired after ping. Killing and respawning..."
+    # Still no heartbeat after ping + wait - spawn sentry for smart recovery
+    printf "  Heartbeat:  ${RED}●${NC} supervisor unresponsive (${staleness}s) - spawning sentry\n"
+    log_warn "Supervisor heartbeat expired after ping. Spawning sentry agent..."
+    spawn_sentry
+}
 
-    # Kill the supervisor window
-    tmux kill-window -t "${CMUX_SESSION}:supervisor" 2>/dev/null || true
-    rm -f "$SUPERVISOR_HEARTBEAT_FILE"
+#───────────────────────────────────────────────────────────────────────────────
+# Sentry Agent - Smart Supervisor Recovery
+#───────────────────────────────────────────────────────────────────────────────
+
+spawn_sentry() {
+    # Prevent double-spawn
+    if [[ "$SENTRY_ACTIVE" == "true" ]] || tmux_window_exists "$CMUX_SESSION" "sentry"; then
+        log_warn "Sentry already active, skipping spawn"
+        return
+    fi
+
+    log_step "Spawning sentry agent for supervisor recovery..."
+
+    # Capture supervisor terminal state before anything else
+    local supervisor_output=""
+    if tmux_window_exists "$CMUX_SESSION" "supervisor"; then
+        supervisor_output=$(tmux_capture_pane "$CMUX_SESSION" "supervisor" 100 2>/dev/null || echo "(could not capture)")
+    fi
+
+    # Gather context: recent journal
+    local journal_context=""
+    local latest_journal=""
+    latest_journal=$(find .cmux/journal -name "journal.md" -type f 2>/dev/null | sort -r | head -1)
+    if [[ -n "$latest_journal" ]]; then
+        journal_context=$(tail -50 "$latest_journal" 2>/dev/null || echo "(empty)")
+    fi
+
+    # Gather context: recent mailbox
+    local mailbox_context=""
+    if [[ -f "$CMUX_MAILBOX" ]]; then
+        mailbox_context=$(tail -10 "$CMUX_MAILBOX" 2>/dev/null || echo "(empty)")
+    fi
+
+    # Timestamps for the report
+    local now last_beat staleness
+    now=$(date +%s)
+    last_beat=$(cat "$SUPERVISOR_HEARTBEAT_FILE" 2>/dev/null || echo 0)
+    if [[ "$last_beat" =~ ^[0-9]+$ ]]; then
+        staleness=$((now - last_beat))
+    else
+        staleness="unknown"
+    fi
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+
+    # Write dynamic context file for the sentry agent
+    local context_file=".cmux/worker-contexts/sentry-context.md"
+    mkdir -p "$(dirname "$context_file")"
+    cat > "$context_file" << SENTRY_EOF
+# Sentry Agent Context
+
+You are the **sentry** agent. Your mission is to recover a stuck supervisor agent.
+
+## Situation Report
+
+- **Timestamp**: ${timestamp}
+- **Heartbeat staleness**: ${staleness}s (threshold was ${HEARTBEAT_PING_THRESHOLD}s + ${HEARTBEAT_KILL_WAIT}s ping wait)
+- **Lockfile**: ${SENTRY_ACTIVE_FILE}
+
+## Supervisor Terminal Output (last 100 lines)
+
+\`\`\`
+${supervisor_output}
+\`\`\`
+
+## Recent Journal (last 50 lines)
+
+\`\`\`
+${journal_context}
+\`\`\`
+
+## Recent Mailbox (last 10 lines)
+
+\`\`\`
+${mailbox_context}
+\`\`\`
+
+## Recovery Procedure
+
+Execute these steps in order. Use Bash tool for all commands.
+
+### Step 1: Try /compact on the stuck supervisor
+
+\`\`\`bash
+tmux send-keys -t "${CMUX_SESSION}:supervisor" "/compact" Enter
+\`\`\`
+
+Then wait 30 seconds:
+
+\`\`\`bash
+sleep 30
+\`\`\`
+
+### Step 2: Check if heartbeat recovered
+
+\`\`\`bash
+now=\$(date +%s)
+beat=\$(cat ${SUPERVISOR_HEARTBEAT_FILE} 2>/dev/null || echo 0)
+age=\$((now - beat))
+echo "Heartbeat age: \${age}s"
+\`\`\`
+
+If age < 120, the supervisor recovered! Skip to Step 5.
+
+### Step 3: Kill the stuck supervisor (only if Step 2 shows still stale)
+
+\`\`\`bash
+tmux kill-window -t "${CMUX_SESSION}:supervisor" 2>/dev/null || true
+rm -f "${SUPERVISOR_HEARTBEAT_FILE}"
+echo "awaiting-supervisor" > "${SENTRY_ACTIVE_FILE}"
+\`\`\`
+
+### Step 4: Wait for new supervisor
+
+monitor.sh will relaunch the supervisor when it sees "awaiting-supervisor" in the lockfile.
+Poll until the new supervisor window exists and has a fresh heartbeat:
+
+\`\`\`bash
+for i in \$(seq 1 60); do
+    if tmux list-windows -t "${CMUX_SESSION}" -F "#{window_name}" 2>/dev/null | grep -qxF "supervisor"; then
+        beat=\$(cat ${SUPERVISOR_HEARTBEAT_FILE} 2>/dev/null || echo 0)
+        now=\$(date +%s)
+        age=\$((now - beat))
+        if [ "\$age" -lt 120 ]; then
+            echo "New supervisor is alive (heartbeat \${age}s ago)"
+            break
+        fi
+    fi
+    echo "Waiting for new supervisor... (\${i}/60)"
+    sleep 5
+done
+\`\`\`
+
+### Step 5: Brief the new supervisor
+
+Send a message explaining what happened:
+
+\`\`\`bash
+tmux send-keys -t "${CMUX_SESSION}:supervisor" -l "SENTRY BRIEFING: The previous supervisor became unresponsive (heartbeat stale for ${staleness}s at ${timestamp}). Recovery was performed. Check the journal for details. Resume normal operations."
+sleep 0.2
+tmux send-keys -t "${CMUX_SESSION}:supervisor" Enter
+\`\`\`
+
+### Step 6: Journal the incident
+
+\`\`\`bash
+curl -sf -X POST "http://localhost:${CMUX_PORT}/api/journal/entry" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Sentry: Supervisor recovery at ${timestamp}",
+    "content": "## Incident\\nSupervisor heartbeat was stale for ${staleness}s.\\n\\n## Action taken\\nSentry agent performed recovery procedure.\\n\\n## Outcome\\nNew supervisor launched and briefed.",
+    "tags": ["sentry", "recovery", "supervisor"]
+  }'
+\`\`\`
+
+### Step 7: Self-terminate
+
+\`\`\`bash
+rm -f "${SENTRY_ACTIVE_FILE}"
+tmux kill-window -t "${CMUX_SESSION}:sentry"
+\`\`\`
+
+**IMPORTANT**: Execute all steps using the Bash tool. Do NOT skip the self-terminate step.
+SENTRY_EOF
+
+    # Create sentry tmux window and start Claude
+    tmux_create_window "$CMUX_SESSION" "sentry"
+    tmux_send_keys "$CMUX_SESSION" "sentry" "export CMUX_AGENT=true CMUX_AGENT_NAME=sentry && cd ${CMUX_PROJECT_ROOT} && claude --dangerously-skip-permissions"
+
+    # Lock window name
+    tmux set-option -t "${CMUX_SESSION}:sentry" allow-rename off 2>/dev/null || true
+
+    # Wait for Claude to initialize
+    local retries=30
+    while ! tmux capture-pane -t "${CMUX_SESSION}:sentry" -p 2>/dev/null | grep -qE "^❯|bypass permissions"; do
+        sleep 1
+        ((retries--)) || break
+        if ((retries <= 0)); then
+            log_warn "Sentry Claude startup timeout, sending instructions anyway"
+            break
+        fi
+    done
+    sleep 1
+
+    # Send the context reference
+    tmux_send_keys "$CMUX_SESSION" "sentry" "Read ${context_file} and execute the recovery procedure described in it. Follow every step exactly."
+
+    # Write lockfile and update state
+    echo "blocking" > "$SENTRY_ACTIVE_FILE"
+    SENTRY_ACTIVE=true
+    SENTRY_STARTED_AT=$(date +%s)
     HEARTBEAT_PING_SENT_AT=0
 
-    # Wait briefly then relaunch
-    sleep 2
-    launch_supervisor
+    log_ok "Sentry agent spawned"
 }
 
 #───────────────────────────────────────────────────────────────────────────────
@@ -360,6 +554,13 @@ cleanup() {
     if [[ -n "${COMPACT_PID:-}" ]]; then
         kill "$COMPACT_PID" 2>/dev/null && printf "  ${GREEN}✓${NC} Compact daemon stopped\n"
     fi
+
+    # Kill sentry agent and clean up lockfile
+    if tmux_window_exists "$CMUX_SESSION" "sentry" 2>/dev/null; then
+        tmux_kill_window "$CMUX_SESSION" "sentry"
+        printf "  ${GREEN}✓${NC} Sentry agent stopped\n"
+    fi
+    rm -f "$SENTRY_ACTIVE_FILE"
 
     # Kill FastAPI server with SIGTERM → SIGKILL escalation
     local pids
@@ -474,15 +675,53 @@ run_dashboard() {
             start_compact
         fi
 
-        # Supervisor status
+        # Sentry status
+        if [[ "$SENTRY_ACTIVE" == "true" ]] || tmux_window_exists "$CMUX_SESSION" "sentry"; then
+            if tmux_window_exists "$CMUX_SESSION" "sentry"; then
+                local sentry_age=0
+                if ((SENTRY_STARTED_AT > 0)); then
+                    sentry_age=$(( $(date +%s) - SENTRY_STARTED_AT ))
+                fi
+                printf "  Sentry:     ${YELLOW}●${NC} active (${sentry_age}s)\n"
+
+                # Timeout safety net
+                if ((sentry_age > SENTRY_TIMEOUT)); then
+                    log_warn "Sentry timed out after ${SENTRY_TIMEOUT}s, force-killing"
+                    tmux_kill_window "$CMUX_SESSION" "sentry"
+                    rm -f "$SENTRY_ACTIVE_FILE"
+                    SENTRY_ACTIVE=false
+                    SENTRY_STARTED_AT=0
+                fi
+            else
+                # Sentry window gone — clear state
+                printf "  Sentry:     ${DIM}●${NC} completed\n"
+                SENTRY_ACTIVE=false
+                SENTRY_STARTED_AT=0
+                rm -f "$SENTRY_ACTIVE_FILE"
+            fi
+        fi
+
+        # Supervisor status with sentry-aware auto-relaunch
         if tmux_window_exists "$CMUX_SESSION" "supervisor"; then
             printf "  Supervisor: ${GREEN}●${NC} running\n"
         else
-            printf "  Supervisor: ${RED}●${NC} not found\n"
+            local lockfile_phase=""
+            if [[ -f "$SENTRY_ACTIVE_FILE" ]]; then
+                lockfile_phase=$(cat "$SENTRY_ACTIVE_FILE" 2>/dev/null || echo "")
+            fi
+
+            if [[ "$lockfile_phase" == "blocking" ]]; then
+                printf "  Supervisor: ${YELLOW}●${NC} sentry handling recovery\n"
+            else
+                printf "  Supervisor: ${YELLOW}●${NC} relaunching...\n"
+                launch_supervisor
+            fi
         fi
 
-        # Supervisor heartbeat check
-        check_supervisor_heartbeat
+        # Supervisor heartbeat check (skip while sentry is active)
+        if [[ "$SENTRY_ACTIVE" != "true" ]]; then
+            check_supervisor_heartbeat
+        fi
 
         echo ""
 
@@ -545,6 +784,11 @@ main() {
     # Ensure directories exist
     mkdir -p "$(dirname "$CMUX_MAILBOX")"
     mkdir -p "$(dirname "$ROUTER_LOG")"
+
+    # Clean up stale sentry lockfile (lockfile exists but no sentry window)
+    if [[ -f "$SENTRY_ACTIVE_FILE" ]] && ! tmux_window_exists "$CMUX_SESSION" "sentry" 2>/dev/null; then
+        rm -f "$SENTRY_ACTIVE_FILE"
+    fi
 
     print_banner
     print_separator
