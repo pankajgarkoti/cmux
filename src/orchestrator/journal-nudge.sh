@@ -42,6 +42,8 @@ get_agent_tool_counts() {
     fi
 
     sqlite3 "$DB_PATH" <<'SQL'
+        PRAGMA journal_mode=WAL;
+        PRAGMA busy_timeout=5000;
         SELECT agent_id, COUNT(*) as cnt
         FROM agent_events
         WHERE event_type = 'PostToolUse'
@@ -65,6 +67,8 @@ get_agent_total_recent() {
             echo "2000-01-01T00:00:00")
 
     sqlite3 "$DB_PATH" <<SQL
+        PRAGMA journal_mode=WAL;
+        PRAGMA busy_timeout=5000;
         SELECT agent_id, COUNT(*) as cnt
         FROM agent_events
         WHERE event_type = 'PostToolUse'
