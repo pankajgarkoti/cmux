@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 
 export function Header() {
   const { theme, toggleTheme } = useThemeStore();
-  const [hearted, setHearted] = useState(false);
+  const [heartState, setHeartState] = useState<0 | 1 | 2>(0); // 0=default, 1=red, 2=red+beating
 
   return (
     <header className="h-12 border-b border-border/50 flex items-center justify-between px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -32,15 +32,17 @@ export function Header() {
           multi-agent orchestrator
         </span>
 
-        {/* Heart toggle */}
+        {/* Heart toggle: default → red → red+beating → default */}
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setHearted(!hearted)}
+          onClick={() => setHeartState(((heartState + 1) % 3) as 0 | 1 | 2)}
           className="h-8 w-8"
         >
           <Heart
-            className={`h-4 w-4 transition-colors ${hearted ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`}
+            className={`h-4 w-4 transition-colors ${
+              heartState >= 1 ? 'fill-red-500 text-red-500' : 'text-muted-foreground'
+            } ${heartState === 2 ? 'animate-heartbeat' : ''}`}
           />
           <span className="sr-only">Toggle heart</span>
         </Button>
