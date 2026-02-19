@@ -123,6 +123,21 @@ async def get_agent_terminal(agent_id: str, lines: int = 50):
     return {"agent_id": agent_id, "output": output, "lines": lines}
 
 
+@router.get("/{agent_id}/history")
+async def get_agent_history(agent_id: str, limit: int = 50):
+    """Get conversation history for an agent from the conversation store.
+
+    Returns the last N messages involving this agent (both sent and received).
+    Useful for agents recovering context after compaction.
+    """
+    messages = conversation_store.get_messages(limit=limit, agent_id=agent_id)
+    return {
+        "agent_id": agent_id,
+        "messages": [msg.model_dump(mode="json") for msg in messages],
+        "count": len(messages),
+    }
+
+
 @router.post("/{agent_id}/archive")
 async def archive_agent(agent_id: str, lines: int = 2000):
     """Archive an agent's conversation and terminal output before killing.

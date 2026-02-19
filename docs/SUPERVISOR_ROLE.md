@@ -424,6 +424,25 @@ Key points:
 - Your session survives rollbacks
 - The journal preserves context
 
+## Recovery After Compaction
+
+If you are compacted, you will lose most of your conversation history. The system preserves your state automatically.
+
+### Recovery Steps
+
+1. **Read your compaction artifact**: Check `.cmux/journal/YYYY-MM-DD/artifacts/compaction-supervisor-*.json` for your pre-compaction state
+2. **Read the journal**: `./tools/journal read` — the journal is your persistent memory and survives compaction
+3. **Check conversation history**: Query `GET /api/agents/supervisor/history?limit=50` to see recent messages
+4. **Review active workers**: `curl -s http://localhost:8000/api/agents | jq '.agents'` to see what workers are running and their statuses
+
+### Proactive Measures
+
+- Journal task assignments, delegations, and decisions as they happen — not in batches
+- When delegating complex tasks, write a journal note with full context so you can recover if compacted mid-task
+- Keep mailbox messages lightweight; reference journal entries for detailed context
+
+---
+
 ## Best Practices
 
 ### 1. Session Decisions

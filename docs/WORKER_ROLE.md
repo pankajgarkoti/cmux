@@ -153,6 +153,52 @@ Files modified:
 Tests: pytest tests/test_auth.py - all passing
 ```
 
+## Recovery After Compaction
+
+When your context is compacted (either automatically by the compact daemon or manually), you lose most of your conversation history. The system preserves your state in a structured artifact so you can recover.
+
+### What Happens During Compaction
+
+1. Before compaction, the system captures your current state (git changes, terminal output, current task) as a JSON artifact
+2. After compaction, a recovery message is injected telling you where to find your state
+
+### Recovery Steps
+
+When you see a message saying "You were just compacted":
+
+1. **Read your compaction artifact**: Check `.cmux/journal/YYYY-MM-DD/artifacts/compaction-{your-name}-*.json` (use the most recent one). It contains:
+   - `files_modified`: Files you were working on
+   - `current_task`: What you were assigned
+   - `git_branch` / `uncommitted_changes`: Your git state
+   - `terminal_snapshot`: Last 50 lines of your terminal before compaction
+
+2. **Check conversation history if needed**: If the artifact doesn't have enough context, query your message history:
+   ```bash
+   curl -s http://localhost:8000/api/agents/{your-name}/history?limit=20 | jq '.messages'
+   ```
+
+3. **Read recent journal entries**: The journal persists across compaction:
+   ```bash
+   ./tools/journal read
+   ```
+
+### Proactive Context Preservation
+
+- **Journal before long-running operations**: If you're about to do something that takes a while, journal your current state first as a checkpoint
+- **Journal decisions immediately**: Don't batch — write decisions as you make them
+- **Reference files, not content**: Instead of pasting large code blocks in messages, reference file paths so the context survives compaction
+
+### When Someone Mentions Something You Don't Know
+
+If a user or supervisor references something not in your context:
+
+1. Check your compaction artifact (you may have been compacted)
+2. Query your conversation history via the API
+3. Read the journal for related entries
+4. Ask for clarification as a last resort
+
+---
+
 ## What NOT To Do
 
 - Don't modify files outside your task scope

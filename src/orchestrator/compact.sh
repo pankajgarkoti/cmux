@@ -25,6 +25,9 @@ CMUX_SESSION="${CMUX_SESSION:-cmux}"
 COMPACT_INTERVAL="${CMUX_COMPACT_INTERVAL:-600}"  # 10 minutes
 VERIFY_DELAY=15                                    # seconds to wait after sending /compact
 SKIP_WINDOWS="monitor|supervisor"                  # windows to never compact
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+PRE_COMPACT_HOOK="${PROJECT_ROOT}/.claude/hooks/pre-compact.sh"
+RECOVERY_DELAY=5                                   # seconds to wait before injecting recovery message
 
 # Track state
 RUNNING=true
@@ -75,6 +78,18 @@ compact_agent() {
     local session="$1"
     local window="$2"
 
+    # --- Pre-compaction: capture agent state ---
+    local artifact_file=""
+    if [[ -x "$PRE_COMPACT_HOOK" ]]; then
+        artifact_file=$("$PRE_COMPACT_HOOK" "$window" 2>/dev/null) || {
+            log_status "COMPACT" "WARN: Pre-compact hook failed for ${window}, continuing anyway"
+            artifact_file=""
+        }
+        if [[ -n "$artifact_file" ]]; then
+            log_status "COMPACT" "Pre-compact state saved: ${artifact_file}"
+        fi
+    fi
+
     # Acquire per-window lock to prevent races with router/journal-nudge
     tmux_send_lock "$window"
 
@@ -99,6 +114,7 @@ compact_agent() {
 
     # Verify compaction happened by checking pane output
     local pane_output
+    local compaction_ok=false
     pane_output=$(tmux_capture_pane "$session" "$window" 30 2>/dev/null) || {
         log_status "COMPACT" "WARN: Could not capture pane for ${window} verification"
         return 1
@@ -107,12 +123,34 @@ compact_agent() {
     # Look for compaction success indicators
     if echo "$pane_output" | grep -qiE 'compact(ed|ion)|context.*reduc|summariz'; then
         log_status "COMPACT" "Verified: ${window} compaction succeeded"
-        return 0
+        compaction_ok=true
+    elif is_agent_idle "$session" "$window"; then
+        # Agent is back at prompt (compaction may have happened but output scrolled)
+        log_status "COMPACT" "OK: ${window} back at prompt after /compact (output not captured)"
+        compaction_ok=true
     fi
 
-    # Check if agent is back at prompt (compaction may have happened but output scrolled)
-    if is_agent_idle "$session" "$window"; then
-        log_status "COMPACT" "OK: ${window} back at prompt after /compact (output not captured)"
+    # --- Post-compaction: inject recovery message ---
+    if $compaction_ok; then
+        sleep "$RECOVERY_DELAY"
+
+        # Wait for agent to be idle again before injecting recovery message
+        if is_agent_idle "$session" "$window"; then
+            local today
+            today=$(date +%Y-%m-%d)
+            local recovery_msg="You were just compacted. Read your recovery context from .cmux/journal/${today}/artifacts/compaction-${window}-*.json (most recent one). Also check your conversation history via GET /api/agents/${window}/history if anything is unclear."
+
+            tmux_send_lock "$window"
+            tmux send-keys -t "${session}:${window}" -l "$recovery_msg"
+            sleep 0.1
+            tmux send-keys -t "${session}:${window}" Enter
+            tmux_send_unlock
+
+            log_status "COMPACT" "Injected recovery message for ${window}"
+        else
+            log_status "COMPACT" "WARN: ${window} not idle after compaction, skipping recovery message"
+        fi
+
         return 0
     fi
 
