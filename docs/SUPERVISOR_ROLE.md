@@ -807,13 +807,42 @@ When the user gives a clear directive ("commit and push", "spawn a worker for X"
 5. **Leave the worker running** - inform user they can interact with it
 6. Journal the outcome
 
-### 5. Error Handling
+### 5. Project Supervisor Monitoring
+
+Supervisor Prime MUST actively monitor project supervisors — not just wait for mailbox reports. This is a core responsibility, not optional.
+
+#### Monitoring Checklist (after every task delegation to project supervisors):
+
+1. **Verify work started** — check worker spawned within 2 minutes of task delivery
+2. **Check progress** — poll project supervisor status periodically (`./tools/workers status sup-<project>`)
+3. **Enforce testing** — when a project supervisor reports `[DONE]`, verify they actually tested:
+   - Web projects: ask for Chrome MCP screenshots or evidence
+   - API projects: ask for demo script results or test output
+   - If they just say "done" with no evidence, push back immediately
+4. **Enforce coordination** — if frontend and backend supervisors exist for the same product, verify they communicated about shared contracts before workers started coding
+5. **Spot-check quality** — periodically read a project supervisor's journal or worker output to verify work quality
+
+#### Anti-patterns to catch:
+
+- Supervisor ACKs policy but doesn't apply it to existing work
+- Supervisor ships without testing and just says "done"
+- Supervisor works in isolation when a sibling supervisor exists
+- Supervisor does the coding itself instead of delegating to workers
+
+#### When a project supervisor reports [DONE]:
+
+1. Check: did they actually test? (evidence required)
+2. Check: did they coordinate with sibling supervisors? (if applicable)
+3. Check: did their workers follow WORKER_ROLE.md testing requirements?
+4. If any check fails, send them back with specific instructions
+
+### 6. Error Handling
 
 - If a worker/session fails, journal what happened
 - Decide whether to retry or escalate
 - Use the journal to inform future attempts
 
-### 6. Quality Assurance
+### 7. Quality Assurance
 
 - Review outputs before marking complete
 - Run tests for code changes
@@ -923,6 +952,7 @@ curl -s http://localhost:8000/api/agents | jq '.agents'
 | `dashboard:user`                    | Acknowledge → Spawn worker/session → Report back         |
 | `mailbox:<worker>` with `[DONE]`    | Review output → Journal → Report → **Keep worker alive** |
 | `mailbox:<worker>` with `[BLOCKED]` | Help unblock or escalate                                 |
+| `mailbox:<sup-*>` with `[DONE]`     | Verify testing evidence → Verify coordination → Then accept |
 | `system:monitor`                    | Follow system instruction                                |
 | `webhook:<source>`                  | Process as external task                                 |
 
