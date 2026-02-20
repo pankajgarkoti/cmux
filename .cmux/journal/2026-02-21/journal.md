@@ -128,3 +128,25 @@ Enhancing tools/tasks with priority levels (critical/high/medium/low), source tr
 
 ## 05:16 - Task system enhancement complete
 Enhanced tools/tasks with: (1) priority levels (critical/high/medium/low) with colored output and sort ordering, (2) source tracking (user/backlog/self-generated/worker-escalation/system), (3) review and failed statuses, (4) tasks dashboard command, (5) tasks import-backlog command, (6) --task flag on workers spawn for task linking, (7) DB migration for existing tasks.db. All features tested with full integration test. Commit: 7bfaa92.
+
+## 05:18 - Spawned autonomy engine + task visibility workers
+User clarified heartbeat vision: it's an autonomy engine, not a liveness check. Should feed work to idle supervisor, not just poke it. Spawned worker-autonomy-engine (task t_zsia98hg, critical) to redesign monitor.sh heartbeat to run autonomy scans and inject actionable results into supervisor prompt. Also spawned worker-task-visibility (task t_yvj7yed3, high) to add cross-agent visibility — filtering by supervisor/worker/project, global view command, project-scoped task views. Both using --task flag for automatic task linkage. 5 workers completed this session (mention-fix, health-resilience, task-system), 2 now in flight.
+
+## 05:19 - Starting: Redesign heartbeat system as autonomy engine. Will rewrite tools/autonomy-check for rich structured output, then update monitor.sh nudge system to format actionable messages.
+
+## 05:19 - Starting task: Add cross-agent visibility features to tools/tasks. Requirements: supervisor/worker filtering, project-scoped views, worker tracking, dashboard enhancements, global view command.
+
+## 05:19 - Task system enhancement delivered
+Completed all requirements for the enhanced CMUX task management system. Added priority levels, source tracking, review/failed statuses, dashboard command, import-backlog command, and --task flag for workers spawn. All features tested and committed as 7bfaa92. Reported [DONE] to supervisor. Now idle awaiting next assignment.
+
+## 05:21 - Task visibility features progress
+Implementing cross-agent visibility features for tools/tasks. Added: DB migration for linked_workers column and task_status_history table, --supervisor and --worker flags on list command, cmd_link for linking workers to tasks, cmd_for_project for project-scoped views, enhanced cmd_show with worker tracking and status history, project breakdown in dashboard, cmd_global for full system overview. Still need to update help text, main dispatch, and workers tool integration.
+
+## 05:21 - Autonomy engine heartbeat redesign
+Rewrote tools/autonomy-check to output rich structured sections: mailbox with sender/type breakdown (BLOCKED, DONE, QUESTION, STATUS counts), worker active/idle counts with names, backlog items by priority level, project supervisor health status, and git diff stats. Updated monitor.sh heartbeat nudge to format this into a single actionable [HEARTBEAT] message with a 'Highest priority' recommendation line. Priority cascade: health failure > BLOCKED mailbox > QUESTION > DONE reports > critical backlog > idle workers > uncommitted git. The old system just said 'you have been idle for Xs' which supervisors ignored for hours.
+
+## 05:24 - Completed task visibility features
+Added all 5 cross-agent visibility features to tools/tasks: (1) --supervisor and --worker flags on list for filtering by agent role, (2) for-project command for project-scoped views with worker assignments, (3) link command + linked_workers column + status history tracking in show, (4) dashboard project breakdown with supervisor status indicators, (5) global command showing all projects, supervisors, workers, in-flight tasks, and blocked items. Also updated tools/workers to auto-link workers via tasks link when --task flag is used. Committed as 31c3fa4.
+
+## 05:26 - Task visibility — final summary
+Completed all cross-agent visibility features for tools/tasks. Five requirements delivered: supervisor/worker list filtering via --supervisor and --worker flags, project-scoped views via for-project command, worker tracking via link command with linked_workers DB column and task_status_history table, dashboard project breakdown with live supervisor status, and global system overview command. Workers tool updated to auto-link on --task. Committed 31c3fa4, reported done to supervisor.
