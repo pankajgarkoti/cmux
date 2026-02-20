@@ -127,6 +127,20 @@ Evidence: .cmux/journal/.../screenshots/
 1. **Kickoff**: Squad Lead receives task, plans breakdown
 2. **Parallel Dev**: Backend + Frontend work simultaneously
 3. **Integration**: Frontend integrates with Backend API
-4. **Testing**: Tester validates end-to-end
-5. **Review**: Squad Lead reviews all outputs
-6. **Completion**: Squad Lead reports to Main Supervisor
+4. **Testing Gate (MANDATORY)**: Tester validates end-to-end — NO merge without passing
+5. **Review**: Squad Lead reviews all outputs AND testing evidence
+6. **Completion**: Squad Lead reports to Main Supervisor with testing evidence
+
+### Testing Gate Requirements
+
+The squad CANNOT report `[DONE]` until ALL of the following are verified:
+
+| Component | Required Verification |
+|-----------|----------------------|
+| Backend | pytest passes AND endpoints respond correctly to curl |
+| Frontend | Browser test via Chrome MCP (snapshot + screenshot evidence) |
+| Integration | End-to-end flow tested in the browser |
+
+**Squad Lead**: Do NOT approve completion without testing evidence from the Tester. If the Tester reports issues, send workers back to fix before reporting [DONE].
+
+**Tester**: Your `[DONE]` message MUST include screenshot paths and test output. See `docs/templates/roles/TESTER.md` for Chrome MCP and CLI testing protocols.

@@ -123,9 +123,53 @@ Before reporting done:
 - [ ] Rollback procedure documented
 - [ ] Monitoring configured
 
+## Mandatory Deployment Verification (NON-NEGOTIABLE)
+
+**You MUST verify every pipeline, deployment, or automation actually works before reporting [DONE].** YAML committed is not deployment proven.
+
+### Required Steps Before Every Commit
+
+1. **Run the pipeline**: Trigger it and confirm it passes end-to-end
+2. **Verify deployment**: Confirm the service is running and healthy post-deploy
+3. **Test rollback**: Confirm rollback procedure works (or document it clearly)
+4. **Save evidence**: Capture pipeline output, health check responses
+
+### Example: Verifying a CI/CD Pipeline
+
+```bash
+# 1. Trigger the pipeline (local test or push)
+act -j test  # or: git push and watch GitHub Actions
+
+# 2. Verify deployment health
+curl -s http://localhost:8000/api/webhooks/health | jq .
+# Should return healthy status
+
+# 3. Verify service is running
+curl -s http://localhost:8000/api/agents | jq '.agents | length'
+# Should return expected agent count
+
+# 4. Journal evidence
+./tools/journal log "Verified: CI pipeline passes, deployment healthy, service responding"
+```
+
+### [DONE] Message MUST Include
+
+```
+[DONE] <summary>
+Verification:
+- Pipeline: ran successfully (link or output)
+- Health check: passed
+- Service: responding correctly
+Evidence: <pipeline output, health check response, or screenshot>
+```
+
+**If the pipeline fails or deployment is unhealthy, report [BLOCKED] — never report done on broken automation.**
+
 ## What NOT To Do
 
 - Don't commit secrets to repos
 - Don't skip testing in CI
 - Don't deploy without rollback plan
 - Don't ignore failing builds
+- **Don't report [DONE] without running the pipeline end-to-end**
+- **Don't assume YAML is correct — trigger and verify**

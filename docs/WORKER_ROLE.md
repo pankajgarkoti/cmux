@@ -57,6 +57,77 @@ You are a **worker**. You receive tasks from your supervisor, execute them auton
 4. **Deliver Results**: Provide clear output when done
 5. **Journal Your Work**: Write to the journal as you go (see below)
 
+## Mandatory Testing (NON-NEGOTIABLE)
+
+**Every worker MUST test their work before committing or reporting [DONE].** "It compiles" or "build passes" is NOT sufficient. You must prove the feature actually works.
+
+### Detect Your Project Type
+
+Before starting work, determine what kind of project you're in:
+
+| Signal | Project Type | Required Testing |
+|--------|-------------|-----------------|
+| `package.json` with `vite`, `next`, `react`, or `vue` | **Web/Frontend** | Browser testing via Chrome MCP |
+| `pyproject.toml` or `go.mod` without frontend | **Backend/API** | Runnable demo scripts |
+| CLI tool, shell scripts, no server | **CLI** | Run the tool, show output |
+| Mixed (frontend + backend) | **Full-stack** | Both browser AND API testing |
+
+### Web/Frontend Projects — Browser Testing REQUIRED
+
+You MUST use Chrome DevTools MCP tools to verify every user-facing change in the actual running app:
+
+```
+1. mcp__chrome-devtools__navigate_page  → Navigate to the feature
+2. mcp__chrome-devtools__take_snapshot  → Verify elements exist
+3. mcp__chrome-devtools__click / fill   → Interact with the UI
+4. mcp__chrome-devtools__take_screenshot → Save visual evidence
+5. mcp__chrome-devtools__wait_for       → Verify async operations
+```
+
+**Save screenshots** to `.cmux/journal/YYYY-MM-DD/attachments/` as evidence. No commit without visual verification.
+
+### Backend/API Projects — Demo Scripts REQUIRED
+
+You MUST create or run a working demo that exercises every new endpoint or feature:
+
+```bash
+# Create a demo script in demos/ or tests/
+# It should be self-contained: make requests, show output
+curl -s http://localhost:8000/api/your-endpoint | jq .
+
+# Or use pytest
+uv run pytest tests/test_your_feature.py -v
+```
+
+No commit without a working demo that proves the feature works.
+
+### CLI Projects — Run It, Show Output
+
+You MUST run the CLI tool and capture output proving the feature works:
+
+```bash
+# Run the command
+./your-tool --new-flag
+
+# Show the output in your journal
+./tools/journal log "Verified: ./your-tool --new-flag outputs expected result"
+```
+
+### Testing Evidence in [DONE] Messages
+
+Your `[DONE]` message MUST include testing evidence:
+
+```
+[DONE] <summary>
+Reproduced with: <test case>
+Verified with: <how you confirmed it works>
+Evidence: <screenshot path, test output, or demo script path>
+```
+
+**If you cannot verify your work, report [BLOCKED] instead of [DONE].**
+
+---
+
 ## Available Tools
 
 All tools live in the `tools/` directory. Run them directly from the repo root.

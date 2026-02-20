@@ -58,6 +58,19 @@ The simplest team structure: a single worker executing a focused task.
 | When done | Worker reports, Supervisor confirms |
 | Scope expansion | Escalate to Supervisor |
 
+## Testing Checkpoint (MANDATORY)
+
+Before reporting `[DONE]`, the worker MUST complete the testing checkpoint:
+
+1. **Detect project type** (see `docs/WORKER_ROLE.md` — Mandatory Testing section)
+2. **Run appropriate tests**:
+   - Web project → Browser test via Chrome MCP (navigate, snapshot, screenshot)
+   - API project → Run pytest AND curl endpoints
+   - CLI project → Run the tool and show output
+3. **Include evidence** in the `[DONE]` message (screenshot path, test output, or demo script)
+
+**A solo worker reports [BLOCKED] if they cannot verify their work — never [DONE] without testing.**
+
 ## When NOT to Use
 
 - Tasks requiring frontend + backend coordination (use Squad)

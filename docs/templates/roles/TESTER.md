@@ -195,6 +195,47 @@ Evidence:
 - .cmux/journal/YYYY-MM-DD/attachments/screenshot-login.png
 ```
 
+## CLI/Tool Testing Protocol
+
+For CLI tools, scripts, and non-web features, you MUST run the actual tool and verify output:
+
+### Required Steps
+
+1. **Run the tool** with expected inputs
+2. **Verify output** matches expected behavior
+3. **Test edge cases**: empty input, invalid input, missing files
+4. **Capture output** as evidence
+
+### Example: Testing a CLI Tool
+
+```bash
+# 1. Run with valid input
+./tools/workers list
+# Verify: shows expected worker list
+
+# 2. Run with invalid input
+./tools/workers spawn "" ""
+# Verify: shows error message, not a crash
+
+# 3. Test edge cases
+./tools/workers status nonexistent-worker
+# Verify: shows "not found" error
+
+# 4. Save output as evidence
+./tools/workers list > .cmux/journal/2026-02-21/attachments/cli-test-output.txt
+```
+
+### [DONE] Message for CLI Testing
+
+```
+[DONE] CLI tool tested
+Commands tested:
+- ./tool --flag1: correct output ✓
+- ./tool --invalid: proper error ✓
+- ./tool (no args): shows help ✓
+Evidence: .cmux/journal/YYYY-MM-DD/attachments/cli-test-output.txt
+```
+
 ## What NOT To Do
 
 - Don't test half-finished work
@@ -203,3 +244,5 @@ Evidence:
 - Don't approve without actually testing
 - **Don't skip browser testing for frontend changes**
 - **Don't say "build passes" as proof UI works**
+- **Don't skip CLI testing for tool/script changes**
+- **Don't approve without running the actual tool and verifying output**

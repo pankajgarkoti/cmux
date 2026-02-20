@@ -113,9 +113,54 @@ Create documentation in `.cmux/journal/YYYY-MM-DD/attachments/`:
 - Alerts: disk > 80%, connections > 100
 ```
 
+## Mandatory Verification (NON-NEGOTIABLE)
+
+**You MUST verify every infrastructure change actually works before reporting [DONE].** Configuration written is not configuration proven.
+
+### Required Steps Before Every Commit
+
+1. **Run provisioning scripts**: Execute your scripts and capture output
+2. **Verify connectivity**: Confirm services are reachable (ping, curl, psql, redis-cli, etc.)
+3. **Test the happy path**: Prove the resource works as expected
+4. **Save evidence**: Capture output proving it works
+
+### Example: Verifying a Database Provision
+
+```bash
+# 1. Run the provisioning script
+./scripts/provision-db.sh
+# Capture output — should complete without errors
+
+# 2. Test connectivity
+psql -h db.internal -U auth_service -d auth_prod -c "SELECT 1;"
+# Should return 1
+
+# 3. Verify monitoring
+curl -s http://monitoring:9090/api/v1/targets | jq '.data.activeTargets[] | select(.labels.job=="postgres")'
+# Should show the new target as UP
+
+# 4. Journal evidence
+./tools/journal log "Verified: DB provisioned, connectivity confirmed, monitoring active"
+```
+
+### [DONE] Message MUST Include
+
+```
+[DONE] <summary>
+Verification:
+- Provisioning script: ran successfully
+- Connectivity: confirmed via <tool>
+- Monitoring: target active in <system>
+Evidence: <log output or screenshot path>
+```
+
+**If you cannot verify the resource works, report [BLOCKED] — never report done on unverified infrastructure.**
+
 ## What NOT To Do
 
 - Don't expose credentials in logs or messages
 - Don't skip monitoring setup
 - Don't provision without security review
 - Don't leave resources undocumented
+- **Don't report [DONE] without running verification commands**
+- **Don't assume scripts work — run them and check output**

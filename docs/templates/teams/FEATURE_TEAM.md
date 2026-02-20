@@ -106,6 +106,27 @@ Ready for final approval.
 ./tools/workers spawn "worker-tester" "Read docs/templates/roles/TESTER.md. Your task: Test [FEATURE] when implementation is ready."
 ```
 
+## Testing Gate Before Merge (MANDATORY)
+
+The Tech Lead MUST NOT approve completion until all testing is verified:
+
+### Requirements
+
+1. **Backend workers**: pytest passes AND endpoints verified with curl
+2. **Frontend workers**: Browser tested via Chrome MCP — snapshot and screenshot evidence REQUIRED
+3. **All workers**: Include testing evidence in their completion reports
+4. **Tech Lead**: Reviews testing evidence before approving — rejects if evidence is missing
+
+### Tech Lead Checklist Before Reporting [DONE]
+
+- [ ] All workers reported completion with testing evidence
+- [ ] Backend tests pass (`uv run pytest`)
+- [ ] Frontend verified in browser (Chrome MCP screenshots exist)
+- [ ] End-to-end flow tested
+- [ ] No workers reported [BLOCKED] on testing
+
+**If any worker cannot verify their changes, the Tech Lead reports [BLOCKED] to the Supervisor — never [DONE] without complete testing evidence.**
+
 ## When NOT to Use
 
 - Simple tasks (use solo worker)

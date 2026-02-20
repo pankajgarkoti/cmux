@@ -292,6 +292,9 @@ This renders as a compact notification in the dashboard instead of cluttering ch
 
 Read docs/WORKER_ROLE.md for full worker guidelines.
 
+TESTING IS MANDATORY. Read the Mandatory Testing section in docs/WORKER_ROLE.md before starting.
+You MUST verify your work actually runs and produces correct results before committing or reporting [DONE].
+
 YOUR TASK:
 ${task}
 EOF

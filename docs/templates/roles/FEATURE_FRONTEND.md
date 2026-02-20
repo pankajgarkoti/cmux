@@ -127,9 +127,59 @@ export async function myApiCall(data: MyRequest): Promise<MyResponse> {
 }
 ```
 
+## Mandatory Browser Testing (NON-NEGOTIABLE)
+
+**You MUST verify every UI change in the actual running browser.** `npm run typecheck` and `npm run build` passing is NOT proof the UI works. You must visually confirm.
+
+### Required Steps Before Every Commit
+
+1. **Build**: `npm run build` (server serves from `dist/`)
+2. **Navigate**: Use `mcp__chrome-devtools__navigate_page` to open the feature
+3. **Snapshot**: Use `mcp__chrome-devtools__take_snapshot` to verify elements exist
+4. **Interact**: Use `mcp__chrome-devtools__click` / `mcp__chrome-devtools__fill` to test interactions
+5. **Screenshot**: Use `mcp__chrome-devtools__take_screenshot` to save evidence
+6. **Wait**: Use `mcp__chrome-devtools__wait_for` for async operations
+
+### Example: Verifying a New Component
+
+```
+# 1. Build the frontend
+cd src/frontend && npm run build
+
+# 2. Navigate to the page with your component
+mcp__chrome-devtools__navigate_page url="http://localhost:8000"
+
+# 3. Take snapshot to find your elements
+mcp__chrome-devtools__take_snapshot
+# Verify: your component's elements appear in the tree
+
+# 4. Interact with the component
+mcp__chrome-devtools__click uid="<button-uid>"
+mcp__chrome-devtools__fill uid="<input-uid>" value="test data"
+
+# 5. Take screenshot as evidence
+mcp__chrome-devtools__take_screenshot filePath=".cmux/journal/2026-02-21/attachments/feature-verified.png"
+```
+
+### [DONE] Message MUST Include
+
+```
+[DONE] <summary>
+Files modified: ...
+Verified:
+- npm run typecheck: passed
+- npm run build: passed
+- Browser test: <what you tested via Chrome MCP>
+Evidence: .cmux/journal/YYYY-MM-DD/attachments/<screenshot>.png
+```
+
+**If you cannot test in the browser, report [BLOCKED] — never skip browser verification.**
+
 ## What NOT To Do
 
 - Don't touch backend code
 - Don't skip typecheck
 - Don't hardcode API URLs (use lib/api.ts)
 - Don't ignore loading/error states
+- **Don't commit without browser testing via Chrome MCP**
+- **Don't claim "build passes" as proof the UI works**

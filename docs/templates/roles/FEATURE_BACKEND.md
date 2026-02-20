@@ -101,9 +101,53 @@ async def test_my_endpoint():
         assert response.status_code == 200
 ```
 
+## Mandatory API Testing (NON-NEGOTIABLE)
+
+**You MUST prove every endpoint works before committing.** Writing code is not enough — you must run it and show output.
+
+### Required Steps Before Every Commit
+
+1. **Write tests**: Create pytest tests in `tests/` for every new endpoint
+2. **Run tests**: `uv run pytest tests/test_yourfeature.py -v` — all must pass
+3. **Live demo**: Hit your endpoints with `curl` and show the response
+4. **Save evidence**: Include test output or curl responses in your journal
+
+### Example: Verifying a New Endpoint
+
+```bash
+# 1. Run pytest
+uv run pytest tests/test_auth.py -v
+# ALL tests must pass
+
+# 2. Hit the endpoint manually
+curl -s -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "test"}' | jq .
+
+# 3. Verify error handling
+curl -s -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "bad"}' | jq .
+# Should return 400/422, not 500
+```
+
+### [DONE] Message MUST Include
+
+```
+[DONE] <summary>
+Files modified: ...
+Tests: uv run pytest tests/test_feature.py - X passed
+Demo: curl output showing endpoints work
+API Contract: <endpoint details for frontend>
+```
+
+**If tests fail or endpoints return unexpected results, report [BLOCKED] — never commit broken code.**
+
 ## What NOT To Do
 
 - Don't touch frontend code
 - Don't skip tests
 - Don't change API contracts without notifying frontend
 - Don't work silently - send status updates
+- **Don't commit without running pytest AND hitting endpoints with curl**
+- **Don't report [DONE] without test evidence**
