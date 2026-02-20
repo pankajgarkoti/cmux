@@ -742,29 +742,6 @@ cmd_install_hooks() {
           }
         ]
       }
-    ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CMUX_HOME}/.claude/hooks/pre-compact.sh",
-            "timeout": 30
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "matcher": "compact",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CMUX_HOME}/.claude/hooks/compact-recovery.sh",
-            "timeout": 10
-          }
-        ]
-      }
     ]
   }
 }
