@@ -1,32 +1,42 @@
 {
   "supervisor": {
-    "registered_at": "2026-02-20T11:15:14.287190+00:00",
+    "registered_at": "2026-02-20T12:44:48.402219+00:00",
     "type": "supervisor",
     "created_by": "monitor.sh",
     "agent_id": "ag_0000prim",
     "display_name": "supervisor",
     "role": "supervisor",
     "project_id": "cmux",
-    "created_at": "2026-02-20T11:15:14.287190+00:00"
+    "created_at": "2026-02-20T12:44:48.402219+00:00"
   },
   "sup-hero": {
-    "registered_at": "2026-02-20T11:15:14Z",
+    "registered_at": "2026-02-20T12:44:48Z",
     "type": "project-supervisor",
     "created_by": "tools/projects",
-    "created_at": "2026-02-20T11:15:14Z",
-    "agent_id": "ag_qmteqxt3",
+    "created_at": "2026-02-20T12:44:48Z",
+    "agent_id": "ag_gdo9xmu1",
     "display_name": "sup-hero",
     "role": "project-supervisor",
     "project_id": "hero"
   },
   "sup-heroweb": {
-    "registered_at": "2026-02-20T11:15:17Z",
+    "registered_at": "2026-02-20T12:44:50Z",
     "type": "project-supervisor",
     "created_by": "tools/projects",
-    "created_at": "2026-02-20T11:15:17Z",
-    "agent_id": "ag_jrb358u9",
+    "created_at": "2026-02-20T12:44:50Z",
+    "agent_id": "ag_ubi7u500",
     "display_name": "sup-heroweb",
     "role": "project-supervisor",
     "project_id": "heroweb"
+  },
+  "sup-hello-world": {
+    "registered_at": "2026-02-20T12:44:53Z",
+    "type": "project-supervisor",
+    "created_by": "tools/projects",
+    "created_at": "2026-02-20T12:44:53Z",
+    "agent_id": "ag_6ojo2faj",
+    "display_name": "sup-hello-world",
+    "role": "project-supervisor",
+    "project_id": "hello-world"
   }
 }

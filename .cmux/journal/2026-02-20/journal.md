@@ -591,3 +591,13 @@ Building the hierarchical task management CLI tool backed by SQLite. Key decisio
 
 ## 17:40 - Session recap — 8 commits
 8 commits this session building the project orchestration system. (1) fc58c47: consolidated message tags in role docs. (2) 92d59d1: @mention routing scoped to Command Center. (3) 02ba03e: TARS preferences system. (4) 0568c5c: project supervisor context — batch analysis, resource fetching, worktree workflow, team templates. (5) 5b4d59c: --worktree flag in tools/workers. (6) ee9ec00: feature-branch workflow — supervisors branch from origin, workers merge to integration branch. (7) 73d1691: system hierarchy awareness — CMUX_SUPERVISOR routing, system overview in role docs. (8) f85fea2: tools/tasks — hierarchical SQLite task management. Also fixed spawn instructions to identify supervisor source and updated startup messages with [SYS] tag reminder.
+
+## 18:08 - Starting task: Build Tasks UI — backend API + frontend panel with tree view
+
+## 18:09 - Tasks UI backend created
+Created src/server/routes/tasks.py with GET /api/tasks (list with filters), GET /api/tasks/tree (hierarchical), GET /api/tasks/{id} (single with children), PATCH /api/tasks/{id} (update status/assigned_to). Uses sqlite3 directly with WAL mode, reads from .cmux/tasks.db shared with CLI tool.
+
+## 18:12 - Tasks UI complete
+Built full Tasks UI feature: backend API (src/server/routes/tasks.py) with GET /api/tasks, GET /api/tasks/tree, GET /api/tasks/{id}, PATCH /api/tasks/{id}. Frontend: TasksPanel component with collapsible tree view, status badges (pending=gray, assigned=yellow, in-progress=blue, done=green, blocked=red), agent assignment, resource links. Added as 'Tasks' tab in ActivityTimeline. All tests pass (45/45), typecheck clean, build succeeds. Commit 944eb98.
+
+## 18:15 - Supervisor online after restart. System healthy, server up, 3 project supervisors active (sup-hero, sup-heroweb, sup-hello-world), no workers running, no backlog items. Uncommitted runtime state in .cmux/ — will commit.

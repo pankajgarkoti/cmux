@@ -19,7 +19,7 @@
       "path": "/Users/pankajgarkoti/Desktop/code/zonko/hero",
       "is_self": false,
       "active": true,
-      "supervisor_agent_id": "ag_qmteqxt3",
+      "supervisor_agent_id": "ag_gdo9xmu1",
       "hooks_installed": true,
       "added_at": "2026-02-20T06:49:54Z",
       "git_remote": "git@github-zonko:zonko-ai/hero.git",
@@ -32,12 +32,25 @@
       "path": "/Users/pankajgarkoti/Desktop/code/zonko/heroweb",
       "is_self": false,
       "active": true,
-      "supervisor_agent_id": "ag_jrb358u9",
+      "supervisor_agent_id": "ag_ubi7u500",
       "hooks_installed": true,
       "added_at": "2026-02-20T06:49:54Z",
       "git_remote": "git@github-zonko:zonko-ai/heroweb.git",
       "language": "javascript",
       "description": "Hero web frontend"
+    },
+    {
+      "id": "hello-world",
+      "name": "Hello World",
+      "path": "/Users/pankajgarkoti/Desktop/code/hello-world",
+      "is_self": false,
+      "active": true,
+      "supervisor_agent_id": "ag_6ojo2faj",
+      "hooks_installed": false,
+      "added_at": "2026-02-20T12:33:35Z",
+      "git_remote": "",
+      "language": "python",
+      "description": "FastAPI hello world test project"
     }
   ]
 }
