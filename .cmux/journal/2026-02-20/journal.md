@@ -299,3 +299,20 @@ New supervisor launched and briefed.
 
 ## 06:17 - Supervisor recovery
 New supervisor instance after sentry recovery at ~06:16. Previous supervisor stale for 361s. System state clean: server healthy, latest commit 3b1525a, all work committed, no pending tasks. Resuming normal operations.
+
+## 12:18 - Investigated missing projects
+User reported two registered projects were missing from projects.json. Traced the cause: commit 09de236 (worker-gitignore-fix) ran git rm --cached on all of .cmux/, deleting projects.json from tracking and wiping the working copy that had the user's two added projects. The revert (7d0f504) only restored the original seed version with just CMUX. The two user-added projects were lost. Awaiting user input on which projects to re-register.
+
+## 12:20 - Re-registered lost projects
+User's two projects (hero and heroweb) were wiped from projects.json by commit 09de236 (worker-gitignore-fix ran git rm --cached on .cmux/). The revert 7d0f504 only restored the seed version with just CMUX. Found the project details in journal attachments: sup-hero-1771558596.md and sup-heroweb-1771564621.md. Re-registered both via tools/projects add. hero @ /Users/pankajgarkoti/Desktop/code/zonko/hero (React Native/Expo), heroweb @ /Users/pankajgarkoti/Desktop/code/zonko/heroweb (web frontend).
+
+## 12:23 - [hero] sup-hero started and ready. Read context and supervisor role docs. Awaiting tasks from Supervisor Prime.
+
+## 12:23 - [heroweb] sup-heroweb online and ready for tasks. Read context and supervisor role docs.
+
+## 12:23 - Activated hero and heroweb supervisors
+Re-registered and activated both lost project supervisors. sup-hero (ag_eal2dmwg) running in /Users/pankajgarkoti/Desktop/code/zonko/hero, sup-heroweb (ag_6bieplsu) running in /Users/pankajgarkoti/Desktop/code/zonko/heroweb. All four tmux windows confirmed: monitor, supervisor, sup-hero, sup-heroweb.
+
+## 12:24 - [hero] [hero] sup-hero recovered from compaction. No pre-compaction artifact found (was idle). Journal confirms no pending tasks. Ready for work.
+
+## 12:34 - [hero] [hero] sup-hero recovered from second compaction. Still idle, no tasks assigned. Ready.

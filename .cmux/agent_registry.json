@@ -1,8 +1,32 @@
 {
   "supervisor": {
-    "registered_at": "2026-02-20T00:46:36.086177+00:00",
+    "registered_at": "2026-02-20T06:43:18.825670+00:00",
     "type": "supervisor",
     "created_by": "monitor.sh",
-    "created_at": "2026-02-20T00:46:36.086177+00:00"
+    "agent_id": "ag_0000prim",
+    "display_name": "supervisor",
+    "role": "supervisor",
+    "project_id": "cmux",
+    "created_at": "2026-02-20T06:43:18.825670+00:00"
+  },
+  "sup-hero": {
+    "registered_at": "2026-02-20T06:52:53Z",
+    "type": "project-supervisor",
+    "created_by": "tools/projects",
+    "created_at": "2026-02-20T06:52:53Z",
+    "agent_id": "ag_eal2dmwg",
+    "display_name": "sup-hero",
+    "role": "project-supervisor",
+    "project_id": "hero"
+  },
+  "sup-heroweb": {
+    "registered_at": "2026-02-20T06:52:57Z",
+    "type": "project-supervisor",
+    "created_by": "tools/projects",
+    "created_at": "2026-02-20T06:52:57Z",
+    "agent_id": "ag_6bieplsu",
+    "display_name": "sup-heroweb",
+    "role": "project-supervisor",
+    "project_id": "heroweb"
   }
 }

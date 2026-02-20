@@ -5,7 +5,7 @@
     "description": "Execute uv run pytest across the entire codebase. Investigate and fix any test failures found. Ensure all tests pass cleanly before marking complete.",
     "priority": 3,
     "source": "system",
-    "status": "pending",
+    "status": "in_progress",
     "created_at": "2026-02-20T05:46:17Z",
     "completed_at": null
   },

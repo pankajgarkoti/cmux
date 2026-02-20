@@ -12,6 +12,32 @@
       "git_remote": "git@github.com:pankajgarkoti/cmux.git",
       "language": "python",
       "description": "Self-improving multi-agent orchestration system"
+    },
+    {
+      "id": "hero",
+      "name": "Hero",
+      "path": "/Users/pankajgarkoti/Desktop/code/zonko/hero",
+      "is_self": false,
+      "active": true,
+      "supervisor_agent_id": "ag_eal2dmwg",
+      "hooks_installed": false,
+      "added_at": "2026-02-20T06:49:54Z",
+      "git_remote": "git@github-zonko:zonko-ai/hero.git",
+      "language": "javascript",
+      "description": "React Native/Expo app"
+    },
+    {
+      "id": "heroweb",
+      "name": "Hero Web",
+      "path": "/Users/pankajgarkoti/Desktop/code/zonko/heroweb",
+      "is_self": false,
+      "active": true,
+      "supervisor_agent_id": "ag_6bieplsu",
+      "hooks_installed": false,
+      "added_at": "2026-02-20T06:49:54Z",
+      "git_remote": "git@github-zonko:zonko-ai/heroweb.git",
+      "language": "javascript",
+      "description": "Hero web frontend"
     }
   ]
 }
