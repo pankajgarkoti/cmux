@@ -3,7 +3,7 @@
 # workers - Manage worker agents from the supervisor
 #
 # Usage:
-#   workers spawn <name> <task> [--dir <path>] [--project <id>] [--worktree]
+#   workers spawn <name> <task> [--dir <path>] [--project <id>] [--task <id>] [--worktree]
 #   workers kill <name>            - Terminate a worker
 #   workers list                   - List all workers
 #   workers send <name> <message>  - Send message to a worker
@@ -75,9 +75,10 @@ cmd_spawn() {
     local task=""
     local worker_dir=""
     local project_id=""
+    local task_id=""
     local use_worktree=false
 
-    # Parse arguments: workers spawn <name> <task> [--dir <path>] [--project <id>] [--worktree]
+    # Parse arguments: workers spawn <name> <task> [--dir <path>] [--project <id>] [--task <task-id>] [--worktree]
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --dir)
@@ -88,6 +89,11 @@ cmd_spawn() {
             --project)
                 [[ -z "${2:-}" ]] && die "--project requires an ID argument"
                 project_id="$2"
+                shift 2
+                ;;
+            --task)
+                [[ -z "${2:-}" ]] && die "--task requires a task ID argument"
+                task_id="$2"
                 shift 2
                 ;;
             --worktree)
@@ -107,8 +113,8 @@ cmd_spawn() {
         esac
     done
 
-    [[ -z "$name" ]] && die "usage: workers spawn <name> <task> [--dir <path>] [--project <id>]"
-    [[ -z "$task" ]] && die "usage: workers spawn <name> <task> [--dir <path>] [--project <id>]"
+    [[ -z "$name" ]] && die "usage: workers spawn <name> <task> [--dir <path>] [--project <id>] [--task <task-id>]"
+    [[ -z "$task" ]] && die "usage: workers spawn <name> <task> [--dir <path>] [--project <id>] [--task <task-id>]"
 
     # Validate --dir path exists
     if [[ -n "$worker_dir" ]]; then
@@ -323,10 +329,21 @@ WTEOF
     sleep 0.1
     tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
 
+    # Link to task system if --task was provided
+    if [[ -n "$task_id" ]]; then
+        local tasks_tool="${CMUX_PROJECT_ROOT}/tools/tasks"
+        if [[ -x "$tasks_tool" ]]; then
+            "$tasks_tool" assign "$task_id" "$name" 2>/dev/null && \
+                "$tasks_tool" update "$task_id" in-progress 2>/dev/null || \
+                warn "Could not link task $task_id (task may not exist)"
+        fi
+    fi
+
     ok "Worker '$name' spawned and task assigned"
     echo ""
     echo "Agent ID: $agent_id"
     echo "Task: $task"
+    [[ -n "$task_id" ]] && echo "Task ID: $task_id"
     [[ -n "$worker_dir" ]] && echo "Directory: $cd_target"
     [[ -n "$worktree_path" ]] && echo "Worktree: $worktree_path"
     [[ -n "$worktree_branch" ]] && echo "Branch: $worktree_branch"
@@ -475,6 +492,8 @@ SPAWN OPTIONS:
     --dir <path>       Set worker's working directory (default: CMUX project root)
                        The path must exist. When set, CMUX tools are added to PATH.
     --project <id>     Associate worker with a project (sets CMUX_PROJECT_ID env var)
+    --task <task-id>   Link worker to a task in the task system (.cmux/tasks.db).
+                       Auto-assigns the task to this worker and sets status to in-progress.
     --worktree         Create a git worktree for branch-isolated work.
                        Creates ~/.cmux/worktrees/<project>/<name> on branch feat/<name>.
                        When combined with --dir, uses --dir as the source repo.
@@ -484,6 +503,7 @@ EXAMPLES:
     workers spawn auth-worker "Implement JWT authentication in src/auth/"
     workers spawn api-worker "Fix the auth bug" --dir /path/to/my-api --project my-api
     workers spawn feature-x "Add feature X" --worktree
+    workers spawn bug-fixer "Fix login crash" --task t_a3f8k2m9
     workers send auth-worker "Also add refresh token support"
     workers status auth-worker 50
     workers kill auth-worker

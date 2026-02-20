@@ -4,14 +4,18 @@
 #
 # Usage:
 #   tasks add <title> [--project <id>] [--assign <agent>] [--parent <task-id>]
-#                     [--desc <description>] [--resources <comma-separated-urls>]
-#   tasks list [--project <id>] [--status <status>] [--assign <agent>] [--all]
+#                     [--desc <description>] [--priority <level>] [--source <src>]
+#                     [--resources <comma-separated-urls>]
+#   tasks list [--project <id>] [--status <status>] [--assign <agent>]
+#              [--priority <level>] [--all]
 #   tasks tree [--project <id>]
 #   tasks show <id>
 #   tasks update <id> <status>
 #   tasks assign <id> <agent>
 #   tasks done <id>
 #   tasks delete <id>
+#   tasks dashboard
+#   tasks import-backlog [<backlog-id>]
 #   tasks help
 #
 # Storage: .cmux/tasks.db (SQLite with WAL mode)
@@ -22,6 +26,7 @@ set -euo pipefail
 
 CMUX_HOME="${CMUX_HOME:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 DB="${CMUX_HOME}/.cmux/tasks.db"
+BACKLOG_FILE="${CMUX_HOME}/.cmux/backlog.json"
 
 # Colors
 RED='\033[0;31m'
@@ -29,6 +34,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 DIM='\033[2m'
 BOLD='\033[1m'
 NC='\033[0m'
@@ -54,6 +60,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     project TEXT DEFAULT '',
     assigned_to TEXT DEFAULT '',
     status TEXT DEFAULT 'pending',
+    priority TEXT DEFAULT 'medium',
+    source TEXT DEFAULT 'system',
     parent_id TEXT DEFAULT '',
     resources TEXT DEFAULT '[]',
     created_at TEXT NOT NULL,
@@ -61,6 +69,18 @@ CREATE TABLE IF NOT EXISTS tasks (
     completed_at TEXT DEFAULT ''
 );
 SQL
+    fi
+    # Migrate: add priority column if missing
+    local has_priority
+    has_priority=$(sqlite3 "$DB" "SELECT COUNT(*) FROM pragma_table_info('tasks') WHERE name='priority';")
+    if [[ "$has_priority" == "0" ]]; then
+        sqlite3 "$DB" "ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT 'medium';"
+    fi
+    # Migrate: add source column if missing
+    local has_source
+    has_source=$(sqlite3 "$DB" "SELECT COUNT(*) FROM pragma_table_info('tasks') WHERE name='source';")
+    if [[ "$has_source" == "0" ]]; then
+        sqlite3 "$DB" "ALTER TABLE tasks ADD COLUMN source TEXT DEFAULT 'system';"
     fi
     sqlite3 "$DB" 'PRAGMA journal_mode=WAL;' > /dev/null 2>&1
 }
@@ -82,16 +102,55 @@ status_color() {
         pending)     echo -e "${DIM}${padded}${NC}" ;;
         assigned)    echo -e "${YELLOW}${padded}${NC}" ;;
         in-progress) echo -e "${BLUE}${padded}${NC}" ;;
+        review)      echo -e "${MAGENTA}${padded}${NC}" ;;
         done)        echo -e "${GREEN}${padded}${NC}" ;;
         blocked)     echo -e "${RED}${padded}${NC}" ;;
+        failed)      echo -e "${RED}${BOLD}${padded}${NC}" ;;
         *)           echo "$padded" ;;
+    esac
+}
+
+priority_color() {
+    local padded
+    padded=$(printf "%-8s" "$1")
+    case "$1" in
+        critical) echo -e "${RED}${BOLD}${padded}${NC}" ;;
+        high)     echo -e "${YELLOW}${padded}${NC}" ;;
+        medium)   echo -e "${CYAN}${padded}${NC}" ;;
+        low)      echo -e "${DIM}${padded}${NC}" ;;
+        *)        echo "$padded" ;;
+    esac
+}
+
+# Sort key for priority ordering (lower = higher priority)
+priority_sort_key() {
+    case "$1" in
+        critical) echo "1" ;;
+        high)     echo "2" ;;
+        medium)   echo "3" ;;
+        low)      echo "4" ;;
+        *)        echo "5" ;;
     esac
 }
 
 validate_status() {
     case "$1" in
-        pending|assigned|in-progress|done|blocked) ;;
-        *) die "invalid status: $1 (valid: pending, assigned, in-progress, done, blocked)" ;;
+        pending|assigned|in-progress|review|done|blocked|failed) ;;
+        *) die "invalid status: $1 (valid: pending, assigned, in-progress, review, done, blocked, failed)" ;;
+    esac
+}
+
+validate_priority() {
+    case "$1" in
+        critical|high|medium|low) ;;
+        *) die "invalid priority: $1 (valid: critical, high, medium, low)" ;;
+    esac
+}
+
+validate_source() {
+    case "$1" in
+        user|backlog|self-generated|worker-escalation|system) ;;
+        *) die "invalid source: $1 (valid: user, backlog, self-generated, worker-escalation, system)" ;;
     esac
 }
 
@@ -100,7 +159,7 @@ validate_status() {
 #-------------------------------------------------------------------------------
 
 cmd_add() {
-    local title="" project="" assign="" parent="" desc="" resources=""
+    local title="" project="" assign="" parent="" desc="" resources="" priority="medium" source="system"
 
     # First positional arg is the title
     if [[ $# -gt 0 && "${1:0:2}" != "--" ]]; then
@@ -111,17 +170,21 @@ cmd_add() {
     # Parse flags
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --project)  project="${2:-}"; shift 2 ;;
-            --assign)   assign="${2:-}"; shift 2 ;;
-            --parent)   parent="${2:-}"; shift 2 ;;
-            --desc)     desc="${2:-}"; shift 2 ;;
+            --project)   project="${2:-}"; shift 2 ;;
+            --assign)    assign="${2:-}"; shift 2 ;;
+            --parent)    parent="${2:-}"; shift 2 ;;
+            --desc)      desc="${2:-}"; shift 2 ;;
             --resources) resources="${2:-}"; shift 2 ;;
+            --priority)  priority="${2:-}"; shift 2 ;;
+            --source)    source="${2:-}"; shift 2 ;;
             *) die "unknown flag: $1" ;;
         esac
     done
 
-    [[ -z "$title" ]] && die "usage: tasks add <title> [--project <id>] [--assign <agent>] [--parent <task-id>] [--desc <description>] [--resources <urls>]"
+    [[ -z "$title" ]] && die "usage: tasks add <title> [--project <id>] [--assign <agent>] [--parent <task-id>] [--desc <description>] [--priority <level>] [--source <src>] [--resources <urls>]"
 
+    validate_priority "$priority"
+    validate_source "$source"
     ensure_db
 
     # Validate parent exists if given
@@ -147,27 +210,32 @@ cmd_add() {
         status="assigned"
     fi
 
-    sqlite3 "$DB" "INSERT INTO tasks (id, title, description, project, assigned_to, status, parent_id, resources, created_at, updated_at)
-        VALUES ('$id', '$(echo "$title" | sed "s/'/''/g")', '$(echo "$desc" | sed "s/'/''/g")', '$project', '$assign', '$status', '$parent', '$(echo "$res_json" | sed "s/'/''/g")', '$now', '$now');"
+    sqlite3 "$DB" "INSERT INTO tasks (id, title, description, project, assigned_to, status, priority, source, parent_id, resources, created_at, updated_at)
+        VALUES ('$id', '$(echo "$title" | sed "s/'/''/g")', '$(echo "$desc" | sed "s/'/''/g")', '$project', '$assign', '$status', '$priority', '$source', '$parent', '$(echo "$res_json" | sed "s/'/''/g")', '$now', '$now');"
 
     ok "Created ${id}: ${title}"
+    echo -e "  ${DIM}Priority: $(priority_color "$priority")${NC}"
     if [[ -n "$parent" ]]; then
         echo -e "  ${DIM}Parent: ${parent}${NC}"
     fi
     if [[ -n "$assign" ]]; then
         echo -e "  ${DIM}Assigned: ${assign}${NC}"
     fi
+    if [[ "$source" != "system" ]]; then
+        echo -e "  ${DIM}Source: ${source}${NC}"
+    fi
 }
 
 cmd_list() {
-    local project="" status="" assign="" show_all=0
+    local project="" status="" assign="" priority="" show_all=0
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --project) project="${2:-}"; shift 2 ;;
-            --status)  status="${2:-}"; shift 2 ;;
-            --assign)  assign="${2:-}"; shift 2 ;;
-            --all)     show_all=1; shift ;;
+            --project)  project="${2:-}"; shift 2 ;;
+            --status)   status="${2:-}"; shift 2 ;;
+            --assign)   assign="${2:-}"; shift 2 ;;
+            --priority) priority="${2:-}"; shift 2 ;;
+            --all)      show_all=1; shift ;;
             *) die "unknown flag: $1" ;;
         esac
     done
@@ -176,7 +244,7 @@ cmd_list() {
 
     local where="1=1"
     if [[ "$show_all" == "0" && -z "$status" ]]; then
-        where="$where AND status != 'done'"
+        where="$where AND status NOT IN ('done', 'failed')"
     fi
     if [[ -n "$project" ]]; then
         where="$where AND project = '$project'"
@@ -188,9 +256,21 @@ cmd_list() {
     if [[ -n "$assign" ]]; then
         where="$where AND assigned_to = '$assign'"
     fi
+    if [[ -n "$priority" ]]; then
+        validate_priority "$priority"
+        where="$where AND priority = '$priority'"
+    fi
 
+    # Order by priority weight then creation time
     local rows
-    rows=$(sqlite3 -separator "$SEP" "$DB" "SELECT id, status, project, assigned_to, title FROM tasks WHERE $where ORDER BY created_at;")
+    rows=$(sqlite3 -separator "$SEP" "$DB" "SELECT id, status, priority, project, assigned_to, title FROM tasks WHERE $where ORDER BY
+        CASE priority
+            WHEN 'critical' THEN 1
+            WHEN 'high' THEN 2
+            WHEN 'medium' THEN 3
+            WHEN 'low' THEN 4
+            ELSE 5
+        END, created_at;")
 
     if [[ -z "$rows" ]]; then
         echo -e "${DIM}No tasks found${NC}"
@@ -199,14 +279,15 @@ cmd_list() {
 
     echo -e "${BOLD}Tasks:${NC}"
     echo ""
-    printf "${DIM}%-12s  %-11s  %-12s  %-12s  %s${NC}\n" "ID" "STATUS" "PROJECT" "ASSIGNED" "TITLE"
-    echo -e "${DIM}────────────  ───────────  ────────────  ────────────  ─────────────────────────${NC}"
+    printf "${DIM}%-12s  %-11s  %-8s  %-12s  %-12s  %s${NC}\n" "ID" "STATUS" "PRI" "PROJECT" "ASSIGNED" "TITLE"
+    echo -e "${DIM}────────────  ───────────  ────────  ────────────  ────────────  ─────────────────────────${NC}"
 
     local count=0
-    while IFS="$SEP" read -r id st proj assigned ttl; do
-        printf "%-12s  %b  %-12s  %-12s  %s\n" \
+    while IFS="$SEP" read -r id st pri proj assigned ttl; do
+        printf "%-12s  %b  %b  %-12s  %-12s  %s\n" \
             "$id" \
             "$(status_color "$st")" \
+            "$(priority_color "${pri:-medium}")" \
             "${proj:--}" \
             "${assigned:--}" \
             "$ttl"
@@ -236,7 +317,14 @@ cmd_tree() {
 
     # Get all tasks
     local all_tasks
-    all_tasks=$(sqlite3 -separator "$SEP" "$DB" "SELECT id, status, parent_id, title FROM tasks WHERE $where ORDER BY created_at;")
+    all_tasks=$(sqlite3 -separator "$SEP" "$DB" "SELECT id, status, parent_id, priority, title FROM tasks WHERE $where ORDER BY
+        CASE priority
+            WHEN 'critical' THEN 1
+            WHEN 'high' THEN 2
+            WHEN 'medium' THEN 3
+            WHEN 'low' THEN 4
+            ELSE 5
+        END, created_at;")
 
     if [[ -z "$all_tasks" ]]; then
         echo -e "${DIM}No tasks found${NC}"
@@ -257,10 +345,10 @@ _print_tree_children() {
 
     # Find children of this parent
     local children=()
-    while IFS="$SEP" read -r id st pid ttl; do
+    while IFS="$SEP" read -r id st pid pri ttl; do
         [[ -z "$id" ]] && continue
         if [[ "$pid" == "$parent_id" ]]; then
-            children+=("${id}|${st}|${ttl}")
+            children+=("${id}|${st}|${pri}|${ttl}")
         fi
     done <<< "$all_tasks"
 
@@ -269,10 +357,11 @@ _print_tree_children() {
     local i=0
     for child in "${children[@]}"; do
         ((i++))
-        local cid cst cttl
+        local cid cst cpri cttl
         cid=$(echo "$child" | cut -d'|' -f1)
         cst=$(echo "$child" | cut -d'|' -f2)
-        cttl=$(echo "$child" | cut -d'|' -f3-)
+        cpri=$(echo "$child" | cut -d'|' -f3)
+        cttl=$(echo "$child" | cut -d'|' -f4-)
 
         local connector="├── "
         local next_prefix="${prefix}│   "
@@ -281,8 +370,16 @@ _print_tree_children() {
             next_prefix="${prefix}    "
         fi
 
-        printf "%s%s%-12s  %b  %s\n" \
-            "$prefix" "$connector" "$cid" "$(status_color "$cst")" "$cttl"
+        # Show priority tag inline for non-medium priorities
+        local pri_tag=""
+        case "$cpri" in
+            critical) pri_tag=" ${RED}[CRIT]${NC}" ;;
+            high)     pri_tag=" ${YELLOW}[HIGH]${NC}" ;;
+            low)      pri_tag=" ${DIM}[LOW]${NC}" ;;
+        esac
+
+        printf "%s%s%-12s  %b  %s%b\n" \
+            "$prefix" "$connector" "$cid" "$(status_color "$cst")" "$cttl" "$pri_tag"
 
         # Recurse into children
         _print_tree_children "$cid" "$next_prefix" "$all_tasks"
@@ -302,13 +399,15 @@ cmd_show() {
     exists=$(_qf "COUNT(*)")
     [[ "$exists" == "0" ]] && die "task not found: $id"
 
-    local ttl st desc proj assigned pid res created updated completed
+    local ttl st desc proj assigned pid pri src res created updated completed
     ttl=$(_qf "title")
     st=$(_qf "status")
     desc=$(_qf "description")
     proj=$(_qf "project")
     assigned=$(_qf "assigned_to")
     pid=$(_qf "parent_id")
+    pri=$(_qf "priority")
+    src=$(_qf "source")
     res=$(_qf "resources")
     created=$(_qf "created_at")
     updated=$(_qf "updated_at")
@@ -317,6 +416,10 @@ cmd_show() {
     echo -e "${BOLD}Task ${id}${NC}"
     echo -e "  Title:       ${ttl}"
     echo -e "  Status:      $(status_color "$st")"
+    echo -e "  Priority:    $(priority_color "${pri:-medium}")"
+    if [[ -n "$src" && "$src" != "system" ]]; then
+        echo -e "  Source:      ${src}"
+    fi
     if [[ -n "$desc" ]]; then
         echo -e "  Description: ${desc}"
     fi
@@ -343,12 +446,19 @@ cmd_show() {
 
     # Show children
     local children
-    children=$(sqlite3 -separator "$SEP" "$DB" "SELECT id, status, title FROM tasks WHERE parent_id='$id' ORDER BY created_at;")
+    children=$(sqlite3 -separator "$SEP" "$DB" "SELECT id, status, priority, title FROM tasks WHERE parent_id='$id' ORDER BY
+        CASE priority
+            WHEN 'critical' THEN 1
+            WHEN 'high' THEN 2
+            WHEN 'medium' THEN 3
+            WHEN 'low' THEN 4
+            ELSE 5
+        END, created_at;")
     if [[ -n "$children" ]]; then
         echo ""
         echo -e "  ${BOLD}Children:${NC}"
-        while IFS="$SEP" read -r cid cst cttl; do
-            printf "    %-12s  %b  %s\n" "$cid" "$(status_color "$cst")" "$cttl"
+        while IFS="$SEP" read -r cid cst cpri cttl; do
+            printf "    %-12s  %b  %b  %s\n" "$cid" "$(status_color "$cst")" "$(priority_color "${cpri:-medium}")" "$cttl"
         done <<< "$children"
     fi
 }
@@ -376,7 +486,7 @@ cmd_update() {
 
         # Warn about incomplete children
         local undone_children
-        undone_children=$(sqlite3 "$DB" "SELECT COUNT(*) FROM tasks WHERE parent_id='$id' AND status != 'done';")
+        undone_children=$(sqlite3 "$DB" "SELECT COUNT(*) FROM tasks WHERE parent_id='$id' AND status NOT IN ('done', 'failed');")
         if [[ "$undone_children" -gt 0 ]]; then
             warn "${undone_children} child task(s) are not done"
         fi
@@ -478,6 +588,166 @@ _delete_recursive() {
     sqlite3 "$DB" "DELETE FROM tasks WHERE id='$parent_id';"
 }
 
+cmd_dashboard() {
+    ensure_db
+
+    local total
+    total=$(sqlite3 "$DB" "SELECT COUNT(*) FROM tasks;")
+
+    if [[ "$total" == "0" ]]; then
+        echo -e "${DIM}No tasks in system${NC}"
+        return
+    fi
+
+    echo -e "${BOLD}Task Dashboard${NC}"
+    echo -e "${DIM}══════════════════════════════════════════════════════${NC}"
+    echo ""
+
+    # Status breakdown
+    echo -e "${BOLD}By Status:${NC}"
+    local statuses
+    statuses=$(sqlite3 -separator "$SEP" "$DB" "SELECT status, COUNT(*) FROM tasks GROUP BY status ORDER BY
+        CASE status
+            WHEN 'blocked' THEN 1
+            WHEN 'failed' THEN 2
+            WHEN 'in-progress' THEN 3
+            WHEN 'review' THEN 4
+            WHEN 'assigned' THEN 5
+            WHEN 'pending' THEN 6
+            WHEN 'done' THEN 7
+            ELSE 8
+        END;")
+    if [[ -n "$statuses" ]]; then
+        while IFS="$SEP" read -r st cnt; do
+            printf "  %b  %s\n" "$(status_color "$st")" "$cnt"
+        done <<< "$statuses"
+    fi
+    echo ""
+
+    # Priority breakdown (non-done only)
+    echo -e "${BOLD}By Priority (active):${NC}"
+    local priorities
+    priorities=$(sqlite3 -separator "$SEP" "$DB" "SELECT COALESCE(NULLIF(priority,''), 'medium'), COUNT(*) FROM tasks WHERE status NOT IN ('done', 'failed') GROUP BY priority ORDER BY
+        CASE priority
+            WHEN 'critical' THEN 1
+            WHEN 'high' THEN 2
+            WHEN 'medium' THEN 3
+            WHEN 'low' THEN 4
+            ELSE 5
+        END;")
+    if [[ -n "$priorities" ]]; then
+        while IFS="$SEP" read -r pri cnt; do
+            printf "  %b  %s\n" "$(priority_color "${pri:-medium}")" "$cnt"
+        done <<< "$priorities"
+    else
+        echo -e "  ${DIM}(no active tasks)${NC}"
+    fi
+    echo ""
+
+    # By assignee (non-done only)
+    echo -e "${BOLD}By Assignee (active):${NC}"
+    local assignees
+    assignees=$(sqlite3 -separator "$SEP" "$DB" "SELECT CASE WHEN assigned_to = '' THEN '(unassigned)' ELSE assigned_to END, COUNT(*) FROM tasks WHERE status NOT IN ('done', 'failed') GROUP BY assigned_to ORDER BY COUNT(*) DESC;")
+    if [[ -n "$assignees" ]]; then
+        while IFS="$SEP" read -r agent cnt; do
+            printf "  %-20s  %s\n" "$agent" "$cnt"
+        done <<< "$assignees"
+    else
+        echo -e "  ${DIM}(no active tasks)${NC}"
+    fi
+    echo ""
+
+    # Attention needed: blocked, failed, or critical+pending
+    local attention
+    attention=$(sqlite3 -separator "$SEP" "$DB" "SELECT id, status, priority, assigned_to, title FROM tasks WHERE status IN ('blocked', 'failed') OR (priority = 'critical' AND status NOT IN ('done', 'failed')) ORDER BY
+        CASE status WHEN 'failed' THEN 1 WHEN 'blocked' THEN 2 ELSE 3 END,
+        CASE priority WHEN 'critical' THEN 1 ELSE 2 END;")
+    if [[ -n "$attention" ]]; then
+        echo -e "${BOLD}${RED}Needs Attention:${NC}"
+        while IFS="$SEP" read -r id st pri agent ttl; do
+            printf "  %-12s  %b  %b  %-12s  %s\n" \
+                "$id" "$(status_color "$st")" "$(priority_color "${pri:-medium}")" "${agent:--}" "$ttl"
+        done <<< "$attention"
+        echo ""
+    fi
+
+    # Summary line
+    local active_count done_count
+    active_count=$(sqlite3 "$DB" "SELECT COUNT(*) FROM tasks WHERE status NOT IN ('done', 'failed');")
+    done_count=$(sqlite3 "$DB" "SELECT COUNT(*) FROM tasks WHERE status = 'done';")
+    local failed_count
+    failed_count=$(sqlite3 "$DB" "SELECT COUNT(*) FROM tasks WHERE status = 'failed';")
+    echo -e "${DIM}Total: ${total} | Active: ${active_count} | Done: ${done_count} | Failed: ${failed_count}${NC}"
+}
+
+cmd_import_backlog() {
+    local backlog_id="${1:-}"
+
+    ensure_db
+
+    if [[ ! -f "$BACKLOG_FILE" ]]; then
+        die "no backlog file found at $BACKLOG_FILE"
+    fi
+
+    local items
+    if [[ -n "$backlog_id" ]]; then
+        # Strip leading #
+        backlog_id="${backlog_id#\#}"
+        items=$(jq -c --argjson id "$backlog_id" '[.[] | select(.id == $id)]' "$BACKLOG_FILE")
+        local count
+        count=$(echo "$items" | jq 'length')
+        [[ "$count" == "0" ]] && die "backlog item #${backlog_id} not found"
+    else
+        # Import all pending items
+        items=$(jq -c '[.[] | select(.status == "pending" or .status == "in_progress")]' "$BACKLOG_FILE")
+        local count
+        count=$(echo "$items" | jq 'length')
+        if [[ "$count" == "0" ]]; then
+            echo -e "${DIM}No pending backlog items to import${NC}"
+            return
+        fi
+    fi
+
+    local imported=0
+    while IFS= read -r item; do
+        local bl_id bl_title bl_desc bl_priority bl_source
+
+        bl_id=$(echo "$item" | jq -r '.id')
+        bl_title=$(echo "$item" | jq -r '.title')
+        bl_desc=$(echo "$item" | jq -r '.description // ""')
+        bl_priority=$(echo "$item" | jq -r '.priority // 3')
+        bl_source=$(echo "$item" | jq -r '.source // "system"')
+
+        # Map backlog priority (1-5) to task priority (critical/high/medium/low)
+        local task_priority
+        case "$bl_priority" in
+            1) task_priority="critical" ;;
+            2) task_priority="high" ;;
+            3) task_priority="medium" ;;
+            4|5) task_priority="low" ;;
+            *) task_priority="medium" ;;
+        esac
+
+        # Map backlog source to task source
+        local task_source="backlog"
+
+        # Generate task ID
+        local task_id
+        task_id=$(gen_id)
+        local now
+        now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+        sqlite3 "$DB" "INSERT INTO tasks (id, title, description, project, assigned_to, status, priority, source, parent_id, resources, created_at, updated_at)
+            VALUES ('$task_id', '$(echo "$bl_title" | sed "s/'/''/g")', '$(echo "$bl_desc" | sed "s/'/''/g")', '', '', 'pending', '$task_priority', '$task_source', '', '[]', '$now', '$now');"
+
+        ok "Imported backlog #${bl_id} → ${task_id}: ${bl_title} ($(priority_color "$task_priority"))"
+        ((imported++))
+    done < <(echo "$items" | jq -c '.[]')
+
+    echo ""
+    echo -e "${DIM}${imported} backlog item(s) imported as tasks${NC}"
+}
+
 cmd_help() {
     cat << 'EOF'
 tasks - Hierarchical task management backed by SQLite
@@ -491,20 +761,25 @@ COMMANDS:
         --assign <agent>             Assign to an agent (auto-sets status to assigned)
         --parent <task-id>           Set parent task for hierarchy
         --desc <description>         Add a description
+        --priority <level>           Set priority: critical, high, medium (default), low
+        --source <src>               Set source: user, backlog, self-generated,
+                                     worker-escalation, system (default)
         --resources <url1,url2>      Attach resource URLs (comma-separated)
 
-    list [flags]                     List tasks (default: non-done)
+    list [flags]                     List tasks (default: non-done/failed)
         --project <id>               Filter by project
         --status <status>            Filter by status
         --assign <agent>             Filter by assignee
-        --all                        Include done tasks
+        --priority <level>           Filter by priority
+        --all                        Include done/failed tasks
 
     tree [--project <id>]            Hierarchical view with indentation
 
     show <id>                        Full details of a task
 
     update <id> <status>             Change status
-                                     Valid: pending, assigned, in-progress, done, blocked
+                                     Valid: pending, assigned, in-progress, review,
+                                            done, blocked, failed
 
     assign <id> <agent>              Assign task to an agent
 
@@ -512,15 +787,40 @@ COMMANDS:
 
     delete <id>                      Delete task and all children
 
+    dashboard                        Summary view: counts by status, priority,
+                                     assignee, plus attention items
+
+    import-backlog [<id>]            Import backlog items as tasks
+                                     Without ID: imports all pending items
+                                     With ID: imports a single item
+
     help                             Show this help
 
+STATUS FLOW:
+    pending → assigned → in-progress → review → done
+                                     ↘ blocked (can resume to in-progress)
+                                     ↘ failed (terminal)
+
+PRIORITY LEVELS:
+    critical    Urgent, blocks other work
+    high        Important, should be next
+    medium      Normal priority (default)
+    low         Nice to have, do when free
+
 EXAMPLES:
-    tasks add "Implement auth" --project cmux --desc "JWT-based authentication"
+    tasks add "Implement auth" --project cmux --priority high --source user
     tasks add "Write login endpoint" --parent t_a3f8k2m9 --assign worker-auth
+    tasks add "Fix bug" --priority critical --assign worker-bugfix --source worker-escalation
     tasks list --status blocked
+    tasks list --priority critical
+    tasks list --assign worker-auth
     tasks tree --project cmux
     tasks update t_a3f8k2m9 in-progress
+    tasks update t_a3f8k2m9 review
     tasks done t_a3f8k2m9
+    tasks dashboard
+    tasks import-backlog
+    tasks import-backlog 3
     tasks delete t_a3f8k2m9
 
 STORAGE:
@@ -540,14 +840,16 @@ main() {
     shift || true
 
     case "$cmd" in
-        add)     cmd_add "$@" ;;
-        list)    cmd_list "$@" ;;
-        tree)    cmd_tree "$@" ;;
-        show)    cmd_show "$@" ;;
-        update)  cmd_update "$@" ;;
-        assign)  cmd_assign "$@" ;;
-        done)    cmd_done "$@" ;;
-        delete)  cmd_delete "$@" ;;
+        add)            cmd_add "$@" ;;
+        list)           cmd_list "$@" ;;
+        tree)           cmd_tree "$@" ;;
+        show)           cmd_show "$@" ;;
+        update)         cmd_update "$@" ;;
+        assign)         cmd_assign "$@" ;;
+        done)           cmd_done "$@" ;;
+        delete)         cmd_delete "$@" ;;
+        dashboard)      cmd_dashboard "$@" ;;
+        import-backlog) cmd_import_backlog "$@" ;;
         help|--help|-h) cmd_help ;;
         *)       die "unknown command: $cmd (try 'tasks help')" ;;
     esac
