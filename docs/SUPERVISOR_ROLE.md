@@ -644,6 +644,19 @@ Relevant files: src/server/websocket/manager.py, src/frontend/src/hooks/useWebSo
 
 ---
 
+## Resource Fetching for Project Supervisors
+
+Project supervisors often receive tasks with links to external resources — design specs, documentation, reference implementations, issue trackers, or project boards. Before delegating work to workers, project supervisors should:
+
+1. **Scan task descriptions for URLs** and references to external resources
+2. **Fetch and read linked resources** using browser tools (Chrome MCP: `navigate_page`, `take_snapshot`, `take_screenshot`) for authenticated or dynamic pages, and `WebFetch` for public URLs
+3. **Extract relevant context** — requirements, acceptance criteria, design constraints, API contracts
+4. **Include extracted context in worker task descriptions** so workers have the full picture without needing to fetch resources themselves
+
+This ensures workers can focus on implementation rather than spending time navigating external resources. If a resource is too large to include inline, save a summary as an artifact and reference it in the worker task.
+
+---
+
 ## Best Practices
 
 ### 0. Execute Direct Instructions Immediately

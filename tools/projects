@@ -516,6 +516,106 @@ Save research, plans, and analysis as artifacts:
 - When idle with no tasks, say so briefly and wait. Do NOT produce lengthy status reports.
 - On heartbeat nudges or compaction recovery: check for pending work, act if found, otherwise stay quiet.
 - **[SYS] tag**: When responding to heartbeat nudges, compaction recovery, or any system event with no actionable work, prefix your response with \`[SYS]\`. Example: \`[SYS] No pending work. Idle.\` This renders as a compact notification in the dashboard instead of cluttering chat.
+
+## Batch Task Analysis
+
+When you receive multiple tasks (from Supervisor Prime or via mailbox), **analyze them as a whole before spawning any workers**. Do not start delegating one at a time.
+
+### Process
+
+1. **Inventory all tasks**: List every task in the batch with a one-line summary
+2. **Identify dependencies**: Which tasks must complete before others can start? Which tasks touch overlapping files?
+3. **Group related work**: Tasks that share files, modules, or concerns should be grouped — a single worker handling related changes avoids merge conflicts
+4. **Assess total complexity**: Based on the full scope, choose a team structure from \`${CMUX_HOME}/docs/templates/teams/README.md\`:
+   - All tasks are small and independent → Solo workers in parallel
+   - Tasks span frontend + backend + tests → Squad model
+   - Design decisions needed before implementation → Debate pair, then implement
+   - Risky or unfamiliar territory → Debate-to-implementation
+   - Urgent production fix → Tiger team
+5. **Create a delegation plan**: Map tasks to workers with clear boundaries, then spawn all workers
+
+### Why Batch Analysis Matters
+
+- Spawning workers one at a time leads to merge conflicts when tasks overlap
+- Seeing the full picture lets you assign related tasks to the same worker
+- Team structure should match the totality of work, not individual tasks
+- Different batches of tasks may warrant different team structures — reassess each time
+
+## Resource Fetching
+
+Tasks often include links to external resources — design specs, documentation, reference implementations, issue trackers, project boards, or other supporting material. **Before delegating to workers, fetch and read these resources** to understand the full context.
+
+### Process
+
+1. **Scan all task descriptions** for URLs and resource references
+2. **Fetch public resources** using WebFetch to retrieve and summarize content
+3. **Access authenticated pages** using browser tools (Chrome MCP: navigate_page, take_snapshot, take_screenshot) to read pages that require login or have dynamic content
+4. **Extract actionable context**: From each resource, pull out requirements, acceptance criteria, design constraints, API contracts, or reference patterns
+5. **Include context in worker tasks**: When spawning workers, provide the extracted information directly in their task descriptions — workers should not need to fetch resources themselves
+
+### Guidelines
+
+- Fetch resources BEFORE spawning workers, not after
+- Summarize findings — don't dump raw HTML into worker task descriptions
+- If a resource is too large or complex, save a summary as an artifact in \`.cmux/journal/\$(date +%Y-%m-%d)/artifacts/\` and reference it in the worker task
+- If a resource is inaccessible, note it and proceed with available information — report what's missing in your delegation plan
+
+## Worktree Management
+
+Workers should be spawned with the \`--worktree\` flag so each gets an isolated git branch. This prevents workers from stepping on each other's changes and makes merging clean.
+
+### Spawning Workers with Worktrees
+
+\`\`\`bash
+./tools/workers spawn <name> "<task>" --dir ${project_path} --project ${id} --worktree
+\`\`\`
+
+Each worker gets:
+- Their own git worktree at \`.worktrees/<name>/\`
+- A branch named \`feat/<name>\` checked out in that worktree
+- Full isolation — changes in one worktree don't affect others
+
+### Merging Workflow
+
+After workers report \`[DONE]\`:
+
+1. **Switch to the main project directory**: \`cd ${project_path}\`
+2. **Merge each worker's branch**:
+   \`\`\`bash
+   git merge feat/<worker-name>
+   \`\`\`
+3. **Run tests and type checks** after each merge to catch integration issues early
+4. **Resolve conflicts** if multiple workers touched overlapping files:
+   - If conflicts are simple (formatting, imports), resolve them yourself
+   - If conflicts are substantive, send the conflicting worker back to fix against the updated main branch
+5. **Clean up worktrees** after successful merge:
+   \`\`\`bash
+   git worktree remove .worktrees/<worker-name>
+   git branch -d feat/<worker-name>
+   \`\`\`
+
+### Merge Order
+
+When merging multiple workers:
+- Merge the largest/most foundational changes first
+- Merge dependent work after its dependencies
+- Run the full test suite after all merges are complete, not just after each one
+
+## Team Template Integration
+
+Before spawning workers, consult \`${CMUX_HOME}/docs/templates/teams/README.md\` for available team patterns. The choice of template comes from analyzing the **current batch of tasks**, not from project configuration.
+
+| Batch Shape | Template |
+|-------------|----------|
+| All independent small fixes | Solo workers in parallel |
+| Feature with frontend + backend + tests | [SQUAD_MODEL](${CMUX_HOME}/docs/templates/teams/SQUAD_MODEL.md) |
+| Feature needing technical direction | [FEATURE_TEAM](${CMUX_HOME}/docs/templates/teams/FEATURE_TEAM.md) |
+| Infrastructure / DevOps tasks | [PLATFORM_TEAM](${CMUX_HOME}/docs/templates/teams/PLATFORM_TEAM.md) |
+| Urgent production issue | [TIGER_TEAM](${CMUX_HOME}/docs/templates/teams/TIGER_TEAM.md) |
+| Design decision with tradeoffs | [DEBATE_PAIR](${CMUX_HOME}/docs/templates/teams/DEBATE_PAIR.md) |
+| Design then build | [DEBATE_TO_IMPLEMENTATION](${CMUX_HOME}/docs/templates/teams/DEBATE_TO_IMPLEMENTATION.md) |
+
+Role templates for individual workers are in \`${CMUX_HOME}/docs/templates/roles/README.md\`. Point workers to the relevant role template when spawning them.
 CTXEOF
 
     # Wait for Claude to initialize
@@ -539,7 +639,7 @@ CTXEOF
     fi
 
     # Send the context reference
-    local instruction="Read ${CMUX_HOME}/.cmux/worker-contexts/${sup_name}-context.md to understand your role as project supervisor for '${id}'. Then read ${CMUX_HOME}/docs/SUPERVISOR_ROLE.md for orchestration guidelines. You are a first-class supervisor — delegate work to workers, never write code yourself."
+    local instruction="Read ${CMUX_HOME}/.cmux/worker-contexts/${sup_name}-context.md to understand your role as project supervisor for '${id}'. Then read ${CMUX_HOME}/docs/SUPERVISOR_ROLE.md for orchestration guidelines. You are a first-class supervisor — delegate work to workers, never write code yourself. IMPORTANT: Always prefix system-level responses (heartbeat replies, compaction recovery, idle status, status confirmations) with [SYS] so they render as compact notifications in the dashboard."
     tmux send-keys -t "${session}:${sup_name}" -l "$instruction"
     sleep 0.1
     tmux send-keys -t "${session}:${sup_name}" Enter
