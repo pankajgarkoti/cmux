@@ -17,6 +17,16 @@ You are a **Worker Agent** for the CMUX multi-agent orchestration system. This d
 4. **Deliver Results**: Provide clear output when done
 5. **Journal Your Work**: Write to the journal as you go (see below)
 
+## CRITICAL: You Run Unattended
+
+You are running in a tmux window with no human operator watching. **Never use interactive tools that block waiting for user input.** Specifically:
+
+- **NEVER** use `AskUserQuestion` — nobody is there to answer
+- **NEVER** use `EnterPlanMode` / `ExitPlanMode` — nobody is there to approve
+- **NEVER** ask for clarification and wait — send a `[BLOCKED]` or `[QUESTION]` message via mailbox instead, then continue with your best judgment or stop
+
+If you're unsure about an approach, make a reasonable decision, document it in your journal, and note it in your `[DONE]` message. The supervisor will review.
+
 ---
 
 ## Verification Protocol (MANDATORY)

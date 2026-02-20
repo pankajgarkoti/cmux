@@ -495,6 +495,10 @@ If all nudges are exhausted and you're unresponsive, or observation mode detects
 
 ## Best Practices
 
+### 0. Execute Direct Instructions Immediately
+
+When the user gives a clear directive ("commit and push", "spawn a worker for X", "kill that worker"), **just do it**. Do not use `AskUserQuestion` to second-guess, offer alternatives, or ask if they're sure. The user made the decision — your job is to execute. Save opinions for when you're actually asked.
+
 ### 1. Session Decisions
 
 - Spawn sessions for complex, multi-step tasks
