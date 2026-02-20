@@ -233,21 +233,6 @@ start_journal_nudge() {
 }
 
 #───────────────────────────────────────────────────────────────────────────────
-# Compact Daemon (runs in background)
-#───────────────────────────────────────────────────────────────────────────────
-
-start_compact() {
-    if [[ -n "${COMPACT_PID:-}" ]] && kill -0 "$COMPACT_PID" 2>/dev/null; then
-        return 0  # Already running
-    fi
-
-    log_step "Starting compact daemon..."
-    "${SCRIPT_DIR}/compact.sh" &
-    COMPACT_PID=$!
-    log_ok "Compact daemon started (PID: $COMPACT_PID)"
-}
-
-#───────────────────────────────────────────────────────────────────────────────
 # Project Supervisor Management
 #───────────────────────────────────────────────────────────────────────────────
 
@@ -821,11 +806,6 @@ cleanup() {
         kill "$JOURNAL_NUDGE_PID" 2>/dev/null && printf "  ${GREEN}✓${NC} Journal nudge stopped\n"
     fi
 
-    # Kill compact daemon
-    if [[ -n "${COMPACT_PID:-}" ]]; then
-        kill "$COMPACT_PID" 2>/dev/null && printf "  ${GREEN}✓${NC} Compact daemon stopped\n"
-    fi
-
     # Kill sentry agent and clean up lockfile
     if tmux_window_exists "$CMUX_SESSION" "sentry" 2>/dev/null; then
         tmux_kill_window "$CMUX_SESSION" "sentry"
@@ -936,14 +916,6 @@ run_dashboard() {
         else
             printf "  J-Nudge:    ${YELLOW}●${NC} restarting...\n"
             start_journal_nudge
-        fi
-
-        # Compact daemon status - restart if dead
-        if [[ -n "${COMPACT_PID:-}" ]] && kill -0 "$COMPACT_PID" 2>/dev/null; then
-            printf "  Compact:    ${GREEN}●${NC} running (PID: ${COMPACT_PID})\n"
-        else
-            printf "  Compact:    ${YELLOW}●${NC} restarting...\n"
-            start_compact
         fi
 
         # Sentry status - sync from lockfile before checking
@@ -1109,11 +1081,7 @@ main() {
     start_journal_nudge
     echo ""
 
-    # Phase 6: Start compact daemon
-    start_compact
-    echo ""
-
-    # Phase 7: Run health dashboard (foreground)
+    # Phase 6: Run health dashboard (foreground)
     log_ok "Entering dashboard mode..."
     sleep 2
     run_dashboard
