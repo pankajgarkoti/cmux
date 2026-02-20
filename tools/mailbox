@@ -209,19 +209,22 @@ cmd_quick() {
 cmd_done() {
     local summary="${1:-}"
     [[ -z "$summary" ]] && die "usage: mailbox done \"<summary>\""
-    cmd_quick "supervisor" "[DONE] $summary"
+    local target="${CMUX_SUPERVISOR:-supervisor}"
+    cmd_quick "$target" "[DONE] $summary"
 }
 
 cmd_blocked() {
     local issue="${1:-}"
     [[ -z "$issue" ]] && die "usage: mailbox blocked \"<issue>\""
-    cmd_quick "supervisor" "[BLOCKED] $issue"
+    local target="${CMUX_SUPERVISOR:-supervisor}"
+    cmd_quick "$target" "[BLOCKED] $issue"
 }
 
 cmd_status() {
     local update="${1:-}"
     [[ -z "$update" ]] && die "usage: mailbox status \"<update>\""
-    cmd_quick "supervisor" "[STATUS] $update"
+    local target="${CMUX_SUPERVISOR:-supervisor}"
+    cmd_quick "$target" "[STATUS] $update"
 }
 
 cmd_read() {
@@ -291,9 +294,9 @@ USAGE:
 COMMANDS:
     send <to> "<subject>" "<body>"       Send with body file attached
     quick <to> "<subject>"               Quick notification (no body)
-    done "<summary>"                     Tell supervisor: [DONE] summary
-    blocked "<issue>"                    Tell supervisor: [BLOCKED] issue
-    status "<update>"                    Tell supervisor: [STATUS] update
+    done "<summary>"                     Tell your supervisor: [DONE] summary
+    blocked "<issue>"                    Tell your supervisor: [BLOCKED] issue
+    status "<update>"                    Tell your supervisor: [STATUS] update
     update <message-id> <new-status>     Update task lifecycle status
     read [lines]                         Show recent mailbox entries
     help                                 Show this help message
@@ -348,6 +351,7 @@ ENVIRONMENT:
     CMUX_SESSION         tmux session name (default: cmux)
     CMUX_AGENT_NAME     This agent's name (default: unknown)
     CMUX_PORT            API server port (default: 8000)
+    CMUX_SUPERVISOR      Direct supervisor name (default: supervisor)
 EOF
 }
 

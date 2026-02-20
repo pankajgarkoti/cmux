@@ -220,7 +220,8 @@ cmd_spawn() {
     jq "${jq_args[@]}" "$jq_filter" "$reg_file" > "$reg_tmp" && mv "$reg_tmp" "$reg_file"
 
     # Build environment variable exports
-    local env_vars="CMUX_AGENT=true CMUX_AGENT_ID=${agent_id} CMUX_AGENT_NAME=${name} CMUX_SESSION=${CMUX_SESSION} CMUX_HOME=${CMUX_PROJECT_ROOT} CMUX_PORT=${CMUX_PORT:-8000} CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false"
+    local supervisor_name="${CMUX_AGENT_NAME:-supervisor}"
+    local env_vars="CMUX_AGENT=true CMUX_AGENT_ID=${agent_id} CMUX_AGENT_NAME=${name} CMUX_SESSION=${CMUX_SESSION} CMUX_HOME=${CMUX_PROJECT_ROOT} CMUX_PORT=${CMUX_PORT:-8000} CMUX_SUPERVISOR=${supervisor_name} CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false"
     if [[ -n "$project_id" ]]; then
         env_vars="${env_vars} CMUX_PROJECT_ID=${project_id}"
     fi
@@ -257,15 +258,19 @@ cmd_spawn() {
     cat > "$context_file" << EOF
 You are a worker agent named '${name}' in the CMUX multi-agent system.
 
+HIERARCHY: User → Supervisor Prime → Project Supervisors → Workers (you).
+Your direct supervisor is ${supervisor_name}. Report to them via mailbox. Do NOT
+communicate with the user directly — only your supervisor chain does that.
+
 IMPORTANT: You are NOT chatting with a human user. You are an autonomous agent that:
-- Receives tasks from the supervisor or other agents
+- Receives tasks from your supervisor (${supervisor_name})
 - Communicates with other agents via the /mailbox skill
 - Journals your work via the /journal skill (do this frequently!)
 - Should respond to messages that appear in your terminal
 - Reports completion via: ./tools/mailbox done "summary"
 - Reports blockers via: ./tools/mailbox blocked "issue"
 
-When you see a message like '[cmux:supervisor] Do X', that's the supervisor assigning you work.
+When you see a message like '[cmux:${supervisor_name}] Do X', that's your supervisor assigning you work.
 
 JOURNAL AS YOU WORK - use ./tools/journal log "what you did" after completing tasks,
 making decisions, or learning something important. This is the system's long-term memory.
@@ -295,7 +300,7 @@ WTEOF
     # This avoids multiline paste issues entirely
     # Use absolute path so workers in external dirs can find the context file
     info "Sending task to worker..."
-    local instruction="Read ${CMUX_PROJECT_ROOT}/.cmux/worker-contexts/${name}-context.md for your identity and task assignment, then begin working on the task described there."
+    local instruction="[cmux:${supervisor_name}] Read ${CMUX_PROJECT_ROOT}/.cmux/worker-contexts/${name}-context.md for your identity and task assignment. You are a worker agent managed by a supervisor, not a human user. Begin working on the task described there."
     tmux send-keys -t "${CMUX_SESSION}:${name}" -l "$instruction"
     sleep 0.1
     tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
@@ -464,6 +469,7 @@ ENVIRONMENT:
     CMUX_HOME          CMUX installation root (set automatically for workers)
     CMUX_PORT          server port (default: 8000)
     CMUX_PROJECT_ID    project association (set via --project flag)
+    CMUX_SUPERVISOR    direct supervisor name (set automatically from spawner)
 EOF
 }
 
