@@ -406,6 +406,13 @@ cmd_send() {
 
     info "Sending message to: $name"
 
+    # Store message in DB so it appears in dashboard chat
+    local from_agent="${CMUX_AGENT_NAME:-supervisor}"
+    curl -sf -X POST "http://localhost:${CMUX_PORT:-8000}/api/messages/internal" \
+        -H "Content-Type: application/json" \
+        -d "{\"from_agent\": $(printf '%s' "$from_agent" | jq -Rs .), \"to_agent\": $(printf '%s' "$name" | jq -Rs .), \"content\": $(printf '%s' "$message" | jq -Rs .), \"type\": \"task\"}" \
+        >/dev/null 2>&1 || true
+
     # Send message using literal flag then Enter
     # Small delay between text and Enter ensures Claude Code receives both
     # (matches lib/tmux.sh delay pattern used by router)

@@ -53,11 +53,19 @@ export function ChatPanel() {
 
     // Filter by specific agent (if selected)
     if (selectedAgentId) {
-      filtered = filtered.filter(
-        (m) =>
-          (m.from_agent === selectedAgentId && m.to_agent === 'user') ||
-          (m.from_agent === 'user' && m.to_agent === selectedAgentId)
-      );
+      if (selectedAgentId === 'supervisor') {
+        // Main supervisor: keep user<->supervisor filter (established pattern)
+        filtered = filtered.filter(
+          (m) =>
+            (m.from_agent === selectedAgentId && m.to_agent === 'user') ||
+            (m.from_agent === 'user' && m.to_agent === selectedAgentId)
+        );
+      } else {
+        // All other agents: show all messages involving this agent
+        filtered = filtered.filter(
+          (m) => m.from_agent === selectedAgentId || m.to_agent === selectedAgentId
+        );
+      }
     }
 
     return filtered;
