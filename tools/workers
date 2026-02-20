@@ -334,7 +334,8 @@ WTEOF
         local tasks_tool="${CMUX_PROJECT_ROOT}/tools/tasks"
         if [[ -x "$tasks_tool" ]]; then
             "$tasks_tool" assign "$task_id" "$name" 2>/dev/null && \
-                "$tasks_tool" update "$task_id" in-progress 2>/dev/null || \
+                "$tasks_tool" update "$task_id" in-progress 2>/dev/null && \
+                "$tasks_tool" link "$task_id" "$name" 2>/dev/null || \
                 warn "Could not link task $task_id (task may not exist)"
         fi
     fi
