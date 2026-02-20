@@ -37,18 +37,30 @@ class AgentRegistry:
 
     def __init__(self):
         self._agents: Dict[str, Dict[str, Any]] = {}
+        self._last_mtime: float = 0.0
         self._load()
 
     def _load(self):
-        """Load registry from disk."""
+        """Load registry from disk and record file mtime."""
         if REGISTRY_FILE.exists():
             try:
+                self._last_mtime = REGISTRY_FILE.stat().st_mtime
                 with open(REGISTRY_FILE, 'r') as f:
                     fcntl.flock(f.fileno(), fcntl.LOCK_SH)
                     self._agents = json.load(f)
                     fcntl.flock(f.fileno(), fcntl.LOCK_UN)
             except (json.JSONDecodeError, IOError):
                 self._agents = {}
+
+    def _reload_if_changed(self):
+        """Reload registry from disk if the file has been modified externally."""
+        if REGISTRY_FILE.exists():
+            try:
+                current_mtime = REGISTRY_FILE.stat().st_mtime
+                if current_mtime != self._last_mtime:
+                    self._load()
+            except OSError:
+                pass
 
     def _save(self):
         """Save registry to disk with exclusive lock."""
@@ -58,6 +70,7 @@ class AgentRegistry:
             json.dump(self._agents, f, indent=2)
             f.flush()
             fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        self._last_mtime = REGISTRY_FILE.stat().st_mtime
 
     def _get_all_agent_ids(self) -> Set[str]:
         """Get all agent_id values from the registry."""
@@ -152,6 +165,7 @@ class AgentRegistry:
 
     def get_agent_metadata(self, key: str) -> Optional[Dict[str, Any]]:
         """Get metadata for a registered agent by window-based key."""
+        self._reload_if_changed()
         entry = self._agents.get(key)
         if entry:
             return self._migrate_entry(key, entry)
@@ -162,6 +176,7 @@ class AgentRegistry:
 
         Returns (key, metadata) tuple or None.
         """
+        self._reload_if_changed()
         for key, entry in self._agents.items():
             entry = self._migrate_entry(key, entry)
             if entry.get("agent_id") == agent_id:
@@ -173,6 +188,7 @@ class AgentRegistry:
 
         Returns (key, metadata) tuple or None.
         """
+        self._reload_if_changed()
         for key, entry in self._agents.items():
             entry = self._migrate_entry(key, entry)
             if entry.get("display_name") == display_name:
