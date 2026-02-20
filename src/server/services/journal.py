@@ -45,7 +45,30 @@ class JournalService:
             async with aiofiles.open(journal_file, "w") as f:
                 await f.write(f"# Journal - {journal_date.strftime('%Y-%m-%d')}\n")
 
-    async def add_entry(self, title: str, content: str, journal_date: Optional[date] = None) -> JournalEntry:
+    @staticmethod
+    def _parse_project_id(header_line: str) -> Optional[str]:
+        """Extract project ID from a journal header line.
+
+        Parses headers like '## 09:16 - [my-project] Title' and returns 'my-project'.
+        Returns None if no project tag is present.
+        """
+        match = re.match(r"## \d{2}:\d{2} - \[([^\]]+)\] ", header_line)
+        return match.group(1) if match else None
+
+    @staticmethod
+    def _parse_title(header_line: str) -> str:
+        """Extract the title from a journal header line, stripping time and project tag."""
+        # With project tag: ## 09:16 - [proj] Title
+        match = re.match(r"## \d{2}:\d{2} - \[[^\]]+\] (.+)", header_line)
+        if match:
+            return match.group(1).strip()
+        # Without project tag: ## 09:16 - Title
+        match = re.match(r"## \d{2}:\d{2} - (.+)", header_line)
+        return match.group(1).strip() if match else header_line.strip()
+
+    async def add_entry(
+        self, title: str, content: str, journal_date: Optional[date] = None, project_id: Optional[str] = None
+    ) -> JournalEntry:
         """Add a new entry to the journal."""
         journal_date = journal_date or date.today()
         await self.ensure_day_exists(journal_date)
@@ -55,31 +78,43 @@ class JournalService:
             title=title,
             content=content,
             timestamp=now_local,
+            project_id=project_id,
         )
 
         journal_file = self._get_journal_file(journal_date)
         time_str = now_local.strftime("%H:%M")
 
+        # Build header with optional project tag
+        if project_id:
+            header = f"## {time_str} - [{project_id}] {title}"
+        else:
+            header = f"## {time_str} - {title}"
+
         # Only append content body if non-empty (quick logs have no body)
         if content and content.strip():
-            entry_text = f"\n## {time_str} - {title}\n{content}\n"
+            entry_text = f"\n{header}\n{content}\n"
         else:
-            entry_text = f"\n## {time_str} - {title}\n"
+            entry_text = f"\n{header}\n"
 
         async with aiofiles.open(journal_file, "a") as f:
             await f.write(entry_text)
 
         return entry
 
-    async def get_day(self, journal_date: date) -> JournalDayResponse:
-        """Get journal content for a specific date."""
+    async def get_day(self, journal_date: date, project: Optional[str] = None) -> JournalDayResponse:
+        """Get journal content for a specific date, optionally filtered by project."""
         journal_file = self._get_journal_file(journal_date)
         artifacts_dir = self._get_artifacts_dir(journal_date)
 
         content = ""
         if journal_file.exists():
             async with aiofiles.open(journal_file, "r") as f:
-                content = await f.read()
+                raw_content = await f.read()
+
+            if project:
+                content = self._filter_by_project(raw_content, project)
+            else:
+                content = raw_content
 
         artifacts = []
         if artifacts_dir.exists():
@@ -90,6 +125,26 @@ class JournalService:
             content=content,
             artifacts=artifacts,
         )
+
+    def _filter_by_project(self, content: str, project: str) -> str:
+        """Filter journal markdown content to only include entries for a given project."""
+        lines = content.split("\n")
+        result_lines: list[str] = []
+        include = False
+
+        for line in lines:
+            if line.startswith("## "):
+                pid = self._parse_project_id(line)
+                include = pid == project
+            elif line.startswith("# "):
+                # Keep the day header
+                result_lines.append(line)
+                continue
+
+            if include:
+                result_lines.append(line)
+
+        return "\n".join(result_lines)
 
     async def list_dates(self) -> list[str]:
         """List all dates that have journal entries."""
@@ -105,8 +160,10 @@ class JournalService:
 
         return sorted(dates, reverse=True)
 
-    async def search(self, query: str, limit: int = 20) -> list[JournalSearchResult]:
-        """Search journal entries for a query string."""
+    async def search(
+        self, query: str, limit: int = 20, project: Optional[str] = None
+    ) -> list[JournalSearchResult]:
+        """Search journal entries for a query string, optionally filtered by project."""
         results = []
         query_lower = query.lower()
 
@@ -123,16 +180,18 @@ class JournalService:
                 lines = await f.readlines()
 
             current_title = ""
+            current_project: Optional[str] = None
             for line_num, line in enumerate(lines, 1):
-                # Track current section title
+                # Track current section title and project
                 if line.startswith("## "):
-                    # Extract title after time (e.g., "## 09:16 - PR Review Task")
-                    match = re.match(r"## \d{2}:\d{2} - (.+)", line)
-                    if match:
-                        current_title = match.group(1).strip()
+                    current_project = self._parse_project_id(line)
+                    current_title = self._parse_title(line)
+
+                # Skip entries that don't match the project filter
+                if project and current_project != project:
+                    continue
 
                 if query_lower in line.lower():
-                    # Create snippet with context
                     snippet = line.strip()[:200]
                     if len(line.strip()) > 200:
                         snippet += "..."
@@ -142,6 +201,7 @@ class JournalService:
                         title=current_title or "Journal",
                         snippet=snippet,
                         line_number=line_num,
+                        project_id=current_project,
                     ))
 
                     if len(results) >= limit:

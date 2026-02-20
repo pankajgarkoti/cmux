@@ -12,6 +12,7 @@ from .journal import (
     JournalSearchResult,
     JournalSearchResponse,
 )
+from .project import Project, ProjectList, ProjectCreate, ProjectUpdate
 
 __all__ = [
     "Agent",
@@ -35,4 +36,8 @@ __all__ = [
     "JournalDatesResponse",
     "JournalSearchResult",
     "JournalSearchResponse",
+    "Project",
+    "ProjectList",
+    "ProjectCreate",
+    "ProjectUpdate",
 ]

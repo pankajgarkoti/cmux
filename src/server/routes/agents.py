@@ -51,6 +51,20 @@ async def get_archived_agent(archive_id: str):
     return archive
 
 
+@router.get("/by-project/{project_id}")
+async def list_agents_by_project(project_id: str):
+    """List agents belonging to a specific project.
+
+    Filters the agent registry by project_id and returns matching agents.
+    """
+    all_entries = agent_registry.get_all_entries()
+    agents = []
+    for key, entry in all_entries.items():
+        if entry.get("project_id") == project_id:
+            agents.append({"key": key, **entry})
+    return {"project_id": project_id, "agents": agents, "total": len(agents)}
+
+
 @router.get("/{agent_id}", response_model=Agent)
 async def get_agent(agent_id: str):
     """Get details of a specific agent.

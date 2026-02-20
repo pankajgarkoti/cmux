@@ -9,6 +9,7 @@ class JournalEntry(BaseModel):
     title: str
     content: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now().astimezone())
+    project_id: Optional[str] = None
 
 
 class JournalEntryCreate(BaseModel):
@@ -16,6 +17,7 @@ class JournalEntryCreate(BaseModel):
 
     title: str
     content: str
+    project_id: Optional[str] = None
 
 
 class JournalDay(BaseModel):
@@ -47,6 +49,7 @@ class JournalSearchResult(BaseModel):
     title: str
     snippet: str
     line_number: int
+    project_id: Optional[str] = None
 
 
 class JournalSearchResponse(BaseModel):

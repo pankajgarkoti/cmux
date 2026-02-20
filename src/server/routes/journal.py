@@ -17,11 +17,13 @@ router = APIRouter()
 @router.get("", response_model=JournalDayResponse)
 async def get_journal(
     journal_date: Optional[str] = Query(None, alias="date", description="Date in YYYY-MM-DD format"),
+    project: Optional[str] = Query(None, description="Filter entries by project ID"),
 ):
     """
     Get journal for a specific date.
 
     If no date is provided, returns today's journal.
+    Optionally filter entries by project ID.
     """
     if journal_date:
         try:
@@ -31,7 +33,7 @@ async def get_journal(
     else:
         parsed_date = date.today()
 
-    return await journal_service.get_day(parsed_date)
+    return await journal_service.get_day(parsed_date, project=project)
 
 
 @router.post("/entry")
@@ -40,12 +42,14 @@ async def add_journal_entry(entry: JournalEntryCreate):
     created = await journal_service.add_entry(
         title=entry.title,
         content=entry.content,
+        project_id=entry.project_id,
     )
     return {
         "success": True,
         "entry": {
             "title": created.title,
             "timestamp": created.timestamp.isoformat(),
+            "project_id": created.project_id,
         },
     }
 
@@ -61,9 +65,10 @@ async def list_journal_dates():
 async def search_journals(
     q: str = Query(..., description="Search query"),
     limit: int = Query(20, ge=1, le=100),
+    project: Optional[str] = Query(None, description="Filter results by project ID"),
 ):
-    """Search across all journal entries."""
-    results = await journal_service.search(query=q, limit=limit)
+    """Search across all journal entries, optionally filtered by project."""
+    results = await journal_service.search(query=q, limit=limit, project=project)
     return JournalSearchResponse(
         query=q,
         results=results,

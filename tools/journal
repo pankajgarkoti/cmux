@@ -57,10 +57,18 @@ append_entry() {
 
     local journal_file="${JOURNAL_DIR}/${target_date}/journal.md"
 
-    if [[ -n "$content" ]]; then
-        printf '\n## %s - %s\n%s\n' "$time_str" "$title" "$content" >> "$journal_file"
+    # Include project tag if CMUX_PROJECT_ID is set
+    local header
+    if [[ -n "${CMUX_PROJECT_ID:-}" ]]; then
+        header="## ${time_str} - [${CMUX_PROJECT_ID}] ${title}"
     else
-        printf '\n## %s - %s\n' "$time_str" "$title" >> "$journal_file"
+        header="## ${time_str} - ${title}"
+    fi
+
+    if [[ -n "$content" ]]; then
+        printf '\n%s\n%s\n' "$header" "$content" >> "$journal_file"
+    else
+        printf '\n%s\n' "$header" >> "$journal_file"
     fi
 }
 
