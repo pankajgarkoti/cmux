@@ -3,7 +3,7 @@
 # mailbox - Send messages to other agents or the user
 #
 # Usage:
-#   mailbox send <to> "<subject>" "<body>"         - Send with body file attached
+#   mailbox send <to> "<subject>" "<body>"         - Send message (inline <500 chars, file otherwise)
 #   mailbox quick <to> "<subject>"                 - Quick notification (no body)
 #   mailbox done "<summary>"                       - Tell supervisor complete
 #   mailbox blocked "<issue>"                      - Tell supervisor blocked
@@ -134,12 +134,21 @@ cmd_send() {
     local to_addr=$(normalize_to "$to")
     local timestamp=$(date -Iseconds)
 
-    # Create body file
-    local attachments_dir=$(get_attachments_dir)
-    local filename="${CMUX_AGENT_NAME}-$(date +%s).md"
-    local filepath="${attachments_dir}/${filename}"
+    # Inline threshold: short messages go directly in JSONL body field,
+    # long messages get written to an attachment file
+    local INLINE_THRESHOLD=500
+    local body_value
 
-    cat > "$filepath" << EOF
+    if (( ${#body} < INLINE_THRESHOLD )); then
+        # Short message: inline in JSONL body field
+        body_value="$body"
+    else
+        # Long message: create attachment file
+        local attachments_dir=$(get_attachments_dir)
+        local filename="${CMUX_AGENT_NAME}-$(date +%s).md"
+        local filepath="${attachments_dir}/${filename}"
+
+        cat > "$filepath" << EOF
 # $subject
 
 **From:** $from
@@ -150,11 +159,17 @@ cmd_send() {
 
 $body
 EOF
+        body_value="$filepath"
+    fi
 
     # Special case: user messages go to API
     if [[ "$to_addr" == "user" ]]; then
         local msg_content
-        msg_content=$(printf '%s\n\n(see: %s)' "$subject" "$filepath" | jq -Rs .)
+        if (( ${#body} < INLINE_THRESHOLD )); then
+            msg_content=$(printf '%s\n\n%s' "$subject" "$body" | jq -Rs .)
+        else
+            msg_content=$(printf '%s\n\n(see: %s)' "$subject" "$body_value" | jq -Rs .)
+        fi
         if curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/user" \
             -H "Content-Type: application/json" \
             -d "{\"content\": $msg_content, \"from_agent\": \"$CMUX_AGENT_NAME\"}" \
@@ -169,10 +184,12 @@ EOF
     # Append JSONL entry to mailbox (with cross-process file lock)
     ensure_mailbox
     mailbox_lock
-    build_mailbox_line "$from" "$to_addr" "$subject" "$filepath" >> "$CMUX_MAILBOX"
+    build_mailbox_line "$from" "$to_addr" "$subject" "$body_value" >> "$CMUX_MAILBOX"
     mailbox_unlock
     ok "Sent: $subject -> $to"
-    echo -e "${DIM}Body: $filepath${NC}"
+    if (( ${#body} >= INLINE_THRESHOLD )); then
+        echo -e "${DIM}Body: $body_value${NC}"
+    fi
 }
 
 cmd_quick() {
@@ -292,7 +309,7 @@ USAGE:
     mailbox <command> [arguments]
 
 COMMANDS:
-    send <to> "<subject>" "<body>"       Send with body file attached
+    send <to> "<subject>" "<body>"       Send message (inline if <500 chars, file if longer)
     quick <to> "<subject>"               Quick notification (no body)
     done "<summary>"                     Tell your supervisor: [DONE] summary
     blocked "<issue>"                    Tell your supervisor: [BLOCKED] issue

@@ -192,8 +192,15 @@ route_message() {
     local status="${6:-}"
 
     # Build content for storage
+    # body_path is either a file path (starts with /) or inline text
     local content="$subject"
-    [[ -n "$body_path" ]] && content="$subject (see: $body_path)"
+    if [[ -n "$body_path" ]]; then
+        if [[ "$body_path" == /* ]]; then
+            content="$subject (see: $body_path)"
+        else
+            content="$subject | $body_path"
+        fi
+    fi
 
     # Store in DB + broadcast to frontend (with task_status if present)
     store_message_via_api "$from" "$to" "$content" "mailbox" "$status"
@@ -230,9 +237,15 @@ route_message() {
 
         # Try exact session match first
         if [[ "$sess" == "$session" ]] && tmux_window_exists "$sess" "$window"; then
-            # Build full message
+            # Build full message — inline body or file reference
             local full_msg="[$from] $subject"
-            [[ -n "$body_path" ]] && full_msg="${full_msg}\n  -> $body_path"
+            if [[ -n "$body_path" ]]; then
+                if [[ "$body_path" == /* ]]; then
+                    full_msg="${full_msg}\n  -> $body_path"
+                else
+                    full_msg="${full_msg}\n  $body_path"
+                fi
+            fi
 
             local send_rc=0
             tmux_safe_send "$sess" "$window" "$full_msg" --retry 3 --queue || send_rc=$?
@@ -252,7 +265,13 @@ route_message() {
             [[ -z "$sess" ]] && continue
             if tmux_window_exists "$sess" "$window"; then
                 local full_msg="[$from] $subject"
-                [[ -n "$body_path" ]] && full_msg="${full_msg}\n  -> $body_path"
+                if [[ -n "$body_path" ]]; then
+                    if [[ "$body_path" == /* ]]; then
+                        full_msg="${full_msg}\n  -> $body_path"
+                    else
+                        full_msg="${full_msg}\n  $body_path"
+                    fi
+                fi
 
                 local send_rc=0
                 tmux_safe_send "$sess" "$window" "$full_msg" --retry 3 --queue || send_rc=$?

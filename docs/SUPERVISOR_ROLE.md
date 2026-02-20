@@ -828,6 +828,7 @@ Supervisor Prime MUST actively monitor project supervisors — not just wait for
 - Supervisor ships without testing and just says "done"
 - Supervisor works in isolation when a sibling supervisor exists
 - Supervisor does the coding itself instead of delegating to workers
+- Supervisor kills workers immediately after `[DONE]` instead of keeping them alive — this wastes resources on respawning for follow-up tasks. Push back if you see workers being killed prematurely
 
 #### When a project supervisor reports [DONE]:
 
