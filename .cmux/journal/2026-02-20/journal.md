@@ -687,3 +687,46 @@ Replaced the hard-capped 50-message loading in the chat panel with paginated inf
 New supervisor instance online after restart. Read SUPERVISOR_ROLE.md and full journal for 2026-02-20. System healthy, server up, 3 project supervisors active (sup-hero, sup-heroweb, sup-hello-world), no workers running, no backlog items. 122 unprocessed mailbox messages (accumulated). 10 files of uncommitted runtime state. Latest commit 192765c (chat pagination). Ready for tasks.
 
 ## 21:24 - Supervisor online (new session). Committed runtime state (dff7deb). System healthy, 3 project sups active, 0 workers, backlog empty. Ready for tasks.
+
+## 21:48 - Starting: unified tmux safe-send system implementation
+
+## 21:50 - Implementing safe-send: core + monitor + compact done
+Built tmux_pane_state() and tmux_safe_send() in lib/tmux.sh. tmux_pane_state detects 8 states (PROMPT, PERMISSION, CONFIRMATION, PLAN_APPROVAL, SELECTION, VIM, BUSY, UNKNOWN). tmux_safe_send wraps tmux_send_keys with state check, --force, --retry N, --queue flags. Queue uses base64-encoded lines in .cmux/send-queue/. tmux_drain_queue() reads and delivers queued messages. Rewired monitor.sh: is_supervisor_at_prompt now delegates to tmux_pane_state, inline capture-pane checks replaced, heartbeat nudges use tmux_safe_send --retry 2, sentry uses --force. Rewired compact.sh: is_agent_idle delegates to tmux_pane_state. Still need to update compact_agent send logic, router.sh, and journal-nudge.sh.
+
+## 21:50 - [todo-backend] sup-todo-backend activated. Project is empty (only README.md, single initial commit). No CLAUDE.md. No pending tasks in mailbox. Ready for task assignment.
+
+## 21:51 - Dispatched todo app builds
+Deleted hello-world project. Created two new repos: todo-backend (FastAPI+SQLite) and todo-frontend (React+Vite+TS+Tailwind). Registered and activated both as CMUX projects with supervisors. Sent 10-step build plans to each. Testing: can project supervisors receive a pre-planned build and execute it end-to-end via workers? worker-safe-send also running in parallel on the tmux safe-send unification task.
+
+## 21:51 - sup-todo-backend hit --worktree/--dir conflict when spawning worker. sup-todo-frontend analyzing task dependencies. Monitoring.
+
+## 21:51 - [todo-backend] Spawned worker build-todo-api (ag_z6ym55h3) in worktree on feat/build-todo-api. Task: 10-step Todo REST API build. Solo worker pattern — sequential dependencies make parallelism impractical.
+
+## 21:52 - [todo-backend] Starting: Build Todo REST API from scratch. 10 steps: project setup, DB layer, models, CRUD, routes, main app, error handling, health endpoints, tests, run script + README.
+
+## 21:53 - [todo-backend] Step 1: Project setup
+Initialized Todo REST API project with uv in /Users/pankajgarkoti/Desktop/code/todo-backend. Added fastapi, uvicorn, aiosqlite, pydantic deps. Created src/ and tests/ directories with __init__.py. Working on branch feat/build-todo-api.
+
+## 21:53 - Completed: unified tmux safe-send system
+Implemented tmux_pane_state() (8 states), tmux_safe_send() (--force/--retry/--queue), tmux_drain_queue() in lib/tmux.sh. Rewired all callers: monitor.sh (heartbeat nudges, supervisor/sentry init), compact.sh (compact sends, recovery msgs), router.sh (message delivery + queue draining), journal-nudge.sh (nudge sends), health.sh (rollback notifications). All syntax checks pass, pane state detection verified against live supervisor (returned PROMPT correctly). Commit: 80427b5.
+
+## 21:55 - Safe-send system complete
+worker-safe-send delivered commit 80427b5. Unified pane state detection (8 states) and safe-send wrapper in lib/tmux.sh. All 6 orchestrator scripts rewired. Replaced scattered is_supervisor_at_prompt/is_agent_idle with single tmux_pane_state function. Router now drains queued messages each cycle. bash -n passes all files.
+
+## 21:55 - Safe-send task complete, awaiting review
+Unified tmux safe-send system fully implemented and committed (80427b5). All 6 files modified, all syntax checks pass, live pane state detection verified. Reported DONE to supervisor. Key design decisions: kept is_supervisor_at_prompt/is_agent_idle/capture_pane_hash as thin wrappers delegating to tmux_pane_state rather than deleting them — reduces blast radius since callers still use familiar names. Queue uses base64 encoding for safe handling of special chars in messages.
+
+## 21:56 - Todo builds progressing well. Backend: 8/10 steps done (steps 1-8 complete, working on 9). Frontend: 3/10 done (steps 1-3 complete, on step 7 — skipped around, interesting).
+
+## 21:58 - [todo-backend] Completed: Todo REST API built from scratch. All 10 steps done, 10 commits, 11 tests passing. Branch: feat/build-todo-api in /Users/pankajgarkoti/Desktop/code/todo-backend
+
+## 21:58 - [todo-backend] Todo REST API Complete
+Built a complete Todo REST API from scratch in /Users/pankajgarkoti/Desktop/code/todo-backend on branch feat/build-todo-api. Executed all 10 steps: project setup with uv (fastapi, uvicorn, aiosqlite, pydantic), database layer with SQLite schema, Pydantic models (TodoCreate/TodoUpdate/TodoResponse), async CRUD operations, API routes (POST/GET/PATCH/DELETE /todos), main app with CORS and lifespan, error handling (404 + global 500), health check and stats endpoints, 11 comprehensive tests (all passing), and run script + README. Key decisions: used module-level DATABASE_URL reference in main.py health endpoint (instead of from-import) to enable test patching, used aiosqlite.Row factory for dict-like row access, added .gitignore for __pycache__/venv/db files.
+
+## 22:00 - [todo-backend] Todo REST API Build Complete
+All 10 steps executed by worker build-todo-api. 10 commits on feat/todo-rest-api, merged clean (fast-forward). 11/11 tests pass. Stack: FastAPI, aiosqlite, Pydantic, pytest. Files: src/{main,database,models,crud,routes}.py, tests/test_api.py, run.sh, README.md. Endpoints: CRUD /api/todos, /api/stats, /health. Integration branch feat/todo-rest-api ready for merge to main.
+
+## 22:02 - Frontend 9/10 done, backend complete (10/10 + 11 tests). Both on feature branches. Last step: build verification + README.
+
+## 22:09 - Todo app builds complete
+Both todo builds finished successfully. Backend (sup-todo-backend): 10 commits on feat/todo-rest-api, 11/11 tests passing, worker build-todo-api did the work. Frontend (sup-todo-frontend): 10 commits on feat/todo-app-frontend, production build verified (207KB JS + 25KB CSS), supervisor executed steps directly without spawning workers. Total time: backend ~10min, frontend ~13min. Both on feature branches ready for merge.

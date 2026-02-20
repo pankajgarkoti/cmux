@@ -40,17 +40,30 @@
       "description": "Hero web frontend"
     },
     {
-      "id": "hello-world",
-      "name": "Hello World",
-      "path": "/Users/pankajgarkoti/Desktop/code/hello-world",
+      "id": "todo-backend",
+      "name": "todo-backend",
+      "path": "/Users/pankajgarkoti/Desktop/code/todo-backend",
       "is_self": false,
       "active": true,
-      "supervisor_agent_id": "ag_lbnjx1yo",
-      "hooks_installed": true,
-      "added_at": "2026-02-20T12:33:35Z",
+      "supervisor_agent_id": "ag_tiw0qkqg",
+      "hooks_installed": false,
+      "added_at": "2026-02-20T16:19:40Z",
       "git_remote": "",
-      "language": "python",
-      "description": "FastAPI hello world test project"
+      "language": "unknown",
+      "description": "FastAPI + SQLite todo API backend"
+    },
+    {
+      "id": "todo-frontend",
+      "name": "todo-frontend",
+      "path": "/Users/pankajgarkoti/Desktop/code/todo-frontend",
+      "is_self": false,
+      "active": true,
+      "supervisor_agent_id": "ag_znr3ie8n",
+      "hooks_installed": false,
+      "added_at": "2026-02-20T16:19:41Z",
+      "git_remote": "",
+      "language": "unknown",
+      "description": "React + Vite + TypeScript todo frontend"
     }
   ]
 }
