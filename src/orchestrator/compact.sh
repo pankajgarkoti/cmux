@@ -28,6 +28,7 @@ SKIP_WINDOWS="monitor|supervisor"                  # windows to never compact
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 PRE_COMPACT_HOOK="${PROJECT_ROOT}/.claude/hooks/pre-compact.sh"
 RECOVERY_DELAY=5                                   # seconds to wait before injecting recovery message
+COMPACT_TIMESTAMPS="${PROJECT_ROOT}/.cmux/.compact-timestamps"
 
 # Track state
 RUNNING=true
@@ -65,6 +66,78 @@ is_agent_idle() {
         return 0
     fi
 
+    return 1
+}
+
+#-------------------------------------------------------------------------------
+# Activity tracking — skip agents with no work since last compaction
+#-------------------------------------------------------------------------------
+
+# Get the epoch timestamp of last compaction for a window.
+# Returns 0 if never compacted.
+get_last_compact_time() {
+    local window="$1"
+    if [[ -f "$COMPACT_TIMESTAMPS" ]]; then
+        local ts
+        ts=$(grep "^${window}=" "$COMPACT_TIMESTAMPS" 2>/dev/null | tail -1 | cut -d= -f2)
+        echo "${ts:-0}"
+    else
+        echo "0"
+    fi
+}
+
+# Record current epoch as last compaction time for a window.
+set_last_compact_time() {
+    local window="$1"
+    local now
+    now=$(date +%s)
+
+    # Create file if missing
+    touch "$COMPACT_TIMESTAMPS"
+
+    # Remove old entry (if any) and append new one
+    if grep -q "^${window}=" "$COMPACT_TIMESTAMPS" 2>/dev/null; then
+        # Use a temp file to avoid sed -i portability issues
+        grep -v "^${window}=" "$COMPACT_TIMESTAMPS" > "${COMPACT_TIMESTAMPS}.tmp" || true
+        mv "${COMPACT_TIMESTAMPS}.tmp" "$COMPACT_TIMESTAMPS"
+    fi
+    echo "${window}=${now}" >> "$COMPACT_TIMESTAMPS"
+}
+
+# Check whether an agent has had activity since its last compaction.
+# Looks at heartbeat file mtime, then falls back to context file mtime.
+# Returns 0 if there IS activity (should compact), 1 if no activity (skip).
+has_activity_since_last_compact() {
+    local window="$1"
+    local last_compact
+    last_compact=$(get_last_compact_time "$window")
+
+    # Never compacted before — always compact
+    if [[ "$last_compact" == "0" ]]; then
+        return 0
+    fi
+
+    # Check heartbeat file first
+    local heartbeat_file="${PROJECT_ROOT}/.cmux/.${window}-heartbeat"
+    if [[ -f "$heartbeat_file" ]]; then
+        local hb_mtime
+        hb_mtime=$(stat -f %m "$heartbeat_file" 2>/dev/null || stat -c %Y "$heartbeat_file" 2>/dev/null || echo 0)
+        if (( hb_mtime > last_compact )); then
+            return 0
+        fi
+    fi
+
+    # Fall back to context file
+    local context_file="${PROJECT_ROOT}/.cmux/worker-contexts/${window}-context.md"
+    if [[ -f "$context_file" ]]; then
+        local ctx_mtime
+        ctx_mtime=$(stat -f %m "$context_file" 2>/dev/null || stat -c %Y "$context_file" 2>/dev/null || echo 0)
+        if (( ctx_mtime > last_compact )); then
+            return 0
+        fi
+    fi
+
+    # No activity detected
     return 1
 }
 
@@ -190,8 +263,16 @@ compact_all_agents() {
             continue
         fi
 
+        # Skip if no activity since last compaction
+        if ! has_activity_since_last_compact "$window"; then
+            log_status "COMPACT" "Skipping ${window}: no activity since last compaction"
+            ((skipped++))
+            continue
+        fi
+
         # Attempt compaction
         if compact_agent "$CMUX_SESSION" "$window"; then
+            set_last_compact_time "$window"
             ((compacted++))
         else
             ((failed++))
