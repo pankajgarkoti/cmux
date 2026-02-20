@@ -28,11 +28,13 @@ export function ChatPanel() {
   // Input ref for keyboard shortcuts
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Filter messages for selected agent or show all if none selected
+  // Filter messages for selected agent: show only user <-> agent conversation
   const allMessages = messagesData?.messages || [];
   const messages = selectedAgentId
     ? allMessages.filter(
-        (m) => m.from_agent === selectedAgentId || m.to_agent === selectedAgentId
+        (m) =>
+          (m.from_agent === selectedAgentId && m.to_agent === 'user') ||
+          (m.from_agent === 'user' && m.to_agent === selectedAgentId)
       )
     : allMessages;
 
