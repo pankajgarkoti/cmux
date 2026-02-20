@@ -87,6 +87,9 @@ parse_line() {
     # Skip empty/whitespace-only lines
     [[ -z "${line// /}" ]] && return 1
 
+    # Skip non-JSON lines (old-format messages, comments, etc.)
+    [[ "$line" != \{* ]] && return 1
+
     # Check if this is a status_update record
     local line_type
     line_type=$(echo "$line" | jq -r '.type // ""' 2>/dev/null)

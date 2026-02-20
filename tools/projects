@@ -356,8 +356,16 @@ cmd_activate() {
     local already_active
     already_active=$(jq -r --arg id "$id" '.projects[] | select(.id == $id) | .active' "$REGISTRY")
     if [[ "$already_active" == "true" ]]; then
-        warn "project '$id' is already active"
-        return 0
+        # Check if the tmux window is actually running
+        local sup_name_check="sup-${id}"
+        local session_check="${CMUX_SESSION:-cmux}"
+        if tmux list-windows -t "$session_check" -F '#{window_name}' 2>/dev/null | grep -qxF "$sup_name_check"; then
+            warn "project '$id' is already active"
+            return 0
+        fi
+        # Window is dead but registry says active — deactivate stale state first
+        warn "project '$id' marked active but supervisor window is gone — reactivating"
+        cmd_deactivate "$id" 2>/dev/null || true
     fi
 
     # Read project details
