@@ -255,10 +255,12 @@ SUPERVISOR_HEARTBEAT_FILE="${CMUX_HEARTBEAT_FILE:-.cmux/.supervisor-heartbeat}"
 HEARTBEAT_WARN_THRESHOLD=${CMUX_HEARTBEAT_WARN:-600}     # seconds idle before first nudge
 HEARTBEAT_NUDGE_INTERVAL=${CMUX_HEARTBEAT_NUDGE:-120}    # seconds to wait after each nudge for response
 HEARTBEAT_MAX_NUDGES=${CMUX_HEARTBEAT_MAX_NUDGES:-3}     # failed nudges before considering sentry
-HEARTBEAT_OBSERVE_TIMEOUT=${CMUX_HEARTBEAT_OBSERVE_TIMEOUT:-1200}  # seconds to observe mid-task supervisor before escalating
+HEARTBEAT_OBSERVE_TIMEOUT=${CMUX_HEARTBEAT_OBSERVE_TIMEOUT:-1200}  # seconds of FROZEN output before escalating
 NUDGE_COUNT=0               # how many consecutive nudges sent without heartbeat response
 NUDGE_SENT_AT=0             # timestamp when last nudge was sent (0 = not sent)
 OBSERVE_STARTED_AT=0        # timestamp when observation mode began (0 = not observing)
+OBSERVE_PANE_HASH=""         # md5 hash of last captured pane output during observation
+OBSERVE_FROZEN_SINCE=0       # timestamp when pane output last changed (frozen timer starts here)
 
 # Sentry agent state
 SENTRY_ACTIVE=${SENTRY_ACTIVE:-false}
@@ -271,6 +273,15 @@ reset_heartbeat_state() {
     NUDGE_COUNT=0
     NUDGE_SENT_AT=0
     OBSERVE_STARTED_AT=0
+    OBSERVE_PANE_HASH=""
+    OBSERVE_FROZEN_SINCE=0
+}
+
+# Capture a hash of the supervisor pane's last 20 lines for change detection
+capture_pane_hash() {
+    tmux_capture_pane "$CMUX_SESSION" "supervisor" 20 2>/dev/null | md5 -q 2>/dev/null \
+        || tmux_capture_pane "$CMUX_SESSION" "supervisor" 20 2>/dev/null | md5sum 2>/dev/null | cut -d' ' -f1 \
+        || echo ""
 }
 
 check_supervisor_heartbeat() {
@@ -317,35 +328,56 @@ check_supervisor_heartbeat() {
         # ── MID-TASK PATH ──
         # Supervisor is actively working (not at prompt). Do NOT nudge or
         # interrupt. Enter observation mode and watch for recovery.
+        # The timeout is PROGRESS-BASED: only frozen (unchanging) pane
+        # output counts toward the timeout. Visible progress resets it.
+
+        local current_hash
+        current_hash=$(capture_pane_hash)
 
         if ((OBSERVE_STARTED_AT == 0)); then
-            # Enter observation mode
+            # Enter observation mode — snapshot initial pane state
             OBSERVE_STARTED_AT=$now
+            OBSERVE_PANE_HASH="$current_hash"
+            OBSERVE_FROZEN_SINCE=$now
             # Clear any prior nudge state — don't nudge a busy supervisor
             NUDGE_COUNT=0
             NUDGE_SENT_AT=0
             log_status "HEARTBEAT" "Supervisor mid-task (stale ${staleness}s, not at prompt), entering observation mode"
         fi
 
-        local observe_elapsed=$((now - OBSERVE_STARTED_AT))
+        # Check if pane output changed since last observation cycle
+        if [[ -n "$current_hash" && "$current_hash" != "$OBSERVE_PANE_HASH" ]]; then
+            # Output changed — supervisor is making progress, reset frozen timer
+            OBSERVE_PANE_HASH="$current_hash"
+            OBSERVE_FROZEN_SINCE=$now
+            log_status "HEARTBEAT" "Supervisor making progress (pane output changed), resetting observation timer"
+        fi
 
-        if ((observe_elapsed < HEARTBEAT_OBSERVE_TIMEOUT)); then
-            # Still within observation window — keep watching
-            printf "  Heartbeat:  ${CYAN}●${NC} mid-task (${staleness}s) - observing (${observe_elapsed}s/${HEARTBEAT_OBSERVE_TIMEOUT}s)\n"
+        local frozen_elapsed=$((now - OBSERVE_FROZEN_SINCE))
+        local observe_total=$((now - OBSERVE_STARTED_AT))
+
+        if ((frozen_elapsed < HEARTBEAT_OBSERVE_TIMEOUT)); then
+            # Pane output still changing or hasn't been frozen long enough
+            if ((frozen_elapsed == observe_total)); then
+                # No progress detected since observation started
+                printf "  Heartbeat:  ${CYAN}●${NC} mid-task (${staleness}s) - observing, frozen (${frozen_elapsed}s/${HEARTBEAT_OBSERVE_TIMEOUT}s)\n"
+            else
+                # Progress was detected at some point
+                printf "  Heartbeat:  ${CYAN}●${NC} mid-task (${staleness}s) - observing (${observe_total}s total, frozen ${frozen_elapsed}s/${HEARTBEAT_OBSERVE_TIMEOUT}s)\n"
+            fi
             return
         fi
 
-        # Observation timeout — supervisor may be stuck in a loop
-        log_status "HEARTBEAT" "Observation timeout (${observe_elapsed}s) with no heartbeat update or prompt — likely stuck"
-        OBSERVE_STARTED_AT=0
+        # Frozen timeout — pane unchanged for HEARTBEAT_OBSERVE_TIMEOUT seconds
+        log_status "HEARTBEAT" "Observation frozen timeout (${frozen_elapsed}s, ${observe_total}s total) — pane unchanged, likely stuck"
 
         # Final liveness gate before sentry
         if is_supervisor_process_alive; then
-            printf "  Heartbeat:  ${RED}●${NC} possibly stuck (${staleness}s, observed ${observe_elapsed}s) - no heartbeat or prompt\n"
-            log_warn "Supervisor possibly stuck after ${observe_elapsed}s observation. Process alive but no heartbeat or prompt. Spawning sentry."
+            printf "  Heartbeat:  ${RED}●${NC} possibly stuck (${staleness}s, frozen ${frozen_elapsed}s) - no output change or heartbeat\n"
+            log_warn "Supervisor possibly stuck: pane frozen ${frozen_elapsed}s, process alive but no heartbeat or output change. Spawning sentry."
         else
             printf "  Heartbeat:  ${RED}●${NC} supervisor dead (${staleness}s) - spawning sentry\n"
-            log_warn "Supervisor process dead after ${observe_elapsed}s observation. Spawning sentry."
+            log_warn "Supervisor process dead after ${frozen_elapsed}s frozen observation. Spawning sentry."
         fi
 
         reset_heartbeat_state
