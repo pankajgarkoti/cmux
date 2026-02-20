@@ -269,6 +269,10 @@ cmd_spawn() {
     cat > "$context_file" << EOF
 You are a worker agent named '${name}' in the CMUX multi-agent system.
 
+⚠️  PORT 8000 IS RESERVED FOR CMUX. Do NOT start any server on port 8000.
+If your task requires running a server, use a different port (e.g. 3000, 5000, 9000).
+Starting a server on port 8000 will replace the CMUX API and break the entire system.
+
 HIERARCHY: User → Supervisor Prime → Project Supervisors → Workers (you).
 Your direct supervisor is ${supervisor_name}. Report to them via mailbox. Do NOT
 communicate with the user directly — only your supervisor chain does that.
