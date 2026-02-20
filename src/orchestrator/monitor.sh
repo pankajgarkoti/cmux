@@ -500,20 +500,32 @@ check_supervisor_heartbeat() {
     if ((NUDGE_COUNT < HEARTBEAT_MAX_NUDGES)); then
         ((NUDGE_COUNT++))
         NUDGE_SENT_AT=$now
-        printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - sending nudge (#${NUDGE_COUNT}/${HEARTBEAT_MAX_NUDGES})\n"
-        log_status "HEARTBEAT" "Supervisor idle (${staleness}s), sending nudge #${NUDGE_COUNT}/${HEARTBEAT_MAX_NUDGES}"
+        printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - sending autonomy nudge (#${NUDGE_COUNT}/${HEARTBEAT_MAX_NUDGES})\n"
+        log_status "HEARTBEAT" "Supervisor idle (${staleness}s), sending autonomy nudge #${NUDGE_COUNT}/${HEARTBEAT_MAX_NUDGES}"
 
-        # Run autonomy-check to find actionable work instead of a static nudge
+        # Run autonomy-check for rich, structured scan results
         local autonomy_output=""
         local autonomy_tool="${CMUX_PROJECT_ROOT}/tools/autonomy-check"
-        if [[ -x "$autonomy_tool" ]] && autonomy_output=$("$autonomy_tool" 2>/dev/null); then
-            local item_count
-            item_count=$(echo "$autonomy_output" | wc -l | tr -d ' ')
+        if [[ -x "$autonomy_tool" ]] && autonomy_output=$("$autonomy_tool" --summary 2>/dev/null); then
+            # Format as a single-line-friendly [HEARTBEAT] message
+            # The autonomy-check --summary output has one section per line + priority
             local nudge_msg
-            nudge_msg=$(printf '[HEARTBEAT] Autonomy scan found %d item(s):\n%s' "$item_count" "$autonomy_output")
+            nudge_msg=$(printf '[HEARTBEAT] Autonomy scan results (idle %ds): ' "$staleness")
+
+            # Append each finding as a bullet
+            while IFS= read -r scan_line; do
+                [[ -z "$scan_line" ]] && continue
+                if [[ "$scan_line" == "---" ]]; then
+                    nudge_msg="${nudge_msg} | "
+                    continue
+                fi
+                nudge_msg="${nudge_msg}  - ${scan_line}"
+            done <<< "$autonomy_output"
+
+            nudge_msg="${nudge_msg}  Act on the highest priority item."
             tmux_safe_send "$CMUX_SESSION" "supervisor" "$nudge_msg" --retry 2
         else
-            tmux_safe_send "$CMUX_SESSION" "supervisor" "[HEARTBEAT] You have been idle for ${staleness}s with no tool activity. Check for pending work — mailbox, worker status, journal TODOs — or find proactive work to do." --retry 2
+            tmux_safe_send "$CMUX_SESSION" "supervisor" "[HEARTBEAT] Autonomy scan (idle ${staleness}s): All clear — no pending mailbox, backlog, or worker issues found. Look for proactive work: code improvements, test coverage, documentation, or check ./tools/backlog list." --retry 2
         fi
         return
     fi
