@@ -30,6 +30,10 @@ class AgentManager:
                 agent.role = AgentRole(role_str)
             except ValueError:
                 agent.role = AgentRole.WORKER
+            # Override type from registry — the registry is the source of truth,
+            # not the window name pattern in _is_supervisor()
+            if agent.role in (AgentRole.SUPERVISOR, AgentRole.PROJECT_SUPERVISOR):
+                agent.type = AgentType.SUPERVISOR
             agent.project_id = meta.get("project_id", "cmux")
         else:
             agent.display_name = agent.name
