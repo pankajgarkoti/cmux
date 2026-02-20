@@ -221,4 +221,19 @@ export const api = {
     if (!res.ok) throw new Error('Failed to archive agent');
     return res.json();
   },
+
+  async getThoughts(limit = 200): Promise<{ thoughts: Array<{
+    id: string;
+    agent_name: string;
+    thought_type: string;
+    content?: string | null;
+    tool_name?: string | null;
+    tool_input?: string | null;
+    tool_response?: string | null;
+    timestamp: string;
+  }>; count: number }> {
+    const res = await fetch(`${API_BASE}/api/thoughts?limit=${limit}`);
+    if (!res.ok) throw new Error('Failed to fetch thoughts');
+    return res.json();
+  },
 };

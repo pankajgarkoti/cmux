@@ -130,12 +130,30 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
     return map;
   }, [sortedMessages, activities, persistedEvents]);
 
+  // Fetch persisted thoughts from API (survives page refresh)
+  const { data: persistedThoughtsData } = useQuery({
+    queryKey: ['thoughts'],
+    queryFn: () => api.getThoughts(200),
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Merge persisted (API) + live (WebSocket) thoughts, deduplicating by id
+  const allThoughts = useMemo(() => {
+    const persisted = (persistedThoughtsData?.thoughts || []) as Thought[];
+    const liveIds = new Set(thoughts.map((t) => t.id));
+    return [
+      ...thoughts,
+      ...persisted.filter((t) => !liveIds.has(t.id)),
+    ];
+  }, [thoughts, persistedThoughtsData]);
+
   // Build thoughts map: correlate thoughts to messages by timestamp window
   const thoughtsByMessage = useMemo(() => {
     const map = new Map<string, Thought[]>();
-    if (thoughts.length === 0) return map;
+    if (allThoughts.length === 0) return map;
 
-    const sortedThoughts = [...thoughts].sort(
+    const sortedThoughts = [...allThoughts].sort(
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
@@ -167,7 +185,7 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
     }
 
     return map;
-  }, [sortedMessages, thoughts]);
+  }, [sortedMessages, allThoughts]);
 
   // Track scroll position to determine if user is near bottom
   const handleScroll = useCallback(() => {
