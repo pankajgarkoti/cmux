@@ -112,11 +112,9 @@ async def send_message_to_agent(agent_id: str, message: AgentMessage):
     # Also broadcast the full message for chat UI
     await ws_manager.broadcast("new_message", msg.model_dump(mode="json"))
 
-    # Route @mentions: forward message to any mentioned agents
+    # Silently route @mentions to mentioned agents
     mentioned_names = MENTION_PATTERN.findall(message.content)
-    routed_to = []
     for name in set(mentioned_names):
-        # Skip if the mention is the primary recipient
         if name == agent_id:
             continue
         mentioned_agent = await agent_manager.get_agent(name)
@@ -126,10 +124,9 @@ async def send_message_to_agent(agent_id: str, message: AgentMessage):
                 mentioned_agent.tmux_window, mention_content,
                 session=mentioned_agent.session,
             )
-            routed_to.append(name)
             logger.info(f"@mention routed message to {name}")
 
-    return {"success": True, "agent_id": agent_id, "message_id": msg.id, "routed_to": routed_to}
+    return {"success": True, "agent_id": agent_id, "message_id": msg.id}
 
 
 @router.post("/{agent_id}/interrupt")
