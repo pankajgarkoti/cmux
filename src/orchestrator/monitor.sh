@@ -889,6 +889,9 @@ run_dashboard() {
         printf "${BOLD}Services:${NC}\n"
         if is_server_running; then
             printf "  FastAPI:    ${GREEN}●${NC} running (port ${CMUX_PORT})\n"
+            if ((HEALTH_FAILURES > 0)); then
+                mark_healthy
+            fi
             HEALTH_FAILURES=0
         else
             ((HEALTH_FAILURES++))
@@ -1006,34 +1009,191 @@ run_dashboard() {
     done
 }
 
-attempt_recovery() {
-    log_step "Attempting server restart..."
+# Healthy commit tracking (from health.sh)
+HEALTHY_COMMIT_FILE=".cmux/.last_healthy_commit"
+RECOVERY_WAIT=30
 
-    # Kill existing server
-    local pid
-    pid=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
-    [[ -n "$pid" ]] && kill "$pid" 2>/dev/null
+mark_healthy() {
+    local commit
+    commit=$(git rev-parse HEAD 2>/dev/null || echo "")
+    if [[ -n "$commit" ]]; then
+        echo "$commit" > "$HEALTHY_COMMIT_FILE"
+    fi
+}
 
-    sleep 2
-
-    # Try to restart
-    if start_server; then
-        log_ok "Recovery successful"
-        HEALTH_FAILURES=0
+get_last_healthy_commit() {
+    if [[ -f "$HEALTHY_COMMIT_FILE" ]]; then
+        cat "$HEALTHY_COMMIT_FILE"
     else
-        log_fail "Recovery failed"
+        git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD
+    fi
+}
 
-        # Git rollback if repeated failures
-        if ((HEALTH_FAILURES >= MAX_FAILURES * 2)); then
-            log_warn "Multiple failures, attempting git rollback..."
-            git stash push -m "cmux-recovery-$(date +%s)" 2>/dev/null || true
-            git checkout HEAD~1 2>/dev/null || true
+# Journal the failure context before rollback
+pre_rollback_journal() {
+    local error_log="$1"
+    local git_status last_commit target_commit
+    git_status=$(git status --short 2>/dev/null || echo "Unable to get git status")
+    last_commit=$(git log -1 --oneline 2>/dev/null || echo "Unable to get last commit")
+    target_commit=$(get_last_healthy_commit)
 
-            # Rebuild and restart
-            (cd "${CMUX_PROJECT_ROOT}/src/frontend" && npm run build) 2>/dev/null || true
-            start_server
+    curl -sf -X POST "http://localhost:${CMUX_PORT}/api/journal/entry" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"title\": \"Auto-Rollback Triggered\",
+            \"content\": \"## Health Check Failure\\n\\nHealth check failed after ${MAX_FAILURES} consecutive retries. Auto-rollback initiated.\\n\\n### Error Context\\n\\\`\\\`\\\`\\n${error_log}\\n\\\`\\\`\\\`\\n\\n### Git Status\\n\\\`\\\`\\\`\\n${git_status}\\n\\\`\\\`\\\`\\n\\n### Last Commit\\n${last_commit}\\n\\n### Rolling Back To\\n${target_commit}\"
+        }" 2>/dev/null || true
+
+    # Also write to local file as backup (API may be down)
+    local journal_dir=".cmux/journal/$(date +%Y-%m-%d)"
+    mkdir -p "$journal_dir"
+    cat > "${journal_dir}/rollback-$(date +%H%M%S).md" << ROLLBACK_EOF
+# Auto-Rollback Triggered
+
+**Time:** $(date -Iseconds)
+
+## Health Check Failure
+
+Health check failed after ${MAX_FAILURES} consecutive retries. Auto-rollback initiated.
+
+### Error Context
+\`\`\`
+${error_log}
+\`\`\`
+
+### Git Status
+\`\`\`
+${git_status}
+\`\`\`
+
+### Last Commit
+${last_commit}
+
+### Rolling Back To
+${target_commit}
+ROLLBACK_EOF
+}
+
+# Notify supervisor of rollback via mailbox and tmux
+notify_supervisor_of_rollback() {
+    local error_context="$1"
+    local target_commit="$2"
+    local message="SYSTEM ALERT: Auto-rollback occurred. The server failed health checks after ${MAX_FAILURES} retries and was rolled back to commit ${target_commit}. Error context: ${error_context}. Check the journal at .cmux/journal/$(date +%Y-%m-%d)/ for full details."
+
+    # Send via mailbox
+    local timestamp
+    timestamp=$(date -Iseconds)
+    echo "[${timestamp}] system:health -> ${CMUX_SESSION}:supervisor: [ERROR] Auto-rollback occurred to ${target_commit}" >> "${CMUX_MAILBOX}" 2>/dev/null || true
+
+    # Also send directly to tmux for immediate attention
+    if tmux_window_exists "$CMUX_SESSION" "supervisor"; then
+        tmux_safe_send "$CMUX_SESSION" "supervisor" "$message" --force
+    fi
+}
+
+# Stop the server by killing processes on CMUX_PORT
+stop_server() {
+    local pids
+    pids=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
+    if [[ -n "$pids" ]]; then
+        for pid in $pids; do
+            kill "$pid" 2>/dev/null || true
+        done
+        # Wait for graceful shutdown
+        local wait_count=0
+        while lsof -ti tcp:"$CMUX_PORT" >/dev/null 2>&1 && ((wait_count < 5)); do
+            sleep 1
+            ((wait_count++))
+        done
+        # Force kill remaining
+        pids=$(lsof -ti tcp:"$CMUX_PORT" 2>/dev/null || true)
+        if [[ -n "$pids" ]]; then
+            for pid in $pids; do
+                kill -9 "$pid" 2>/dev/null || true
+            done
         fi
     fi
+    pkill -f "uvicorn.*src.server.main:app" 2>/dev/null || true
+}
+
+# Rollback to a specific commit, rebuild deps, restart server
+rollback_and_restart() {
+    local target_commit="$1"
+    log_step "Rolling back to commit ${target_commit}"
+
+    cd "$CMUX_PROJECT_ROOT"
+
+    git stash push -m "cmux-auto-rollback-$(date +%s)" 2>/dev/null || true
+    git reset --hard "$target_commit" 2>/dev/null || return 1
+
+    # Rebuild dependencies
+    uv sync 2>/dev/null || log_warn "uv sync failed, continuing..."
+    (cd "${CMUX_PROJECT_ROOT}/src/frontend" && npm ci --silent 2>/dev/null && npm run build 2>/dev/null) || log_warn "Frontend rebuild failed, continuing..."
+
+    stop_server
+    start_server
+}
+
+attempt_recovery() {
+    log_step "Attempting server recovery (multi-stage)..."
+
+    # Capture recent server log for context
+    local error_log
+    error_log=$(tail -50 /tmp/cmux-server.log 2>/dev/null || echo "No server log available")
+
+    # Stage 1: Simple restart
+    log_step "Stage 1: Simple restart..."
+    stop_server
+    sleep 2
+    if start_server && is_server_running; then
+        log_ok "Recovery successful (simple restart)"
+        mark_healthy
+        HEALTH_FAILURES=0
+        return
+    fi
+
+    # Stage 2: Journal failure and rollback to last healthy commit
+    log_step "Stage 2: Rollback to last healthy commit..."
+    pre_rollback_journal "$error_log"
+
+    local target_commit
+    target_commit=$(get_last_healthy_commit)
+    rollback_and_restart "$target_commit"
+
+    sleep "$RECOVERY_WAIT"
+
+    if is_server_running; then
+        log_ok "Recovery successful (rollback to $target_commit)"
+        notify_supervisor_of_rollback "$error_log" "$target_commit"
+        HEALTH_FAILURES=0
+        return
+    fi
+
+    # Stage 3: Try progressively older commits
+    log_step "Stage 3: Trying older commits..."
+    local commits
+    commits=$(git log --oneline -10 | tail -n +2)
+
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        local commit_hash
+        commit_hash=$(echo "$line" | cut -d' ' -f1)
+
+        log_step "Trying rollback to $commit_hash..."
+        rollback_and_restart "$commit_hash"
+
+        sleep "$RECOVERY_WAIT"
+
+        if is_server_running; then
+            log_ok "Recovery successful (rollback to $commit_hash)"
+            notify_supervisor_of_rollback "$error_log" "$commit_hash"
+            HEALTH_FAILURES=0
+            return
+        fi
+    done <<< "$commits"
+
+    log_fail "All recovery attempts failed - manual intervention required"
+    notify_supervisor_of_rollback "All rollback attempts failed. Manual intervention required." "NONE"
 }
 
 #───────────────────────────────────────────────────────────────────────────────
