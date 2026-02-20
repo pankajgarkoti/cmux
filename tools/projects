@@ -521,6 +521,42 @@ Save research, plans, and analysis as artifacts:
 # Write to .cmux/journal/\$(date +%Y-%m-%d)/artifacts/filename.md
 \`\`\`
 
+## Peer Coordination with Sibling Supervisors
+
+If other project supervisors exist for related projects (e.g. a frontend and backend for the same product), coordinate directly via mailbox. Propose API contracts, flag issues, and agree on shared interfaces before delegating to workers.
+
+### Discovering Peers
+
+\`\`\`bash
+./tools/projects list   # Shows all registered projects — active ones have running supervisors
+\`\`\`
+
+Message a peer supervisor: \`./tools/mailbox send sup-<project-id> '<subject>' '<body>'\`
+
+### What to Coordinate
+
+- API contracts (endpoints, request/response shapes, error formats)
+- Shared data models and schema changes
+- Breaking changes that affect the sibling project
+- Integration concerns (auth flows, CORS, environment variables)
+
+### Protocol
+
+1. Either supervisor proposes a contract or flags an issue via mailbox
+2. The peer MUST ACK or counter-propose — silence is not agreement
+3. Workers do not start coding against unconfirmed contracts
+4. If peers can't agree, escalate to Supervisor Prime
+
+### Example
+
+\`\`\`bash
+./tools/mailbox send sup-todo-backend "API Contract Proposal" "
+Adding user profile page — need GET /api/users/:id endpoint.
+Expected response: { id, name, email, avatar_url, created_at }
+Please confirm or counter-propose before I assign frontend workers.
+"
+\`\`\`
+
 ## Critical Rules
 
 - You run unattended in tmux. **NEVER use AskUserQuestion or EnterPlanMode** — these block forever.

@@ -127,6 +127,15 @@ The Tech Lead MUST NOT approve completion until all testing is verified:
 
 **If any worker cannot verify their changes, the Tech Lead reports [BLOCKED] to the Supervisor — never [DONE] without complete testing evidence.**
 
+## Cross-Team Coordination (Frontend + Backend)
+
+When a feature team spans both frontend and backend (e.g. a full-stack feature with separate frontend and backend workers, or when a sibling project supervisor owns the other half):
+
+1. **API contracts must be agreed before workers start coding.** The Tech Lead (or both project supervisors) must confirm endpoint URLs, request/response shapes, error formats, and auth requirements.
+2. **Backend ships the contract first.** Frontend workers wait for a confirmed API contract before building against it.
+3. **Breaking changes trigger re-coordination.** If a worker discovers the contract needs to change mid-implementation, they report to the Tech Lead, who re-coordinates with the other side before work continues.
+4. **Cross-project teams**: If the frontend and backend live in separate projects with their own supervisors (e.g. `sup-todo-frontend` and `sup-todo-backend`), both supervisors must agree on the contract via direct mailbox messages before delegating to workers.
+
 ## When NOT to Use
 
 - Simple tasks (use solo worker)

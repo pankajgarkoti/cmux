@@ -337,6 +337,68 @@ cmux-feature-auth (can be terminated)
 └── worker-tests     [Worker]
 ```
 
+## Cross-Supervisor Coordination
+
+When multiple project supervisors exist for related projects (e.g. `sup-todo-backend` and `sup-todo-frontend` for the same product), they MUST coordinate directly rather than relying on Supervisor Prime to relay everything.
+
+### When to Coordinate
+
+- **API contract changes**: New endpoints, changed request/response shapes, removed fields
+- **Shared data model updates**: Schema changes that both sides depend on
+- **Breaking changes**: Anything that will cause the sibling project to fail
+- **Error format disagreements**: Status codes, error response shapes, validation messages
+- **Integration concerns**: Auth flows, CORS, shared environment variables, deployment dependencies
+
+### How to Coordinate
+
+Message sibling supervisors directly via mailbox:
+
+```bash
+./tools/mailbox send sup-todo-backend "API Contract Proposal" "
+Adding GET /api/tasks/:id/comments endpoint.
+Response: { comments: [{ id, author, body, created_at }] }
+Errors: 404 if task not found, 401 if unauthenticated.
+Please ACK or counter-propose before I start workers on the frontend.
+"
+```
+
+### Shared Contract Protocol
+
+When frontend and backend supervisors co-exist for the same product:
+
+1. **Either supervisor can propose** an API contract via mailbox
+2. **The other MUST ACK or counter-propose** — silence is not agreement
+3. **Workers do not start coding** against an unconfirmed contract
+4. **Changes to agreed contracts** require a new proposal round
+
+### Proactive Alerts
+
+If your worker discovers an issue that affects a sibling project — wrong endpoint URL, missing field, unexpected error format, incompatible auth header — **immediately notify the sibling supervisor**. Don't wait for it to surface as a bug.
+
+```bash
+./tools/mailbox send sup-todo-frontend "Missing Field Alert" "
+Worker found that GET /api/tasks response does not include 'assignee' field.
+Frontend may be expecting it. Adding it now — will send updated contract.
+"
+```
+
+### Discovering Peers
+
+```bash
+./tools/projects list    # Shows all registered projects and their supervisors
+```
+
+Any project with `active: yes` has a running supervisor you can message at `sup-<project-id>`.
+
+### Escalation
+
+Only escalate to Supervisor Prime when:
+- Peer supervisors can't reach agreement after one round of counter-proposals
+- A change affects projects outside the current conversation (third-party projects)
+- A decision requires user input (user-facing behavior changes)
+
+---
+
 ## When to Spawn a Session vs Create a Worker
 
 ### Create a Worker (in your session)

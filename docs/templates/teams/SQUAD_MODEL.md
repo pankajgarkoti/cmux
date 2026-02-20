@@ -122,6 +122,15 @@ Evidence: .cmux/journal/.../screenshots/
 ./tools/workers spawn "tester-XXXX" "Read docs/templates/roles/TESTER.md. Your task: Test [FEATURE] when backend and frontend signal ready."
 ```
 
+## Cross-Team Coordination (Frontend + Backend)
+
+When a squad spans both frontend and backend components (the common case):
+
+1. **Backend and Frontend workers must agree on API contracts before parallel development begins.** The Squad Lead facilitates this — typically by having Backend propose the contract and Frontend ACK or counter-propose.
+2. **Contract-first development**: Backend publishes endpoint URLs, request/response shapes, error formats, and auth requirements. Frontend builds against the confirmed contract.
+3. **Mid-sprint contract changes**: If either side discovers the contract needs to change, they notify the Squad Lead immediately. The Lead pauses affected work and re-coordinates before workers continue.
+4. **Cross-project squads**: If the frontend and backend live in separate projects with their own supervisors (e.g. `sup-todo-frontend` and `sup-todo-backend`), the Squad Lead must coordinate with the sibling project's supervisor via `./tools/mailbox send sup-<project> '<subject>' '<body>'` to agree on shared interfaces before workers start.
+
 ## Workflow Phases
 
 1. **Kickoff**: Squad Lead receives task, plans breakdown
