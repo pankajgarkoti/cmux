@@ -4,6 +4,7 @@ from typing import List
 import asyncio
 import json
 import logging
+import re
 import uuid
 
 from ..models.agent import Agent, AgentList, AgentMessage
@@ -20,6 +21,9 @@ from ..services.conversation_store import (
 from ..websocket.manager import ws_manager
 
 logger = logging.getLogger(__name__)
+
+# Regex to extract @mentions from message content
+MENTION_PATTERN = re.compile(r"@([\w-]+)")
 
 # Timeout for WebSocket receive operations (seconds)
 WS_RECEIVE_TIMEOUT = 60
@@ -108,7 +112,24 @@ async def send_message_to_agent(agent_id: str, message: AgentMessage):
     # Also broadcast the full message for chat UI
     await ws_manager.broadcast("new_message", msg.model_dump(mode="json"))
 
-    return {"success": True, "agent_id": agent_id, "message_id": msg.id}
+    # Route @mentions: forward message to any mentioned agents
+    mentioned_names = MENTION_PATTERN.findall(message.content)
+    routed_to = []
+    for name in set(mentioned_names):
+        # Skip if the mention is the primary recipient
+        if name == agent_id:
+            continue
+        mentioned_agent = await agent_manager.get_agent(name)
+        if mentioned_agent:
+            mention_content = f"[cmux:user] @you: {message.content}"
+            await tmux_service.send_input(
+                mentioned_agent.tmux_window, mention_content,
+                session=mentioned_agent.session,
+            )
+            routed_to.append(name)
+            logger.info(f"@mention routed message to {name}")
+
+    return {"success": True, "agent_id": agent_id, "message_id": msg.id, "routed_to": routed_to}
 
 
 @router.post("/{agent_id}/interrupt")
