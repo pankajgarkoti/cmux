@@ -452,6 +452,45 @@ If you are compacted, you will lose most of your conversation history. The syste
 - When delegating complex tasks, write a journal note with full context so you can recover if compacted mid-task
 - Keep mailbox messages lightweight; reference journal entries for detailed context
 
+## Heartbeat System
+
+The heartbeat system detects when you've been idle too long and nudges you back into action.
+
+### How It Works
+
+A `PostToolUse` hook (in `.claude/settings.json`) writes the current Unix timestamp to `.cmux/.supervisor-heartbeat` every time you use a tool. The monitor daemon (`src/orchestrator/monitor.sh`) reads this file each cycle and compares it to the current time.
+
+### Idle Detection and Nudges
+
+If no tool activity is detected for `CMUX_HEARTBEAT_WARN` seconds (default 600s / 10 minutes), and you are at the prompt (not mid-task), the monitor sends a `[HEARTBEAT]` message to your terminal:
+
+```
+[HEARTBEAT] You have been idle for 650s with no tool activity.
+Check for pending work — mailbox, worker status, journal TODOs — or find proactive work to do.
+```
+
+When you see this, check for work: read the mailbox, review active workers (`./tools/workers list`), consult the journal, or find something proactive to do. Any tool use resets the heartbeat timer.
+
+Nudges respect a cooldown of `CMUX_HEARTBEAT_NUDGE` seconds (default 120s) between sends. After `CMUX_HEARTBEAT_MAX_NUDGES` consecutive nudges without a heartbeat update (default 3), the monitor escalates to a liveness check.
+
+### Observation Mode (Mid-Task)
+
+If you are **not** at the prompt (actively working on something), the monitor does **not** nudge. Instead it enters **observation mode** — it watches your terminal pane output for changes. As long as the output is changing (progress is visible), nothing happens. If the pane output freezes for `CMUX_HEARTBEAT_OBSERVE_TIMEOUT` seconds (default 1200s / 20 minutes), the monitor escalates.
+
+### Sentry (Last Resort)
+
+If all nudges are exhausted and you're unresponsive, or observation mode detects a frozen terminal, the monitor spawns a **sentry agent** as a last resort. The sentry is only for truly dead or frozen processes — it checks if the supervisor process is alive and attempts recovery. This should rarely trigger during normal operation.
+
+### Configuration
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `CMUX_HEARTBEAT_WARN` | `600` | Seconds idle before first nudge |
+| `CMUX_HEARTBEAT_NUDGE` | `120` | Cooldown seconds between nudges |
+| `CMUX_HEARTBEAT_MAX_NUDGES` | `3` | Max nudges before escalation |
+| `CMUX_HEARTBEAT_OBSERVE_TIMEOUT` | `1200` | Seconds of frozen pane output before escalation |
+| `CMUX_HEARTBEAT_FILE` | `.cmux/.supervisor-heartbeat` | Path to heartbeat timestamp file |
+
 ---
 
 ## Best Practices
