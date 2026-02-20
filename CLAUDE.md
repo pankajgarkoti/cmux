@@ -151,7 +151,7 @@ Agent events (from Claude Code hooks): `PostToolUse`, `Stop` - tracked in `route
 
 ### Runtime Data
 
-`.cmux/` directory (gitignored):
+`.cmux/` directory (version-controlled):
 
 - `mailbox` - Message queue file
 - `status.log` - System status log
