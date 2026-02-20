@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ \"$CMUX_AGENT_NAME\" = \"supervisor\" ] && date +%s > \"$(git rev-parse --show-toplevel)/.cmux/.supervisor-heartbeat\"",
+            "command": "{ [ \"$CMUX_AGENT_NAME\" = \"supervisor\" ] && date +%s > \"${CMUX_HOME:-$(git rev-parse --show-toplevel)}/.cmux/.supervisor-heartbeat\"; } || { [ \"${CMUX_AGENT_ROLE:-}\" = \"project-supervisor\" ] && date +%s > \"${CMUX_HOME:-$(git rev-parse --show-toplevel)}/.cmux/.${CMUX_AGENT_NAME}-heartbeat\"; } || true",
             "timeout": 5,
             "async": true
           }

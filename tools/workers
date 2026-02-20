@@ -37,7 +37,7 @@ window_exists() {
 }
 
 is_supervisor() {
-    [[ "$1" == "supervisor" ]] || [[ "$1" == supervisor-* ]]
+    [[ "$1" == "supervisor" ]] || [[ "$1" == supervisor-* ]] || [[ "$1" == sup-* ]]
 }
 
 generate_agent_id() {
@@ -258,7 +258,9 @@ cmd_list() {
         # Skip system windows
         [[ "$window" == "monitor" ]] && continue
 
-        if is_supervisor "$window"; then
+        if [[ "$window" == sup-* ]]; then
+            echo -e "  ${CYAN}●${NC} $window (project-supervisor)"
+        elif is_supervisor "$window"; then
             echo -e "  ${CYAN}●${NC} $window (supervisor)"
         else
             echo -e "  ${GREEN}●${NC} $window"

@@ -248,6 +248,110 @@ start_compact() {
 }
 
 #───────────────────────────────────────────────────────────────────────────────
+# Project Supervisor Management
+#───────────────────────────────────────────────────────────────────────────────
+
+# Check if a window name is a project supervisor (sup-*)
+is_project_supervisor_name() {
+    [[ "$1" == sup-* ]]
+}
+
+# Check if a window name is any kind of supervisor (main or project)
+is_any_supervisor_name() {
+    [[ "$1" == "supervisor" ]] || [[ "$1" == sup-* ]]
+}
+
+# Launch project supervisors for all active, non-self projects
+launch_project_supervisors() {
+    local registry="${CMUX_PROJECT_ROOT}/.cmux/projects.json"
+    if [[ ! -f "$registry" ]]; then
+        return 0
+    fi
+
+    local active_projects
+    active_projects=$(jq -r '.projects[] | select(.active == true and .is_self == false) | .id' "$registry" 2>/dev/null || true)
+
+    if [[ -z "$active_projects" ]]; then
+        return 0
+    fi
+
+    log_step "Starting project supervisors..."
+    local count=0
+
+    while IFS= read -r project_id; do
+        [[ -z "$project_id" ]] && continue
+        local sup_name="sup-${project_id}"
+
+        if tmux_window_exists "$CMUX_SESSION" "$sup_name"; then
+            log_ok "Project supervisor '$sup_name' already running"
+            continue
+        fi
+
+        info "Activating project supervisor: $project_id"
+        # Use tools/projects activate which handles the full lifecycle
+        "${CMUX_PROJECT_ROOT}/tools/projects" activate "$project_id" || {
+            log_warn "Failed to activate project: $project_id"
+            continue
+        }
+        ((count++))
+    done <<< "$active_projects"
+
+    if ((count > 0)); then
+        log_ok "Started $count project supervisor(s)"
+    fi
+}
+
+# Check heartbeats for all project supervisors
+check_project_supervisor_heartbeats() {
+    local registry="${CMUX_PROJECT_ROOT}/.cmux/projects.json"
+    if [[ ! -f "$registry" ]]; then
+        return 0
+    fi
+
+    local active_projects
+    active_projects=$(jq -r '.projects[] | select(.active == true and .is_self == false) | .id' "$registry" 2>/dev/null || true)
+
+    if [[ -z "$active_projects" ]]; then
+        return 0
+    fi
+
+    while IFS= read -r project_id; do
+        [[ -z "$project_id" ]] && continue
+        local sup_name="sup-${project_id}"
+
+        if ! tmux_window_exists "$CMUX_SESSION" "$sup_name"; then
+            printf "  %-12s ${RED}●${NC} down — relaunching...\n" "$sup_name:"
+            "${CMUX_PROJECT_ROOT}/tools/projects" activate "$project_id" 2>/dev/null || true
+            continue
+        fi
+
+        local hb_file="${CMUX_PROJECT_ROOT}/.cmux/.${sup_name}-heartbeat"
+        if [[ ! -f "$hb_file" ]]; then
+            printf "  %-12s ${DIM}●${NC} waiting for first heartbeat\n" "$sup_name:"
+            continue
+        fi
+
+        local now last_beat staleness
+        now=$(date +%s)
+        last_beat=$(cat "$hb_file" 2>/dev/null || echo 0)
+        if ! [[ "$last_beat" =~ ^[0-9]+$ ]]; then
+            printf "  %-12s ${YELLOW}●${NC} invalid heartbeat data\n" "$sup_name:"
+            continue
+        fi
+
+        staleness=$((now - last_beat))
+
+        if ((staleness < HEARTBEAT_WARN_THRESHOLD)); then
+            printf "  %-12s ${GREEN}●${NC} ${staleness}s ago\n" "$sup_name:"
+        elif ((staleness < HEARTBEAT_WARN_THRESHOLD * 2)); then
+            printf "  %-12s ${YELLOW}●${NC} stale (${staleness}s)\n" "$sup_name:"
+        else
+            printf "  %-12s ${RED}●${NC} stale (${staleness}s) — consider restarting\n" "$sup_name:"
+        fi
+    done <<< "$active_projects"
+}
+
+#───────────────────────────────────────────────────────────────────────────────
 # Supervisor Heartbeat Monitor
 #───────────────────────────────────────────────────────────────────────────────
 
@@ -884,6 +988,9 @@ run_dashboard() {
             check_supervisor_heartbeat
         fi
 
+        # Project supervisor heartbeats
+        check_project_supervisor_heartbeats
+
         echo ""
 
         # Recent mailbox activity
@@ -960,6 +1067,10 @@ main() {
 
     # Phase 2: Launch supervisor
     launch_supervisor
+    echo ""
+
+    # Phase 2b: Launch project supervisors for active projects
+    launch_project_supervisors
     echo ""
 
     # Phase 3: Start router in background

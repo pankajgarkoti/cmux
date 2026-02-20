@@ -249,6 +249,29 @@ cmd_info() {
     echo "  Added:       $(echo "$data" | jq -r '.added_at')"
 }
 
+generate_agent_id() {
+    # Generate ag_ + 8 random alphanumeric chars (same logic as tools/workers)
+    local registry_file="${CMUX_HOME}/.cmux/agent_registry.json"
+    local attempt=0
+    local id
+
+    while [[ $attempt -lt 100 ]]; do
+        id="ag_$(head -c 32 /dev/urandom | base64 | tr -dc 'a-z0-9' | head -c 8)"
+        if [[ ${#id} -ne 11 ]]; then
+            ((attempt++))
+            continue
+        fi
+        if [[ -f "$registry_file" ]] && grep -q "\"$id\"" "$registry_file" 2>/dev/null; then
+            ((attempt++))
+            continue
+        fi
+        echo "$id"
+        return 0
+    done
+
+    die "failed to generate unique agent ID after 100 attempts"
+}
+
 cmd_activate() {
     local id="${1:-}"
     [[ -z "$id" ]] && die "usage: projects activate <id>"
@@ -259,6 +282,18 @@ cmd_activate() {
         die "project '$id' not found"
     fi
 
+    # Self-project uses Supervisor Prime — nothing to spawn
+    local is_self
+    is_self=$(jq -r --arg id "$id" '.projects[] | select(.id == $id) | .is_self' "$REGISTRY")
+    if [[ "$is_self" == "true" ]]; then
+        # Just mark active
+        local tmp
+        tmp=$(mktemp)
+        jq --arg id "$id" '(.projects[] | select(.id == $id)).active = true' "$REGISTRY" > "$tmp" && mv "$tmp" "$REGISTRY"
+        ok "Self-project '$id' activated (Supervisor Prime handles this project)"
+        return 0
+    fi
+
     local already_active
     already_active=$(jq -r --arg id "$id" '.projects[] | select(.id == $id) | .active' "$REGISTRY")
     if [[ "$already_active" == "true" ]]; then
@@ -266,13 +301,136 @@ cmd_activate() {
         return 0
     fi
 
+    # Read project details
+    local project_path
+    project_path=$(jq -r --arg id "$id" '.projects[] | select(.id == $id) | .path' "$REGISTRY")
+    [[ -d "$project_path" ]] || die "project path does not exist: $project_path"
+
+    local sup_name="sup-${id}"
+    local session="${CMUX_SESSION:-cmux}"
+
+    # Check if supervisor window already exists
+    if tmux list-windows -t "$session" -F '#{window_name}' 2>/dev/null | grep -qxF "$sup_name"; then
+        warn "supervisor window '$sup_name' already exists"
+        # Still mark active in registry
+        local tmp
+        tmp=$(mktemp)
+        jq --arg id "$id" '(.projects[] | select(.id == $id)).active = true' "$REGISTRY" > "$tmp" && mv "$tmp" "$REGISTRY"
+        return 0
+    fi
+
     info "Activating project: $id"
 
+    # Generate agent ID for the project supervisor
+    local agent_id
+    agent_id=$(generate_agent_id)
+    info "Project supervisor agent ID: $agent_id"
+
+    # Create tmux window
+    tmux new-window -t "${session}:" -n "$sup_name"
+    tmux set-option -t "${session}:${sup_name}" allow-rename off 2>/dev/null || true
+
+    # Build environment variables
+    local port="${CMUX_PORT:-8000}"
+    local env_vars="CMUX_AGENT=true CMUX_AGENT_ID=${agent_id} CMUX_AGENT_NAME=${sup_name} CMUX_AGENT_ROLE=project-supervisor CMUX_PROJECT_ID=${id} CMUX_SESSION=${session} CMUX_HOME=${CMUX_HOME} CMUX_PORT=${port} CMUX_MAILBOX=${CMUX_HOME}/.cmux/mailbox"
+
+    # Build spawn command — add CMUX tools to PATH so supervisor can use journal/mailbox/workers
+    local spawn_cmd="export ${env_vars} && export PATH=${CMUX_HOME}/tools:\$PATH && cd ${project_path} && claude --dangerously-skip-permissions"
+
+    # Start Claude
+    info "Starting project supervisor..."
+    tmux send-keys -t "${session}:${sup_name}" -l "$spawn_cmd"
+    tmux send-keys -t "${session}:${sup_name}" Enter
+
+    # Write context file for the project supervisor
+    local context_dir="${CMUX_HOME}/.cmux/worker-contexts"
+    mkdir -p "$context_dir"
+    local context_file="${context_dir}/${sup_name}-context.md"
+
+    cat > "$context_file" << CTXEOF
+# Project Supervisor: ${id}
+
+You are a **project supervisor** for the '${id}' project in the CMUX multi-agent system.
+
+## Your Identity
+
+- **Role**: Project Supervisor (immortal — cannot be killed by health daemon)
+- **Agent ID**: ${agent_id}
+- **Agent Name**: ${sup_name}
+- **Project**: ${id}
+- **Project Path**: ${project_path}
+- **CMUX Home**: ${CMUX_HOME}
+
+## What to Read
+
+1. Read \`${CMUX_HOME}/docs/SUPERVISOR_ROLE.md\` for your orchestration behavior and delegation guidelines.
+2. Read the project's own \`CLAUDE.md\` (if it exists) for project-specific context — it's in your working directory.
+
+## Communication
+
+- You communicate with Supervisor Prime via the shared mailbox: \`./tools/mailbox send supervisor "<message>"\`
+- Supervisor Prime sends you tasks via the mailbox. Messages appear in your terminal as \`[cmux:supervisor] ...\`
+- You spawn workers for this project using: \`./tools/workers spawn <name> "<task>" --dir ${project_path} --project ${id}\`
+- Report completion: \`./tools/mailbox done "summary"\`
+- Report blockers: \`./tools/mailbox blocked "issue"\`
+
+## Journal
+
+Journal your work frequently:
+\`\`\`bash
+./tools/journal log "what you did"
+./tools/journal note "title" "detailed description"
+\`\`\`
+
+## Important
+
+- You run unattended in tmux. NEVER use AskUserQuestion or EnterPlanMode.
+- You are a coordinator — spawn workers for implementation work.
+- Stay focused on tasks for the '${id}' project only.
+CTXEOF
+
+    # Wait for Claude to initialize
+    info "Waiting for Claude to initialize..."
+    local retries=30
+    while ! tmux capture-pane -t "${session}:${sup_name}" -p 2>/dev/null | grep -qE "^❯|bypass permissions"; do
+        sleep 1
+        ((retries--)) || break
+        if ((retries <= 0)); then
+            warn "Claude startup timeout, sending instructions anyway"
+            break
+        fi
+    done
+    sleep 1
+
+    # Disable vim mode if enabled
+    if tmux capture-pane -t "${session}:${sup_name}" -p 2>/dev/null | grep -qE "\-\- (INSERT|NORMAL|VISUAL) \-\-"; then
+        tmux send-keys -t "${session}:${sup_name}" -l "/vim"
+        tmux send-keys -t "${session}:${sup_name}" Enter
+        sleep 1
+    fi
+
+    # Send the context reference
+    local instruction="Read ${CMUX_HOME}/.cmux/worker-contexts/${sup_name}-context.md to understand your role as project supervisor for '${id}'. Then read ${CMUX_HOME}/docs/SUPERVISOR_ROLE.md for orchestration guidelines. Wait for tasks from the main supervisor."
+    tmux send-keys -t "${session}:${sup_name}" -l "$instruction"
+    sleep 0.1
+    tmux send-keys -t "${session}:${sup_name}" Enter
+
+    # Update registry: set active=true, save supervisor_agent_id
     local tmp
     tmp=$(mktemp)
-    jq --arg id "$id" '(.projects[] | select(.id == $id)).active = true' "$REGISTRY" > "$tmp" && mv "$tmp" "$REGISTRY"
+    jq --arg id "$id" --arg aid "$agent_id" \
+        '(.projects[] | select(.id == $id)) |= (.active = true | .supervisor_agent_id = $aid)' \
+        "$REGISTRY" > "$tmp" && mv "$tmp" "$REGISTRY"
+
+    # Initialize heartbeat file for this supervisor
+    date +%s > "${CMUX_HOME}/.cmux/.${sup_name}-heartbeat"
 
     ok "Project '$id' activated"
+    echo ""
+    echo "  Supervisor: $sup_name"
+    echo "  Agent ID:   $agent_id"
+    echo "  Directory:  $project_path"
+    echo "  Window:     ${session}:${sup_name}"
 }
 
 cmd_deactivate() {
@@ -301,11 +459,187 @@ cmd_deactivate() {
 
     info "Deactivating project: $id"
 
+    local sup_name="sup-${id}"
+    local session="${CMUX_SESSION:-cmux}"
+
+    # Kill the project supervisor's tmux window if it exists
+    if tmux list-windows -t "$session" -F '#{window_name}' 2>/dev/null | grep -qxF "$sup_name"; then
+        info "Killing project supervisor: $sup_name"
+        # Send Ctrl+C first for graceful shutdown
+        tmux send-keys -t "${session}:${sup_name}" C-c 2>/dev/null || true
+        sleep 1
+        tmux kill-window -t "${session}:${sup_name}" 2>/dev/null || true
+        ok "Supervisor window killed"
+    fi
+
+    # Remove heartbeat file
+    rm -f "${CMUX_HOME}/.cmux/.${sup_name}-heartbeat"
+
+    # Update registry: set active=false, clear supervisor_agent_id
     local tmp
     tmp=$(mktemp)
-    jq --arg id "$id" '(.projects[] | select(.id == $id)).active = false' "$REGISTRY" > "$tmp" && mv "$tmp" "$REGISTRY"
+    jq --arg id "$id" \
+        '(.projects[] | select(.id == $id)) |= (.active = false | .supervisor_agent_id = null)' \
+        "$REGISTRY" > "$tmp" && mv "$tmp" "$REGISTRY"
 
     ok "Project '$id' deactivated"
+}
+
+cmd_install_hooks() {
+    local id="${1:-}"
+    [[ -z "$id" ]] && die "usage: projects install-hooks <id>"
+
+    ensure_registry
+
+    if ! project_exists "$id"; then
+        die "project '$id' not found"
+    fi
+
+    local is_self
+    is_self=$(jq -r --arg id "$id" '.projects[] | select(.id == $id) | .is_self' "$REGISTRY")
+    if [[ "$is_self" == "true" ]]; then
+        warn "CMUX self-project already has hooks configured"
+        return 0
+    fi
+
+    local project_path
+    project_path=$(jq -r --arg id "$id" '.projects[] | select(.id == $id) | .path' "$REGISTRY")
+    [[ -d "$project_path" ]] || die "project path does not exist: $project_path"
+
+    info "Installing CMUX hooks in: $project_path"
+
+    # Create .claude directory in the target project
+    local target_claude_dir="${project_path}/.claude"
+    mkdir -p "$target_claude_dir"
+
+    # Generate settings.json with absolute paths to CMUX hooks
+    local settings_file="${target_claude_dir}/settings.json"
+
+    # Warn if settings.json already exists
+    if [[ -f "$settings_file" ]]; then
+        warn "Existing .claude/settings.json found — overwriting"
+    fi
+
+    cat > "$settings_file" << HOOKSEOF
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion|EnterPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CMUX_HOME}/.claude/hooks/block-interactive.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CMUX_HOME}/.claude/hooks/stream-thought.sh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CMUX_HOME}/.claude/hooks/notify-output.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CMUX_HOME}/.claude/hooks/audit-log.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"\$CMUX_AGENT_ROLE\" = \"supervisor\" -o \"\$CMUX_AGENT_ROLE\" = \"project-supervisor\" ] && date +%s > \"\${CMUX_HOME}/.cmux/.sup-\${CMUX_PROJECT_ID}-heartbeat\"",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CMUX_HOME}/.claude/hooks/stream-result.sh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CMUX_HOME}/.claude/hooks/stop-gate.sh",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CMUX_HOME}/.claude/hooks/notify-complete.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CMUX_HOME}/.claude/hooks/pre-compact.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CMUX_HOME}/.claude/hooks/compact-recovery.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+HOOKSEOF
+
+    # Update registry: mark hooks as installed
+    local tmp
+    tmp=$(mktemp)
+    jq --arg id "$id" '(.projects[] | select(.id == $id)).hooks_installed = true' "$REGISTRY" > "$tmp" && mv "$tmp" "$REGISTRY"
+
+    ok "Hooks installed in $project_path/.claude/settings.json"
+    echo "  All hooks point to: ${CMUX_HOME}/.claude/hooks/"
 }
 
 cmd_help() {
@@ -320,8 +654,9 @@ COMMANDS:
     remove <id>             Unregister a project
     list                    List all registered projects
     info <id>               Show project details
-    activate <id>           Set project as active
-    deactivate <id>         Set project as inactive
+    activate <id>           Spawn project supervisor and set active
+    deactivate <id>         Kill project supervisor and set inactive
+    install-hooks <id>      Install CMUX hooks in target project
     help                    Show this help message
 
 ADD OPTIONS:
@@ -338,6 +673,7 @@ EXAMPLES:
     projects add /path/to/my-api --name "My API" --description "REST API service"
     projects list
     projects info my-api
+    projects install-hooks my-api
     projects activate my-api
     projects deactivate my-api
     projects remove my-api
@@ -356,14 +692,15 @@ main() {
     shift || true
 
     case "$cmd" in
-        add)        cmd_add "$@" ;;
-        remove)     cmd_remove "$@" ;;
-        list)       cmd_list "$@" ;;
-        info)       cmd_info "$@" ;;
-        activate)   cmd_activate "$@" ;;
-        deactivate) cmd_deactivate "$@" ;;
+        add)            cmd_add "$@" ;;
+        remove)         cmd_remove "$@" ;;
+        list)           cmd_list "$@" ;;
+        info)           cmd_info "$@" ;;
+        activate)       cmd_activate "$@" ;;
+        deactivate)     cmd_deactivate "$@" ;;
+        install-hooks)  cmd_install_hooks "$@" ;;
         help|--help|-h) cmd_help ;;
-        *)          die "unknown command: $cmd (try 'projects help')" ;;
+        *)              die "unknown command: $cmd (try 'projects help')" ;;
     esac
 }
 
