@@ -168,7 +168,7 @@ launch_supervisor() {
 
     # Build startup instruction with journal context
     log_step "Sending role instructions..."
-    local startup_instruction="Read docs/SUPERVISOR_ROLE.md to understand your role as the CMUX supervisor agent. This file contains your instructions for managing workers, using the journal system, and coordinating tasks."
+    local startup_instruction="Read docs/SUPERVISOR_ROLE.md to understand your role as the CMUX supervisor agent. This file contains your instructions for managing workers, using the journal system, and coordinating tasks. IMPORTANT: Always prefix system-level responses (heartbeat replies, compaction recovery, idle status, status confirmations) with [SYS] so they render as compact notifications in the dashboard."
 
     # Find the most recent journal and include it for continuity
     local latest_journal=""

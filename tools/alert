@@ -9,7 +9,6 @@
 
 SOUND="/System/Library/Sounds/Glass.aiff"
 PING_SOUND="/System/Library/Sounds/Ping.aiff"
-VOICE="Samantha"
 RATE=180  # normal speech rate
 
 case "${1:-sound}" in
@@ -21,12 +20,12 @@ case "${1:-sound}" in
     ;;
   say)
     shift
-    say -v "$VOICE" -r "$RATE" "$*" &
+    say -r "$RATE" "$*" &
     ;;
   both)
     shift
     afplay -v 2 "$SOUND" &
-    say -v "$VOICE" -r "$RATE" "$*" &
+    say -r "$RATE" "$*" &
     ;;
   nuke)
     shift
