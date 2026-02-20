@@ -3,7 +3,7 @@
 # workers - Manage worker agents from the supervisor
 #
 # Usage:
-#   workers spawn <name> <task> [--dir <path>] [--project <id>]
+#   workers spawn <name> <task> [--dir <path>] [--project <id>] [--worktree]
 #   workers kill <name>            - Terminate a worker
 #   workers list                   - List all workers
 #   workers send <name> <message>  - Send message to a worker
@@ -75,8 +75,9 @@ cmd_spawn() {
     local task=""
     local worker_dir=""
     local project_id=""
+    local use_worktree=false
 
-    # Parse arguments: workers spawn <name> <task> [--dir <path>] [--project <id>]
+    # Parse arguments: workers spawn <name> <task> [--dir <path>] [--project <id>] [--worktree]
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --dir)
@@ -88,6 +89,10 @@ cmd_spawn() {
                 [[ -z "${2:-}" ]] && die "--project requires an ID argument"
                 project_id="$2"
                 shift 2
+                ;;
+            --worktree)
+                use_worktree=true
+                shift
                 ;;
             *)
                 if [[ -z "$name" ]]; then
@@ -122,6 +127,36 @@ cmd_spawn() {
         die "worker '$name' already exists"
     fi
 
+    # Set up git worktree if requested
+    local worktree_path=""
+    local worktree_branch=""
+    if [[ "$use_worktree" == true ]]; then
+        [[ -n "$worker_dir" ]] && die "--worktree and --dir are mutually exclusive"
+
+        # Inherit project_id early for worktree path calculation
+        local wt_project="${project_id:-${CMUX_PROJECT_ID:-cmux}}"
+        worktree_branch="feat/${name}"
+        worktree_path="${HOME}/.cmux/worktrees/${wt_project}/${name}"
+
+        if [[ -d "$worktree_path" ]]; then
+            info "Reusing existing worktree at $worktree_path"
+        else
+            info "Creating git worktree at $worktree_path on branch $worktree_branch"
+            mkdir -p "$(dirname "$worktree_path")"
+            # Create worktree with a new branch from HEAD
+            # If the branch already exists (leftover from previous run), reuse it
+            if git -C "$cd_target" branch --list "$worktree_branch" | grep -q "$worktree_branch"; then
+                git -C "$cd_target" worktree add "$worktree_path" "$worktree_branch"
+            else
+                git -C "$cd_target" worktree add -b "$worktree_branch" "$worktree_path" HEAD
+            fi
+            ok "Worktree created"
+        fi
+
+        # Override working directory to the worktree
+        cd_target="$worktree_path"
+    fi
+
     # Generate unique agent ID
     local agent_id
     agent_id=$(generate_agent_id)
@@ -148,11 +183,7 @@ cmd_spawn() {
     local now
     now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     local reg_project="${project_id:-cmux}"
-    jq --arg key "$name" \
-       --arg aid "$agent_id" \
-       --arg pid "$reg_project" \
-       --arg now "$now" \
-       '.[$key] = {
+    local jq_filter='.[$key] = {
            "registered_at": $now,
            "type": "worker",
            "created_by": "tools/workers",
@@ -161,7 +192,27 @@ cmd_spawn() {
            "display_name": $key,
            "role": "worker",
            "project_id": $pid
-       }' "$reg_file" > "$reg_tmp" && mv "$reg_tmp" "$reg_file"
+       }'
+    local jq_args=(--arg key "$name" --arg aid "$agent_id" --arg pid "$reg_project" --arg now "$now")
+
+    # Add worktree fields if applicable
+    if [[ -n "$worktree_path" ]]; then
+        jq_filter='.[$key] = {
+           "registered_at": $now,
+           "type": "worker",
+           "created_by": "tools/workers",
+           "created_at": $now,
+           "agent_id": $aid,
+           "display_name": $key,
+           "role": "worker",
+           "project_id": $pid,
+           "worktree_path": $wpath,
+           "worktree_branch": $wbranch
+       }'
+        jq_args+=(--arg wpath "$worktree_path" --arg wbranch "$worktree_branch")
+    fi
+
+    jq "${jq_args[@]}" "$jq_filter" "$reg_file" > "$reg_tmp" && mv "$reg_tmp" "$reg_file"
 
     # Build environment variable exports
     local env_vars="CMUX_AGENT=true CMUX_AGENT_ID=${agent_id} CMUX_AGENT_NAME=${name} CMUX_SESSION=${CMUX_SESSION} CMUX_HOME=${CMUX_PROJECT_ROOT} CMUX_PORT=${CMUX_PORT:-8000} CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false"
@@ -169,9 +220,9 @@ cmd_spawn() {
         env_vars="${env_vars} CMUX_PROJECT_ID=${project_id}"
     fi
 
-    # Build the command — prepend CMUX tools to PATH when working in external projects
+    # Build the command — prepend CMUX tools to PATH when working outside project root
     local spawn_cmd="export ${env_vars}"
-    if [[ -n "$worker_dir" ]]; then
+    if [[ -n "$worker_dir" ]] || [[ -n "$worktree_path" ]]; then
         spawn_cmd="${spawn_cmd} && export PATH=${CMUX_PROJECT_ROOT}/tools:\$PATH"
     fi
     spawn_cmd="${spawn_cmd} && cd ${cd_target} && claude --dangerously-skip-permissions"
@@ -224,6 +275,15 @@ YOUR TASK:
 ${task}
 EOF
 
+    # Add worktree info to context file if applicable
+    if [[ -n "$worktree_path" ]]; then
+        cat >> "$context_file" << WTEOF
+
+WORKTREE:
+You are working in a git worktree at ${worktree_path} on branch ${worktree_branch}. Commit your work to this branch. Do not switch branches. Your supervisor will handle merging.
+WTEOF
+    fi
+
     # Send single-line instruction telling Claude to read the context file
     # This avoids multiline paste issues entirely
     # Use absolute path so workers in external dirs can find the context file
@@ -238,6 +298,8 @@ EOF
     echo "Agent ID: $agent_id"
     echo "Task: $task"
     [[ -n "$worker_dir" ]] && echo "Directory: $cd_target"
+    [[ -n "$worktree_path" ]] && echo "Worktree: $worktree_path"
+    [[ -n "$worktree_branch" ]] && echo "Branch: $worktree_branch"
     [[ -n "$project_id" ]] && echo "Project: $project_id"
     echo "Window: ${CMUX_SESSION}:${name}"
 }
@@ -273,6 +335,19 @@ cmd_kill() {
     tmux kill-window -t "${CMUX_SESSION}:${name}"
 
     ok "Worker '$name' terminated"
+
+    # Check for worktree and print preservation note
+    local reg_file="${CMUX_PROJECT_ROOT}/.cmux/agent_registry.json"
+    if [[ -f "$reg_file" ]]; then
+        local wt_path wt_branch
+        wt_path=$(jq -r --arg key "$name" '.[$key].worktree_path // empty' "$reg_file" 2>/dev/null)
+        wt_branch=$(jq -r --arg key "$name" '.[$key].worktree_branch // empty' "$reg_file" 2>/dev/null)
+        if [[ -n "$wt_path" ]]; then
+            echo ""
+            warn "Worktree preserved at ${wt_path} on branch ${wt_branch}."
+            echo "  Use 'git worktree remove ${wt_path}' to clean up after merging."
+        fi
+    fi
 }
 
 cmd_list() {
@@ -363,10 +438,14 @@ SPAWN OPTIONS:
     --dir <path>       Set worker's working directory (default: CMUX project root)
                        The path must exist. When set, CMUX tools are added to PATH.
     --project <id>     Associate worker with a project (sets CMUX_PROJECT_ID env var)
+    --worktree         Create a git worktree for branch-isolated work.
+                       Creates ~/.cmux/worktrees/<project>/<name> on branch feat/<name>.
+                       Mutually exclusive with --dir. Worktrees are preserved on kill.
 
 EXAMPLES:
     workers spawn auth-worker "Implement JWT authentication in src/auth/"
     workers spawn api-worker "Fix the auth bug" --dir /path/to/my-api --project my-api
+    workers spawn feature-x "Add feature X" --worktree
     workers send auth-worker "Also add refresh token support"
     workers status auth-worker 50
     workers kill auth-worker
