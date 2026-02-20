@@ -50,7 +50,7 @@ interface FileTreeNodeProps {
 }
 
 function FileTreeNode({ item, onFileSelect, selectedPath, level }: FileTreeNodeProps) {
-  const [isOpen, setIsOpen] = useState(level < 2);
+  const [isOpen, setIsOpen] = useState(level < 1);
   const Icon = getFileIcon(item.name, item.type);
   const isSelected = selectedPath === item.path;
   const isDirectory = item.type === 'directory';

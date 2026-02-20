@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { ChevronRight, Bot, FolderOpen, RefreshCw, Inbox, Plus, Users, Archive, Mail, MessageSquare, ArrowRight, Package, ChevronDown } from 'lucide-react';
+import { ChevronRight, Bot, FolderOpen, RefreshCw, Plus, Users, Archive, Package, ChevronDown } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -40,7 +40,7 @@ import { AgentTreeItem } from './AgentTreeItem';
 import { api } from '@/lib/api';
 import type { Agent } from '@/types/agent';
 import type { Project } from '@/types/project';
-import type { Message } from '@/types/message';
+// import type { Message } from '@/types/message'; // Hidden: mailbox panel disabled
 
 interface ProjectGroup {
   project: Project | null;
@@ -51,7 +51,7 @@ interface ProjectGroup {
 export function Explorer() {
   const [agentsOpen, setAgentsOpen] = useState(true);
   const [archivedOpen, setArchivedOpen] = useState(false);
-  const [mailboxOpen, setMailboxOpen] = useState(true);
+  // const [mailboxOpen, setMailboxOpen] = useState(true); // Hidden: mailbox panel disabled
   const [memoryOpen, setMemoryOpen] = useState(true);
   const [createSessionOpen, setCreateSessionOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
@@ -196,7 +196,7 @@ export function Explorer() {
     ? buildFileTree(filesystemData.items)
     : [];
 
-  const mailboxItem = allItems.find(item => item.name === 'mailbox');
+  // const mailboxItem = allItems.find(item => item.name === 'mailbox'); // Hidden: mailbox panel disabled
   const journalFolder = allItems.find(item => item.name === 'journal' && item.type === 'directory');
   const fileTree = allItems.filter(item => item.name !== 'mailbox' && item.name !== 'journal');
 
@@ -391,7 +391,7 @@ export function Explorer() {
             </Collapsible>
           )}
 
-          {/* MAILBOX Section - Agent Communication */}
+          {/* MAILBOX Section - Agent Communication (hidden for now, re-enable by uncommenting)
           <MailboxSection
             mailboxOpen={mailboxOpen}
             setMailboxOpen={setMailboxOpen}
@@ -399,6 +399,7 @@ export function Explorer() {
             selectedFile={selectedFile}
             handleFileSelect={handleFileSelect}
           />
+          */}
 
           {/* MEMORY Section */}
           <Collapsible open={memoryOpen} onOpenChange={setMemoryOpen} className="mt-4">
@@ -604,6 +605,7 @@ function ProjectAgentGroup({
   );
 }
 
+/* MailboxSection — hidden for now, re-enable by uncommenting
 function MailboxSection({
   mailboxOpen,
   setMailboxOpen,
@@ -620,13 +622,12 @@ function MailboxSection({
   const { data: messagesData, isLoading } = useQuery({
     queryKey: ['mailboxMessages'],
     queryFn: () => api.getMailboxMessages(10),
-    refetchInterval: 5000, // Refresh every 5 seconds
+    refetchInterval: 5000,
   });
 
   const recentMessages = messagesData?.messages || [];
   const messageCount = recentMessages.length;
 
-  // Extract subject from content (before "(see:" if present)
   const parseSubject = (content: string) => {
     const seeIdx = content.indexOf(' (see:');
     if (seeIdx > 0) return content.substring(0, seeIdx);
@@ -656,7 +657,6 @@ function MailboxSection({
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-1 space-y-0.5">
-        {/* View raw mailbox file */}
         {mailboxItem && (
           <button
             onClick={() => handleFileSelect(mailboxItem)}
@@ -670,8 +670,6 @@ function MailboxSection({
             <span className="truncate">View Raw Mailbox</span>
           </button>
         )}
-
-        {/* Recent messages */}
         {isLoading ? (
           <div className="px-3 py-2">
             <Skeleton className="h-4 w-full" />
@@ -706,3 +704,4 @@ function MailboxSection({
     </Collapsible>
   );
 }
+*/
