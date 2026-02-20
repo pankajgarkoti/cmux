@@ -253,7 +253,7 @@ start_compact() {
 
 SUPERVISOR_HEARTBEAT_FILE="${CMUX_HEARTBEAT_FILE:-.cmux/.supervisor-heartbeat}"
 HEARTBEAT_WARN_THRESHOLD=${CMUX_HEARTBEAT_WARN:-600}     # seconds idle before first nudge
-HEARTBEAT_NUDGE_INTERVAL=${CMUX_HEARTBEAT_NUDGE:-120}    # seconds to wait after each nudge for response
+HEARTBEAT_NUDGE_INTERVAL=${CMUX_HEARTBEAT_NUDGE:-120}    # cooldown seconds between nudges
 HEARTBEAT_MAX_NUDGES=${CMUX_HEARTBEAT_MAX_NUDGES:-3}     # failed nudges before considering sentry
 HEARTBEAT_OBSERVE_TIMEOUT=${CMUX_HEARTBEAT_OBSERVE_TIMEOUT:-1200}  # seconds of FROZEN output before escalating
 NUDGE_COUNT=0               # how many consecutive nudges sent without heartbeat response
@@ -395,33 +395,21 @@ check_supervisor_heartbeat() {
         return
     fi
 
-    # Send productivity nudges to idle supervisor
-    if ((NUDGE_SENT_AT == 0)); then
-        # First nudge
-        NUDGE_COUNT=1
-        NUDGE_SENT_AT=$now
-        printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - sending productivity nudge (#${NUDGE_COUNT})\n"
-        log_status "HEARTBEAT" "Supervisor idle (${staleness}s), sending nudge #${NUDGE_COUNT}"
-        tmux_send_keys "$CMUX_SESSION" "supervisor" "You have been idle for ${staleness}s."
-        return
-    fi
-
+    # Send productivity nudges to idle supervisor (cooldown: HEARTBEAT_NUDGE_INTERVAL)
     local since_nudge=$((now - NUDGE_SENT_AT))
 
-    if ((since_nudge < HEARTBEAT_NUDGE_INTERVAL)); then
-        # Still waiting for response to the last nudge
-        printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - waiting for nudge #${NUDGE_COUNT} response (${since_nudge}s/${HEARTBEAT_NUDGE_INTERVAL}s)\n"
+    if ((NUDGE_SENT_AT > 0 && since_nudge < HEARTBEAT_NUDGE_INTERVAL)); then
+        # Cooldown — don't send another nudge yet
+        printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - nudge cooldown (${since_nudge}s/${HEARTBEAT_NUDGE_INTERVAL}s)\n"
         return
     fi
 
-    # Nudge response window expired without heartbeat update
     if ((NUDGE_COUNT < HEARTBEAT_MAX_NUDGES)); then
-        # Send another nudge
         ((NUDGE_COUNT++))
         NUDGE_SENT_AT=$now
-        printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - sending productivity nudge (#${NUDGE_COUNT}/${HEARTBEAT_MAX_NUDGES})\n"
+        printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - sending nudge (#${NUDGE_COUNT}/${HEARTBEAT_MAX_NUDGES})\n"
         log_status "HEARTBEAT" "Supervisor idle (${staleness}s), sending nudge #${NUDGE_COUNT}/${HEARTBEAT_MAX_NUDGES}"
-        tmux_send_keys "$CMUX_SESSION" "supervisor" "Nudge #${NUDGE_COUNT}: Still idle (${staleness}s). No tool activity detected."
+        tmux_send_keys "$CMUX_SESSION" "supervisor" "You have been idle for ${staleness}s."
         return
     fi
 
