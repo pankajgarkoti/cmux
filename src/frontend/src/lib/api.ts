@@ -5,6 +5,7 @@ import type { JournalDayResponse, JournalDatesResponse, JournalSearchResponse } 
 import type { FilesystemResponse } from '../types/filesystem';
 import type { SessionListResponse, Session, SessionCreateRequest } from '../types/session';
 import type { ProjectList, Project, ProjectCreate, ProjectAgentsResponse } from '../types/project';
+import type { TaskListResponse, TaskTreeResponse, Task } from '../types/task';
 import { API_BASE } from './constants';
 
 export const api = {
@@ -276,6 +277,45 @@ export const api = {
   }>; count: number }> {
     const res = await fetch(`${API_BASE}/api/thoughts?limit=${limit}`);
     if (!res.ok) throw new Error('Failed to fetch thoughts');
+    return res.json();
+  },
+
+  // Tasks API
+  async getTasks(params?: { project?: string; status?: string; assigned_to?: string; include_done?: boolean }): Promise<TaskListResponse> {
+    const qs = new URLSearchParams();
+    if (params?.project) qs.set('project', params.project);
+    if (params?.status) qs.set('status', params.status);
+    if (params?.assigned_to) qs.set('assigned_to', params.assigned_to);
+    if (params?.include_done) qs.set('include_done', 'true');
+    const query = qs.toString();
+    const res = await fetch(`${API_BASE}/api/tasks${query ? `?${query}` : ''}`);
+    if (!res.ok) throw new Error('Failed to fetch tasks');
+    return res.json();
+  },
+
+  async getTaskTree(params?: { project?: string; include_done?: boolean }): Promise<TaskTreeResponse> {
+    const qs = new URLSearchParams();
+    if (params?.project) qs.set('project', params.project);
+    if (params?.include_done) qs.set('include_done', 'true');
+    const query = qs.toString();
+    const res = await fetch(`${API_BASE}/api/tasks/tree${query ? `?${query}` : ''}`);
+    if (!res.ok) throw new Error('Failed to fetch task tree');
+    return res.json();
+  },
+
+  async getTask(taskId: string): Promise<Task> {
+    const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(taskId)}`);
+    if (!res.ok) throw new Error('Failed to fetch task');
+    return res.json();
+  },
+
+  async updateTask(taskId: string, update: { status?: string; assigned_to?: string }): Promise<Task> {
+    const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(taskId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(update),
+    });
+    if (!res.ok) throw new Error('Failed to update task');
     return res.json();
   },
 };

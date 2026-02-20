@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ActivityTimelineItem } from './ActivityTimelineItem';
 import { ActivityFilters } from './ActivityFilters';
 import { ThoughtStream } from './ThoughtStream';
+import { TasksPanel } from '@/components/tasks/TasksPanel';
 import { PanelHeader } from '@/components/layout/PanelHeader';
 import { Activity as ActivityIcon, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import type { ActivityType } from '@/types/activity';
@@ -83,6 +84,7 @@ export function ActivityTimeline() {
           <TabsList className="h-7 w-full">
             <TabsTrigger value="thoughts" className="text-xs h-5 flex-1">Thoughts</TabsTrigger>
             <TabsTrigger value="activity" className="text-xs h-5 flex-1">Events</TabsTrigger>
+            <TabsTrigger value="tasks" className="text-xs h-5 flex-1">Tasks</TabsTrigger>
           </TabsList>
         </div>
 
@@ -116,6 +118,10 @@ export function ActivityTimeline() {
               )}
             </div>
           </ScrollArea>
+        </TabsContent>
+
+        <TabsContent value="tasks" className="flex-1 overflow-hidden mt-0">
+          <TasksPanel />
         </TabsContent>
       </Tabs>
     </div>
