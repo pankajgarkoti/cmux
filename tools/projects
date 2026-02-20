@@ -423,7 +423,7 @@ cmd_activate() {
 
     # Build environment variables
     local port="${CMUX_PORT:-8000}"
-    local env_vars="CMUX_AGENT=true CMUX_AGENT_ID=${agent_id} CMUX_AGENT_NAME=${sup_name} CMUX_AGENT_ROLE=project-supervisor CMUX_PROJECT_ID=${id} CMUX_SESSION=${session} CMUX_HOME=${CMUX_HOME} CMUX_PORT=${port} CMUX_MAILBOX=${CMUX_HOME}/.cmux/mailbox"
+    local env_vars="CMUX_AGENT=true CMUX_AGENT_ID=${agent_id} CMUX_AGENT_NAME=${sup_name} CMUX_AGENT_ROLE=project-supervisor CMUX_PROJECT_ID=${id} CMUX_SESSION=${session} CMUX_HOME=${CMUX_HOME} CMUX_PORT=${port} CMUX_MAILBOX=${CMUX_HOME}/.cmux/mailbox CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false"
 
     # Build spawn command — add CMUX tools to PATH so supervisor can use journal/mailbox/workers
     local spawn_cmd="export ${env_vars} && export PATH=${CMUX_HOME}/tools:\$PATH && cd ${project_path} && claude --dangerously-skip-permissions"

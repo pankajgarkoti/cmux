@@ -96,8 +96,11 @@ async def send_message_to_agent(agent_id: str, message: AgentMessage):
     )
     mailbox_service.store_message(msg)
 
-    # Send raw message (multiline formatted messages break tmux send-keys)
-    await tmux_service.send_input(agent.tmux_window, message.content)
+    # Prefix with [user] so the message starts with an alphabetic character.
+    # This prevents tmux send-keys content (e.g. markdown like "- [ ] task")
+    # from being interpreted as Claude Code autocomplete suggestions.
+    prefixed_content = f"[user] {message.content}"
+    await tmux_service.send_input(agent.tmux_window, prefixed_content)
     await ws_manager.broadcast("message_sent", {
         "agent_id": agent_id,
         "content": message.content[:100]

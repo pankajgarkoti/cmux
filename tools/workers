@@ -134,7 +134,7 @@ cmd_spawn() {
     tmux set-option -t "${CMUX_SESSION}:${name}" allow-rename off 2>/dev/null || true
 
     # Build environment variable exports
-    local env_vars="CMUX_AGENT=true CMUX_AGENT_ID=${agent_id} CMUX_AGENT_NAME=${name} CMUX_SESSION=${CMUX_SESSION} CMUX_HOME=${CMUX_PROJECT_ROOT} CMUX_PORT=${CMUX_PORT:-8000}"
+    local env_vars="CMUX_AGENT=true CMUX_AGENT_ID=${agent_id} CMUX_AGENT_NAME=${name} CMUX_SESSION=${CMUX_SESSION} CMUX_HOME=${CMUX_PROJECT_ROOT} CMUX_PORT=${CMUX_PORT:-8000} CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false"
     if [[ -n "$project_id" ]]; then
         env_vars="${env_vars} CMUX_PROJECT_ID=${project_id}"
     fi

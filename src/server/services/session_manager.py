@@ -118,7 +118,8 @@ class SessionManager:
         # 3. Start Claude in supervisor window
         startup_cmd = (
             f"export CMUX_AGENT=true CMUX_AGENT_NAME={supervisor_name} "
-            f"CMUX_SESSION={session_id} && cd {project_root} && "
+            f"CMUX_SESSION={session_id} CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false "
+            f"&& cd {project_root} && "
             f"claude --dangerously-skip-permissions"
         )
         await tmux_service.send_input(supervisor_name, startup_cmd, session_id)

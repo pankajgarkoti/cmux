@@ -135,7 +135,7 @@ launch_supervisor() {
     log_step "Launching supervisor agent..."
 
     tmux_create_window "$CMUX_SESSION" "supervisor"
-    tmux_send_keys "$CMUX_SESSION" "supervisor" "export CMUX_AGENT=true CMUX_AGENT_NAME=supervisor && cd ${CMUX_PROJECT_ROOT} && claude --dangerously-skip-permissions"
+    tmux_send_keys "$CMUX_SESSION" "supervisor" "export CMUX_AGENT=true CMUX_AGENT_NAME=supervisor CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false && cd ${CMUX_PROJECT_ROOT} && claude --dangerously-skip-permissions"
 
     # Lock window name
     tmux set-option -t "${CMUX_SESSION}:supervisor" allow-rename off 2>/dev/null || true
@@ -759,7 +759,7 @@ SENTRY_EOF
 
     # Create sentry tmux window and start Claude
     tmux_create_window "$CMUX_SESSION" "sentry"
-    tmux_send_keys "$CMUX_SESSION" "sentry" "export CMUX_AGENT=true CMUX_AGENT_NAME=sentry && cd ${CMUX_PROJECT_ROOT} && claude --dangerously-skip-permissions"
+    tmux_send_keys "$CMUX_SESSION" "sentry" "export CMUX_AGENT=true CMUX_AGENT_NAME=sentry CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false && cd ${CMUX_PROJECT_ROOT} && claude --dangerously-skip-permissions"
 
     # Lock window name
     tmux set-option -t "${CMUX_SESSION}:sentry" allow-rename off 2>/dev/null || true
