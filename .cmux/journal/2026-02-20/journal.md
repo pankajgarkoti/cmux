@@ -601,3 +601,87 @@ Created src/server/routes/tasks.py with GET /api/tasks (list with filters), GET 
 Built full Tasks UI feature: backend API (src/server/routes/tasks.py) with GET /api/tasks, GET /api/tasks/tree, GET /api/tasks/{id}, PATCH /api/tasks/{id}. Frontend: TasksPanel component with collapsible tree view, status badges (pending=gray, assigned=yellow, in-progress=blue, done=green, blocked=red), agent assignment, resource links. Added as 'Tasks' tab in ActivityTimeline. All tests pass (45/45), typecheck clean, build succeeds. Commit 944eb98.
 
 ## 18:15 - Supervisor online after restart. System healthy, server up, 3 project supervisors active (sup-hero, sup-heroweb, sup-hello-world), no workers running, no backlog items. Uncommitted runtime state in .cmux/ — will commit.
+
+## 18:18 - Dispatched 5-task Hello World build to sup-hello-world: FastAPI setup, static HTML, API routes, wiring, run script + README. Single-worker scope.
+
+## 18:22 - [hello-world] hello-world: build-out delegation
+Received 5-task batch from Supervisor Prime to build out hello-world FastAPI project. Tasks: (1) FastAPI+uvicorn setup, (2) static HTML pages, (3) API routes, (4) wire static serving + page routes, (5) run script + README. All sequential with overlapping files. Delegated to single solo worker 'worker-hello-build' on branch feat/worker-hello-build (worktree). Integration branch: feat/build-hello-world.
+
+## 18:23 - [hello-world] Starting Hello World FastAPI build — 5 tasks to complete on feat/worker-hello-build branch
+
+## 18:24 - [hello-world] Task 1-2 progress
+Completed Task 1: Created src/app.py with FastAPI app and /health endpoint (commit df6f622). Working on Task 2: Created static/index.html, static/about.html, and static/style.css with clean minimal design.
+
+## 18:25 - [hello-world] Completed all 5 Hello World FastAPI tasks: df6f622 (FastAPI+health), 549791c (static pages), 2060cde (API routes), fc582a5 (static serving), 716929b (run script+README)
+
+## 18:27 - Completed tasks-live polling fix: changed useTasks refetchInterval from 30s to 5s, staleTime from 15s to 4s. Tasks tab was already always visible. Typecheck + build pass. Commit 07201b9.
+
+## 18:27 - [hello-world] Starting task: Apply pre-built hello-world files from worktree to /Users/pankajgarkoti/Desktop/code/hello-world. 5 commits to make in order.
+
+## 18:27 - Tasks panel live updates — worker-tasks-live changed polling from 30s to 5s in useTasks.ts. Commit 07201b9. Hello World project 5/5 tasks done (commits df6f622 through 716929b).
+
+## 18:29 - [hello-world] Hello World build complete
+Completed all 5 tasks for the Hello World FastAPI project on feat/worker-hello-build branch. Created src/app.py with FastAPI app, health endpoint, static file serving via StaticFiles mount, and page routes using FileResponse. Added src/routes/hello.py with APIRouter for /api/hello and /api/hello/{name}. Created static/index.html, about.html, and style.css with clean minimal design. index.html dynamically fetches greeting from /api/hello. Added run.sh (uv run uvicorn on port 3000) and updated README with project description and usage. All 5 commits clean and sequential. Reported DONE to supervisor.
+
+## 18:29 - [hello-world] Completed all 5 tasks for hello-world apply. Commits: dc79edc, 959e1b6, 85d2761, 4d0ec68, 2fa303e on branch feat/build-hello-world
+
+## 18:30 - [hello-world] hello-world: build complete
+All 5 tasks completed on feat/build-hello-world. Commits: dc79edc (FastAPI+uvicorn+health), 959e1b6 (static HTML pages+CSS), 85d2761 (API routes), 4d0ec68 (static serving+page routes), 2fa303e (run script+README). Note: first worker (worker-hello-build) built in wrong repo due to --worktree creating from CMUX context. Second worker (worker-hello-apply) correctly applied to hello-world repo using --dir. Both workers killed and cleaned up.
+
+## 18:30 - sup-hello-world reported [DONE] for hello-world build. All 5 tasks delivered with commits. Project ready at /Users/pankajgarkoti/Desktop/code/hello-world.
+
+## 18:34 - Starting: investigating why project agent events/thoughts don't appear in dashboard
+
+## 18:35 - Project events investigation — in progress
+Investigating why activity events/thoughts don't show in dashboard for project agents. Checked hooks in all 3 project dirs: hero and heroweb have settings.json with hooks installed using absolute paths; hello-world has NO .claude directory at all. Hook scripts use CMUX_AGENT env var as gate — default URLs are localhost:8000. Now checking worker spawn env vars, CMUX_PROJECT_ROOT resolution, and frontend filtering.
+
+## 18:40 - Project events deep-dive
+Completed comprehensive investigation. Found: 1) Backend IS receiving events from project agents (sup-hero, sup-heroweb confirmed in DB). 2) hello-world has no .claude dir, hooks not installed. 3) Type mismatch in ProjectAgentsResponse — backend sends dicts, frontend type says string[]. 4) The useActivity.ts project filter uses Set of objects, not strings — Set comparison would fail. 5) Hook scripts use absolute paths and correct env vars. Now compiling full report.
+
+## 18:42 - Investigation complete: project events
+Finished investigating why project agent events/thoughts don't show in dashboard. Found 5 issues: (1) CRITICAL — ProjectAgentsResponse type mismatch, backend returns dicts but frontend expects strings, breaking all project-scoped filtering. (2) CRITICAL — hello-world has no .claude/ dir, hooks never installed. (3) MODERATE — thought content extraction yields null for many project agent thoughts. (4) MINOR — historical thought limit=200 can miss older project agent data. (5) MINOR — dead code in AgentActivityIndicator session matching. Full report saved to artifacts/project-events-investigation.md.
+
+## 18:45 - Starting: fix project agent events/thoughts not showing in dashboard — 3 bugs to fix
+
+## 18:46 - Fixing project events display bugs
+Implementing 3 fixes: (1) Fixed ProjectAgentsResponse type — backend sends agent objects but frontend expected string[], changed type to match and updated useActivity.ts + ChatPanel.tsx to extract keys via .map(a => a.key). (2) Added agent_name param to api.getThoughts and updated useThoughts to fetch per-agent thoughts when project selected. (3) About to remove dead sessionId.includes check in AgentActivityIndicator.
+
+## 18:47 - Committed 382fe7b — fixed 3 bugs: ProjectAgentsResponse type, useThoughts project scoping, dead AgentActivityIndicator code
+
+## 18:47 - Fixed project agent events/thoughts visibility — commit 382fe7b. Three fixes: (1) ProjectAgentsResponse type updated to match backend objects, consumers extract .key for Set matching. (2) useThoughts filters by agent_name when project selected. (3) Dead sessionId.includes check removed from AgentActivityIndicator. Also installed hooks for hello-world project.
+
+## 18:51 - fix: useTasks hook now passes include_done=true so completed tasks show in tree view
+
+## 18:52 - Project events + tasks visibility fixes
+Fixed three issues preventing hello-world project data from showing in dashboard. (1) ProjectAgentsResponse type mismatch — backend sent objects, frontend expected strings, breaking all project-scoped filtering (commit 382fe7b). (2) Tasks panel hidden completed tasks because include_done defaulted to false (commit 53b0b5a). (3) Installed CMUX hooks for hello-world project — sup-hello-world had zero events/thoughts because .claude/ dir didn't exist during its work session. Also confirmed tasks DB has all 5 hello-world tasks, thoughts DB has 84 entries from worker-hello-build. sup-hello-world will generate data going forward now that hooks are installed.
+
+## 18:54 - Starting: Investigating project supervisor chat panel visibility issue
+
+## 18:56 - Chat visibility investigation progress
+Traced the full message flow for project supervisors. Found 3 root causes: (1) tools/workers send uses raw tmux, never stores in DB — task assignments are invisible. (2) agent_events.py Stop hook hardcodes to_agent=user for all agents. (3) ChatPanel.tsx filter requires one party to be 'user', excluding inter-agent messages. Main supervisor has 133 user<->supervisor messages; sup-hero has only 2 matching the filter (from Stop hook [SYS] tags) out of 3 total.
+
+## 18:57 - Investigation complete
+Finished investigating project supervisor chat visibility. Found 3 root causes: (1) tools/workers send uses raw tmux without storing in DB, (2) agent_events.py hardcodes to_agent=user for all Stop events, (3) ChatPanel.tsx filter requires one party to be user. Proposed 3 fixes — expand frontend filter, store workers-send messages via API, and optionally fix Stop hook to_agent. Full report saved to artifacts.
+
+## 19:02 - Starting: Fix sup chat visibility — Fix 1 (ChatPanel filter) and Fix 2 (tools/workers send persistence)
+
+## 19:05 - Fix sup chat visibility
+Implemented three changes: (1) ChatPanel.tsx filter expanded so non-supervisor agents show ALL messages involving them (from_agent OR to_agent) instead of requiring one party to be 'user'. (2) tools/workers cmd_send() now persists messages via POST /api/messages/internal before tmux send-keys, so task assignments appear in dashboard chat. (3) Added toggleable filter button in ChatHeader — MessagesSquare/MessageSquare icon lets users switch between all-messages and user-only views. Defaults to 'all' for non-supervisor agents, 'user-only' for main supervisor. Resets on agent change. Commits: b458be4 and 29ce94a.
+
+## 19:05 - Supervisor chat visibility fix — commit 29ce94a. ChatPanel filter expanded: project agents show all messages by default, main supervisor has a toggle to switch between user-only and all messages (including inter-agent). tools/workers send now stores messages in DB via API.
+
+## 19:07 - Starting: Fix thoughts disappearing bug in Activity panel
+
+## 19:10 - Fix thoughts disappearing bug
+Investigated and fixed the bug where supervisor thoughts would appear briefly (8 visible) then vanish to 1-2 in the Thoughts tab. Root cause: MAX_THOUGHTS=50 was a global cap across all agents. When workers generated thoughts rapidly via WebSocket, addThought appended and sliced to 50 on every call, evicting older supervisor thoughts. Fix: increased MAX_THOUGHTS to 500 and stabilized the useEffect dependency in useThoughts.ts (useQueries returns a new array ref every render, causing the effect to fire unnecessarily).
+
+## 19:13 - Starting chat pagination task
+Explored the full codebase for chat message pagination. Key findings: backend supports limit/offset but total returns len(messages) not COUNT(*), frontend uses useMessages(50,0) with no pagination, ChatMessages receives messages as props, ScrollArea with viewport tracking exists. Plan: fix backend total count + has_more, convert useMessages to useInfiniteQuery, add IntersectionObserver for scroll-to-top loading in ChatMessages.
+
+## 19:18 - Chat pagination implemented
+Replaced the hard-capped 50-message loading in the chat panel with paginated infinite scroll. Backend: added count_messages() to conversation_store, switched GET /api/messages to use SQLite directly (not the bounded 200-item deque) and return proper total + has_more. Frontend: converted useMessages hook from useQuery to useInfiniteQuery with 50-message pages, added IntersectionObserver in ChatMessages for scroll-to-top loading with scroll position preservation. Updated all 5 consumers of useMessages (ChatPanel, ChatHeader, MessageList, CommandCenter). All 45 tests pass, typecheck clean, build succeeds. Commit 192765c.
+
+## 19:18 - Chat infinite scroll — commit 192765c. Replaced 50-message hard cap with paginated loading. Backend returns total count + has_more flag. Frontend uses useInfiniteQuery with IntersectionObserver for scroll-to-top loading, scroll position preserved when prepending. 11 files changed.
+
+## 19:23 - Supervisor recovery
+New supervisor instance online after restart. Read SUPERVISOR_ROLE.md and full journal for 2026-02-20. System healthy, server up, 3 project supervisors active (sup-hero, sup-heroweb, sup-hello-world), no workers running, no backlog items. 122 unprocessed mailbox messages (accumulated). 10 files of uncommitted runtime state. Latest commit 192765c (chat pagination). Ready for tasks.

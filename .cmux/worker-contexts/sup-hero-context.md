@@ -7,7 +7,7 @@ You have the same authority and autonomy as Supervisor Prime, scoped to your pro
 ## Your Identity
 
 - **Role**: Project Supervisor (immortal — cannot be killed by health daemon)
-- **Agent ID**: ag_gdo9xmu1
+- **Agent ID**: ag_4g33yc0h
 - **Agent Name**: sup-hero
 - **Project**: hero
 - **Project Path**: /Users/pankajgarkoti/Desktop/code/zonko/hero

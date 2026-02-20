@@ -1,40 +1,90 @@
 {
   "supervisor": {
-    "registered_at": "2026-02-20T12:44:48.402219+00:00",
+    "registered_at": "2026-02-20T13:53:23.287622+00:00",
     "type": "supervisor",
     "created_by": "monitor.sh",
     "agent_id": "ag_0000prim",
     "display_name": "supervisor",
     "role": "supervisor",
     "project_id": "cmux",
-    "created_at": "2026-02-20T12:44:48.402219+00:00"
+    "created_at": "2026-02-20T13:53:23.287622+00:00"
+  },
+  "worker-tasks-include-done": {
+    "registered_at": "2026-02-20T13:20:53Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-20T13:20:53Z",
+    "agent_id": "ag_nptho7f1",
+    "display_name": "worker-tasks-include-done",
+    "role": "worker",
+    "project_id": "cmux"
+  },
+  "worker-sup-chat-visibility": {
+    "registered_at": "2026-02-20T13:24:05Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-20T13:24:05Z",
+    "agent_id": "ag_u6m128qh",
+    "display_name": "worker-sup-chat-visibility",
+    "role": "worker",
+    "project_id": "cmux"
+  },
+  "worker-fix-sup-chat": {
+    "registered_at": "2026-02-20T13:32:11Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-20T13:32:11Z",
+    "agent_id": "ag_273skxo7",
+    "display_name": "worker-fix-sup-chat",
+    "role": "worker",
+    "project_id": "cmux"
+  },
+  "worker-fix-thoughts-disappear": {
+    "registered_at": "2026-02-20T13:36:32Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-20T13:36:32Z",
+    "agent_id": "ag_jrerxv83",
+    "display_name": "worker-fix-thoughts-disappear",
+    "role": "worker",
+    "project_id": "cmux"
+  },
+  "worker-chat-pagination": {
+    "registered_at": "2026-02-20T13:41:46Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-20T13:41:46Z",
+    "agent_id": "ag_e1kaouj8",
+    "display_name": "worker-chat-pagination",
+    "role": "worker",
+    "project_id": "cmux"
   },
   "sup-hero": {
-    "registered_at": "2026-02-20T12:44:48Z",
+    "registered_at": "2026-02-20T13:53:23Z",
     "type": "project-supervisor",
     "created_by": "tools/projects",
-    "created_at": "2026-02-20T12:44:48Z",
-    "agent_id": "ag_gdo9xmu1",
+    "created_at": "2026-02-20T13:53:23Z",
+    "agent_id": "ag_4g33yc0h",
     "display_name": "sup-hero",
     "role": "project-supervisor",
     "project_id": "hero"
   },
   "sup-heroweb": {
-    "registered_at": "2026-02-20T12:44:50Z",
+    "registered_at": "2026-02-20T13:53:25Z",
     "type": "project-supervisor",
     "created_by": "tools/projects",
-    "created_at": "2026-02-20T12:44:50Z",
-    "agent_id": "ag_ubi7u500",
+    "created_at": "2026-02-20T13:53:25Z",
+    "agent_id": "ag_cncffiym",
     "display_name": "sup-heroweb",
     "role": "project-supervisor",
     "project_id": "heroweb"
   },
   "sup-hello-world": {
-    "registered_at": "2026-02-20T12:44:53Z",
+    "registered_at": "2026-02-20T13:53:28Z",
     "type": "project-supervisor",
     "created_by": "tools/projects",
-    "created_at": "2026-02-20T12:44:53Z",
-    "agent_id": "ag_6ojo2faj",
+    "created_at": "2026-02-20T13:53:28Z",
+    "agent_id": "ag_845i46td",
     "display_name": "sup-hello-world",
     "role": "project-supervisor",
     "project_id": "hello-world"
