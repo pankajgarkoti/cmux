@@ -3,7 +3,7 @@
 # workers - Manage worker agents from the supervisor
 #
 # Usage:
-#   workers spawn <name> <task>    - Create and start a new worker
+#   workers spawn <name> <task> [--dir <path>] [--project <id>]
 #   workers kill <name>            - Terminate a worker
 #   workers list                   - List all workers
 #   workers send <name> <message>  - Send message to a worker
@@ -45,11 +45,49 @@ is_supervisor() {
 #───────────────────────────────────────────────────────────────────────────────
 
 cmd_spawn() {
-    local name="${1:-}"
-    local task="${2:-}"
+    local name=""
+    local task=""
+    local worker_dir=""
+    local project_id=""
 
-    [[ -z "$name" ]] && die "usage: workers spawn <name> <task>"
-    [[ -z "$task" ]] && die "usage: workers spawn <name> <task>"
+    # Parse arguments: workers spawn <name> <task> [--dir <path>] [--project <id>]
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dir)
+                [[ -z "${2:-}" ]] && die "--dir requires a path argument"
+                worker_dir="$2"
+                shift 2
+                ;;
+            --project)
+                [[ -z "${2:-}" ]] && die "--project requires an ID argument"
+                project_id="$2"
+                shift 2
+                ;;
+            *)
+                if [[ -z "$name" ]]; then
+                    name="$1"
+                elif [[ -z "$task" ]]; then
+                    task="$1"
+                else
+                    die "unexpected argument: $1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    [[ -z "$name" ]] && die "usage: workers spawn <name> <task> [--dir <path>] [--project <id>]"
+    [[ -z "$task" ]] && die "usage: workers spawn <name> <task> [--dir <path>] [--project <id>]"
+
+    # Validate --dir path exists
+    if [[ -n "$worker_dir" ]]; then
+        [[ -d "$worker_dir" ]] || die "directory does not exist: $worker_dir"
+        # Resolve to absolute path
+        worker_dir="$(cd "$worker_dir" && pwd)"
+    fi
+
+    # Default working directory is CMUX project root
+    local cd_target="${worker_dir:-$CMUX_PROJECT_ROOT}"
 
     # Sanitize name
     name=$(echo "$name" | tr ' ' '-' | tr -cd 'a-zA-Z0-9-_')
@@ -66,10 +104,22 @@ cmd_spawn() {
     # Lock window name
     tmux set-option -t "${CMUX_SESSION}:${name}" allow-rename off 2>/dev/null || true
 
+    # Build environment variable exports
+    local env_vars="CMUX_AGENT=true CMUX_AGENT_NAME=${name} CMUX_SESSION=${CMUX_SESSION} CMUX_HOME=${CMUX_PROJECT_ROOT} CMUX_PORT=${CMUX_PORT:-8000}"
+    if [[ -n "$project_id" ]]; then
+        env_vars="${env_vars} CMUX_PROJECT_ID=${project_id}"
+    fi
+
+    # Build the command — prepend CMUX tools to PATH when working in external projects
+    local spawn_cmd="export ${env_vars}"
+    if [[ -n "$worker_dir" ]]; then
+        spawn_cmd="${spawn_cmd} && export PATH=${CMUX_PROJECT_ROOT}/tools:\$PATH"
+    fi
+    spawn_cmd="${spawn_cmd} && cd ${cd_target} && claude --dangerously-skip-permissions"
+
     # Start Claude with environment variables (two-step pattern for reliability)
     info "Starting Claude agent..."
-    tmux send-keys -t "${CMUX_SESSION}:${name}" -l \
-        "export CMUX_AGENT=true CMUX_AGENT_NAME=${name} CMUX_SESSION=${CMUX_SESSION} && cd ${CMUX_PROJECT_ROOT} && claude --dangerously-skip-permissions"
+    tmux send-keys -t "${CMUX_SESSION}:${name}" -l "$spawn_cmd"
     tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
 
     # Wait for Claude to initialize
@@ -85,7 +135,7 @@ cmd_spawn() {
 
     # Write worker context to temp file to avoid multiline paste issues
     # (Multiline tmux send-keys causes "[Pasted text]" that gets stuck in buffer)
-    local context_dir=".cmux/worker-contexts"
+    local context_dir="${CMUX_PROJECT_ROOT}/.cmux/worker-contexts"
     mkdir -p "$context_dir"
     local context_file="${context_dir}/${name}-context.md"
 
@@ -113,8 +163,9 @@ EOF
 
     # Send single-line instruction telling Claude to read the context file
     # This avoids multiline paste issues entirely
+    # Use absolute path so workers in external dirs can find the context file
     info "Sending task to worker..."
-    local instruction="Read ${context_file} for your identity and task assignment, then begin working on the task described there."
+    local instruction="Read ${CMUX_PROJECT_ROOT}/.cmux/worker-contexts/${name}-context.md for your identity and task assignment, then begin working on the task described there."
     tmux send-keys -t "${CMUX_SESSION}:${name}" -l "$instruction"
     sleep 0.1
     tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
@@ -122,6 +173,8 @@ EOF
     ok "Worker '$name' spawned and task assigned"
     echo ""
     echo "Task: $task"
+    [[ -n "$worker_dir" ]] && echo "Directory: $cd_target"
+    [[ -n "$project_id" ]] && echo "Project: $project_id"
     echo "Window: ${CMUX_SESSION}:${name}"
 }
 
@@ -233,15 +286,21 @@ USAGE:
     workers <command> [arguments]
 
 COMMANDS:
-    spawn <name> <task>      Create a new worker and assign a task
-    kill <name>              Terminate a worker (not supervisors)
-    list                     List all workers in the session
-    send <name> <message>    Send a message to a worker
-    status <name> [lines]    Show recent terminal output (default: 30 lines)
-    help                     Show this help message
+    spawn <name> <task> [options]   Create a new worker and assign a task
+    kill <name>                     Terminate a worker (not supervisors)
+    list                            List all workers in the session
+    send <name> <message>           Send a message to a worker
+    status <name> [lines]           Show recent terminal output (default: 30 lines)
+    help                            Show this help message
+
+SPAWN OPTIONS:
+    --dir <path>       Set worker's working directory (default: CMUX project root)
+                       The path must exist. When set, CMUX tools are added to PATH.
+    --project <id>     Associate worker with a project (sets CMUX_PROJECT_ID env var)
 
 EXAMPLES:
     workers spawn auth-worker "Implement JWT authentication in src/auth/"
+    workers spawn api-worker "Fix the auth bug" --dir /path/to/my-api --project my-api
     workers send auth-worker "Also add refresh token support"
     workers status auth-worker 50
     workers kill auth-worker
@@ -250,6 +309,9 @@ EXAMPLES:
 ENVIRONMENT:
     CMUX_SESSION       tmux session name (default: cmux)
     CMUX_PROJECT_ROOT  project root directory (default: git root or pwd)
+    CMUX_HOME          CMUX installation root (set automatically for workers)
+    CMUX_PORT          server port (default: 8000)
+    CMUX_PROJECT_ID    project association (set via --project flag)
 EOF
 }
 
