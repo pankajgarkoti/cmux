@@ -15,7 +15,7 @@
     "description": "Run npm run typecheck in src/frontend/ and fix any TypeScript errors found. Ensure clean typecheck pass.",
     "priority": 3,
     "source": "system",
-    "status": "pending",
+    "status": "in_progress",
     "created_at": "2026-02-20T05:46:18Z",
     "completed_at": null
   },
@@ -25,7 +25,7 @@
     "description": "Search the codebase for TODO, FIXME, and HACK comments. Categorize them by urgency and area. Create backlog items for any that represent real work to be done.",
     "priority": 4,
     "source": "system",
-    "status": "pending",
+    "status": "in_progress",
     "created_at": "2026-02-20T05:46:20Z",
     "completed_at": null
   },
@@ -35,7 +35,7 @@
     "description": "Check .cmux/worker-contexts/ for context files belonging to workers that no longer exist. Remove stale ones to keep the directory clean.",
     "priority": 5,
     "source": "system",
-    "status": "pending",
+    "status": "in_progress",
     "created_at": "2026-02-20T05:46:21Z",
     "completed_at": null
   }
