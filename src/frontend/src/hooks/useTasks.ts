@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 export function useTasks(project?: string) {
   return useQuery({
     queryKey: ['tasks-tree', project],
-    queryFn: () => api.getTaskTree({ project, include_done: false }),
+    queryFn: () => api.getTaskTree({ project, include_done: true }),
     staleTime: 4000,
     refetchInterval: 5000,
   });
