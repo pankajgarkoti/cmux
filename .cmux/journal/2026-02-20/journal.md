@@ -738,3 +738,8 @@ Completed 4 fixes: (1) worktrees now branch from CWD git root instead of inherit
 
 ## 22:37 - Project worker fixes
 worker-fix-project-workers delivered commit 39e5ede. Four fixes: (1) worktree branches from CWD git root not CMUX, (2) --worktree and --dir no longer conflict, (3) CRITICAL delegation language in project supervisor template, (4) mandatory mailbox done reporting. 8 files, +36/-10. bash -n passes.
+
+## 22:44 - Supervisor online (new session). Committed runtime state (77e7050). System healthy, 4 project sups active (hero, heroweb, todo-backend, todo-frontend), 0 workers, backlog empty. 133 unprocessed mailbox messages accumulated. Ready for tasks.
+
+## 22:47 - New supervisor session
+Restarted as supervisor. Read SUPERVISOR_ROLE.md and caught up on today's journal (2026-02-20). 19+ commits this session covering reliability fixes, hook-based improvements, UI enhancements, thought streaming, sentry agent, compaction recovery, and timezone fixes. Worker sup-todo-frontend is online on feat/todo-app-frontend branch with 10 commits, build complete, ready for assignments.
