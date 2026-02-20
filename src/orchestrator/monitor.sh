@@ -513,7 +513,19 @@ check_supervisor_heartbeat() {
         NUDGE_SENT_AT=$now
         printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - sending nudge (#${NUDGE_COUNT}/${HEARTBEAT_MAX_NUDGES})\n"
         log_status "HEARTBEAT" "Supervisor idle (${staleness}s), sending nudge #${NUDGE_COUNT}/${HEARTBEAT_MAX_NUDGES}"
-        tmux_send_keys "$CMUX_SESSION" "supervisor" "[HEARTBEAT] You have been idle for ${staleness}s with no tool activity. Check for pending work — mailbox, worker status, journal TODOs — or find proactive work to do."
+
+        # Run autonomy-check to find actionable work instead of a static nudge
+        local autonomy_output=""
+        local autonomy_tool="${CMUX_PROJECT_ROOT}/tools/autonomy-check"
+        if [[ -x "$autonomy_tool" ]] && autonomy_output=$("$autonomy_tool" 2>/dev/null); then
+            local item_count
+            item_count=$(echo "$autonomy_output" | wc -l | tr -d ' ')
+            local nudge_msg
+            nudge_msg=$(printf '[HEARTBEAT] Autonomy scan found %d item(s):\n%s' "$item_count" "$autonomy_output")
+            tmux_send_keys "$CMUX_SESSION" "supervisor" "$nudge_msg"
+        else
+            tmux_send_keys "$CMUX_SESSION" "supervisor" "[HEARTBEAT] You have been idle for ${staleness}s with no tool activity. Check for pending work — mailbox, worker status, journal TODOs — or find proactive work to do."
+        fi
         return
     fi
 
@@ -784,6 +796,8 @@ HEALTH_FAILURES=0
 MAX_FAILURES=3
 LAST_CTRL_C=0
 CLEANUP_DONE=false
+MAINTENANCE_COUNTER=0
+MAINTENANCE_INTERVAL=60  # run every 60 iterations (60 * 5s sleep = 5 minutes)
 
 cleanup() {
     # Prevent running cleanup twice
@@ -1007,6 +1021,16 @@ run_dashboard() {
         print_separator
         printf "${DIM}Dashboard: http://localhost:${CMUX_PORT}${NC}\n"
         printf "${DIM}Ctrl+b n/p: switch windows | Ctrl+b d: detach${NC}\n"
+
+        # Periodic auto-maintenance (every MAINTENANCE_INTERVAL iterations)
+        ((MAINTENANCE_COUNTER++)) || true
+        if ((MAINTENANCE_COUNTER >= MAINTENANCE_INTERVAL)); then
+            MAINTENANCE_COUNTER=0
+            local maintenance_tool="${CMUX_PROJECT_ROOT}/tools/auto-maintenance"
+            if [[ -x "$maintenance_tool" ]]; then
+                "$maintenance_tool" 2>/dev/null || true
+            fi
+        fi
 
         sleep 5
     done

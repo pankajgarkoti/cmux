@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+#═══════════════════════════════════════════════════════════════════════════════
+# autonomy-check - Scan all work sources and output actionable items
+#
+# Checks (in priority order):
+#   1. Mailbox - unprocessed messages
+#   2. Backlog - pending backlog items (if tool exists)
+#   3. Workers - idle workers that should be cleaned up
+#   4. Health  - system health endpoint
+#   5. Git    - uncommitted tracked changes
+#
+# Output: one line per finding, prefixed with category tag
+# Exit 0 if work found, exit 1 if nothing to do
+#═══════════════════════════════════════════════════════════════════════════════
+
+set -euo pipefail
+
+CMUX_PROJECT_ROOT="${CMUX_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+CMUX_SESSION="${CMUX_SESSION:-cmux}"
+CMUX_PORT="${CMUX_PORT:-8000}"
+CMUX_MAILBOX="${CMUX_MAILBOX:-${CMUX_PROJECT_ROOT}/.cmux/mailbox}"
+WORKER_IDLE_THRESHOLD=${WORKER_IDLE_THRESHOLD:-1800}  # 30 minutes in seconds
+
+findings=()
+
+#───────────────────────────────────────────────────────────────────────────────
+# 1. Mailbox — unprocessed messages
+#───────────────────────────────────────────────────────────────────────────────
+
+if [[ -f "$CMUX_MAILBOX" ]] && [[ -s "$CMUX_MAILBOX" ]]; then
+    msg_count=$(wc -l < "$CMUX_MAILBOX" | tr -d ' ')
+    if ((msg_count > 0)); then
+        findings+=("[MAILBOX] ${msg_count} unprocessed message(s) in mailbox")
+    fi
+fi
+
+#───────────────────────────────────────────────────────────────────────────────
+# 2. Backlog — pending items (tool may not exist yet)
+#───────────────────────────────────────────────────────────────────────────────
+
+backlog_tool="${CMUX_PROJECT_ROOT}/tools/backlog"
+if [[ -x "$backlog_tool" ]]; then
+    backlog_output=$("$backlog_tool" next 2>/dev/null || true)
+    if [[ -n "$backlog_output" ]]; then
+        # Trim to first line for summary
+        first_line=$(echo "$backlog_output" | head -1)
+        findings+=("[BACKLOG] Next item: ${first_line}")
+    fi
+fi
+
+#───────────────────────────────────────────────────────────────────────────────
+# 3. Workers — idle for 30+ min (check context file mtime)
+#───────────────────────────────────────────────────────────────────────────────
+
+context_dir="${CMUX_PROJECT_ROOT}/.cmux/worker-contexts"
+if [[ -d "$context_dir" ]]; then
+    now=$(date +%s)
+    windows=$(tmux list-windows -t "$CMUX_SESSION" -F '#{window_name}' 2>/dev/null || true)
+
+    for ctx_file in "${context_dir}"/*-context.md; do
+        [[ -f "$ctx_file" ]] || continue
+        basename=$(basename "$ctx_file")
+        worker_name="${basename%-context.md}"
+
+        # Skip supervisors and system windows
+        [[ "$worker_name" == "supervisor" ]] && continue
+        [[ "$worker_name" == sup-* ]] && continue
+        [[ "$worker_name" == "sentry" ]] && continue
+        [[ "$worker_name" == "monitor" ]] && continue
+
+        # Only check workers that have a live tmux window
+        if ! echo "$windows" | grep -qxF "$worker_name"; then
+            continue
+        fi
+
+        # Check context file modification time
+        if [[ "$(uname)" == "Darwin" ]]; then
+            file_mtime=$(stat -f %m "$ctx_file" 2>/dev/null || echo 0)
+        else
+            file_mtime=$(stat -c %Y "$ctx_file" 2>/dev/null || echo 0)
+        fi
+
+        idle_seconds=$((now - file_mtime))
+        if ((idle_seconds > WORKER_IDLE_THRESHOLD)); then
+            idle_min=$((idle_seconds / 60))
+            findings+=("[CLEANUP] Worker '${worker_name}' idle for ${idle_min}m (context file unchanged)")
+        fi
+    done
+fi
+
+#───────────────────────────────────────────────────────────────────────────────
+# 4. Health — system health endpoint
+#───────────────────────────────────────────────────────────────────────────────
+
+if ! curl -sf "http://localhost:${CMUX_PORT}/api/webhooks/health" >/dev/null 2>&1; then
+    findings+=("[HEALTH] Server health check failed (port ${CMUX_PORT})")
+fi
+
+#───────────────────────────────────────────────────────────────────────────────
+# 5. Git — uncommitted tracked changes
+#───────────────────────────────────────────────────────────────────────────────
+
+cd "$CMUX_PROJECT_ROOT"
+git_status=$(git diff --stat HEAD 2>/dev/null || true)
+if [[ -n "$git_status" ]]; then
+    changed_files=$(echo "$git_status" | tail -1 | sed 's/^ *//')
+    findings+=("[GIT] Uncommitted tracked changes: ${changed_files}")
+fi
+
+#───────────────────────────────────────────────────────────────────────────────
+# Output
+#───────────────────────────────────────────────────────────────────────────────
+
+if ((${#findings[@]} == 0)); then
+    exit 1
+fi
+
+for finding in "${findings[@]}"; do
+    echo "$finding"
+done
+
+exit 0
