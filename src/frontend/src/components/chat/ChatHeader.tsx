@@ -21,6 +21,8 @@ import {
   Trash2,
   StopCircle,
   RefreshCw,
+  MessagesSquare,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAgentStore } from '@/stores/agentStore';
@@ -32,6 +34,8 @@ interface ChatHeaderProps {
   agent?: Agent | null;
   isWorker?: boolean;
   onClearChat?: () => void;
+  showAllMessages?: boolean;
+  onToggleFilter?: () => void;
 }
 
 // Map agent status to display style
@@ -87,6 +91,8 @@ export function ChatHeader({
   agent,
   isWorker,
   onClearChat,
+  showAllMessages,
+  onToggleFilter,
 }: ChatHeaderProps) {
   const { isConnected, isReconnecting } = useConnectionStore();
   const { getActiveSessions, latestEventBySession } = useAgentEventStore();
@@ -187,6 +193,32 @@ export function ChatHeader({
 
       {/* Right side - connection status and actions */}
       <div className="flex items-center gap-2">
+        {/* Message filter toggle - only show when viewing a specific agent */}
+        {agentId && onToggleFilter && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  'h-8 w-8',
+                  showAllMessages && 'bg-accent'
+                )}
+                onClick={onToggleFilter}
+              >
+                {showAllMessages ? (
+                  <MessagesSquare className="h-4 w-4" />
+                ) : (
+                  <MessageSquare className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              {showAllMessages ? 'Showing all messages' : 'Showing user messages only'}
+            </TooltipContent>
+          </Tooltip>
+        )}
+
         {/* Connection indicator */}
         <Tooltip>
           <TooltipTrigger asChild>

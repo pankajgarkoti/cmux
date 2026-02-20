@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useMessages } from '@/hooks/useMessages';
@@ -38,7 +38,18 @@ export function ChatPanel() {
     return new Set(projectAgentsData.agents.map(a => a.key));
   }, [selectedProjectId, projectAgentsData]);
 
-  // Filter messages for selected agent: show only user <-> agent conversation
+  // Message filter toggle: show all messages (inter-agent) or just user<->agent
+  // Default: true for non-supervisor agents, false for main supervisor
+  const [showAllMessages, setShowAllMessages] = useState(
+    selectedAgentId !== null && selectedAgentId !== 'supervisor'
+  );
+
+  // Reset to default when selected agent changes
+  useEffect(() => {
+    setShowAllMessages(selectedAgentId !== null && selectedAgentId !== 'supervisor');
+  }, [selectedAgentId]);
+
+  // Filter messages for selected agent
   // Also filter by project when a project is selected
   const allMessages = messagesData?.messages || [];
   const messages = useMemo(() => {
@@ -53,23 +64,23 @@ export function ChatPanel() {
 
     // Filter by specific agent (if selected)
     if (selectedAgentId) {
-      if (selectedAgentId === 'supervisor') {
-        // Main supervisor: keep user<->supervisor filter (established pattern)
+      if (showAllMessages) {
+        // Show all messages involving this agent (inter-agent included)
+        filtered = filtered.filter(
+          (m) => m.from_agent === selectedAgentId || m.to_agent === selectedAgentId
+        );
+      } else {
+        // Show only user<->agent messages
         filtered = filtered.filter(
           (m) =>
             (m.from_agent === selectedAgentId && m.to_agent === 'user') ||
             (m.from_agent === 'user' && m.to_agent === selectedAgentId)
         );
-      } else {
-        // All other agents: show all messages involving this agent
-        filtered = filtered.filter(
-          (m) => m.from_agent === selectedAgentId || m.to_agent === selectedAgentId
-        );
       }
     }
 
     return filtered;
-  }, [allMessages, selectedAgentId, projectAgentIds]);
+  }, [allMessages, selectedAgentId, projectAgentIds, showAllMessages]);
 
   const targetAgent = selectedAgentId || 'supervisor';
 
@@ -150,6 +161,8 @@ export function ChatPanel() {
         agent={selectedAgent}
         isWorker={isWorker}
         onClearChat={handleClearChat}
+        showAllMessages={showAllMessages}
+        onToggleFilter={() => setShowAllMessages(prev => !prev)}
       />
 
       {/* Chat Content */}
