@@ -1,9 +1,0 @@
-{
-  "source": "test",
-  "event_type": "ping",
-  "timestamp": "2026-02-18 22:00:57.117146",
-  "data": {
-    "msg": "JSONL webhook e2e"
-  },
-  "signature": null
-}

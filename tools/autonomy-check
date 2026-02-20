@@ -101,7 +101,7 @@ fi
 #───────────────────────────────────────────────────────────────────────────────
 
 cd "$CMUX_PROJECT_ROOT"
-git_status=$(git diff --stat HEAD 2>/dev/null || true)
+git_status=$(git diff --stat HEAD -- ':!.cmux/' 2>/dev/null || true)
 if [[ -n "$git_status" ]]; then
     changed_files=$(echo "$git_status" | tail -1 | sed 's/^ *//')
     findings+=("[GIT] Uncommitted tracked changes: ${changed_files}")
