@@ -143,7 +143,7 @@ launch_supervisor() {
     # Wait for Claude to initialize (look for the prompt indicator)
     log_step "Waiting for Claude to initialize..."
     local retries=30
-    while ! tmux capture-pane -t "${CMUX_SESSION}:supervisor" -p | grep -qE "^❯|bypass permissions"; do
+    while [[ "$(tmux_pane_state "$CMUX_SESSION" "supervisor")" != "PROMPT" ]]; do
         sleep 1
         ((retries--)) || break
         if ((retries <= 0)); then
@@ -154,7 +154,7 @@ launch_supervisor() {
     sleep 1  # Extra buffer after prompt appears
 
     # Disable vim mode if enabled (for reliable message delivery)
-    if tmux capture-pane -t "${CMUX_SESSION}:supervisor" -p | grep -qE "\-\- (INSERT|NORMAL|VISUAL) \-\-"; then
+    if [[ "$(tmux_pane_state "$CMUX_SESSION" "supervisor")" == "VIM" ]]; then
         log_step "Disabling vim mode..."
         tmux_send_keys "$CMUX_SESSION" "supervisor" "/vim"
         sleep 1
@@ -366,10 +366,12 @@ reset_heartbeat_state() {
     OBSERVE_FROZEN_SINCE=0
 }
 
-# Capture a hash of the supervisor pane's last 20 lines for change detection
+# Capture a hash of a pane's last 20 lines for change detection
 capture_pane_hash() {
-    tmux_capture_pane "$CMUX_SESSION" "supervisor" 20 2>/dev/null | md5 -q 2>/dev/null \
-        || tmux_capture_pane "$CMUX_SESSION" "supervisor" 20 2>/dev/null | md5sum 2>/dev/null | cut -d' ' -f1 \
+    local session="${1:-$CMUX_SESSION}"
+    local window="${2:-supervisor}"
+    tmux_capture_pane "$session" "$window" 20 2>/dev/null | md5 -q 2>/dev/null \
+        || tmux_capture_pane "$session" "$window" 20 2>/dev/null | md5sum 2>/dev/null | cut -d' ' -f1 \
         || echo ""
 }
 
@@ -507,9 +509,9 @@ check_supervisor_heartbeat() {
             item_count=$(echo "$autonomy_output" | wc -l | tr -d ' ')
             local nudge_msg
             nudge_msg=$(printf '[HEARTBEAT] Autonomy scan found %d item(s):\n%s' "$item_count" "$autonomy_output")
-            tmux_send_keys "$CMUX_SESSION" "supervisor" "$nudge_msg"
+            tmux_safe_send "$CMUX_SESSION" "supervisor" "$nudge_msg" --retry 2
         else
-            tmux_send_keys "$CMUX_SESSION" "supervisor" "[HEARTBEAT] You have been idle for ${staleness}s with no tool activity. Check for pending work — mailbox, worker status, journal TODOs — or find proactive work to do."
+            tmux_safe_send "$CMUX_SESSION" "supervisor" "[HEARTBEAT] You have been idle for ${staleness}s with no tool activity. Check for pending work — mailbox, worker status, journal TODOs — or find proactive work to do." --retry 2
         fi
         return
     fi
@@ -563,18 +565,12 @@ is_supervisor_process_alive() {
     return 1
 }
 
-# Check if the supervisor pane is showing an idle prompt (same pattern as
-# compact.sh's is_agent_idle). Returns 0 if at prompt, 1 if busy.
+# Check if the supervisor pane is showing an idle prompt.
+# Delegates to unified tmux_pane_state(). Returns 0 if at prompt, 1 if busy.
 is_supervisor_at_prompt() {
-    local pane_output
-    pane_output=$(tmux_capture_pane "$CMUX_SESSION" "supervisor" 20 2>/dev/null) || return 1
-
-    # Look for Claude Code prompt indicators (consistent with compact.sh)
-    if echo "$pane_output" | grep -qE '❯|bypass permissions|^> '; then
-        return 0
-    fi
-
-    return 1
+    local state
+    state=$(tmux_pane_state "$CMUX_SESSION" "supervisor")
+    [[ "$state" == "PROMPT" ]]
 }
 
 #───────────────────────────────────────────────────────────────────────────────
@@ -751,7 +747,7 @@ SENTRY_EOF
 
     # Wait for Claude to initialize
     local retries=30
-    while ! tmux capture-pane -t "${CMUX_SESSION}:sentry" -p 2>/dev/null | grep -qE "^❯|bypass permissions"; do
+    while [[ "$(tmux_pane_state "$CMUX_SESSION" "sentry")" != "PROMPT" ]]; do
         sleep 1
         ((retries--)) || break
         if ((retries <= 0)); then
@@ -761,8 +757,8 @@ SENTRY_EOF
     done
     sleep 1
 
-    # Send the context reference
-    tmux_send_keys "$CMUX_SESSION" "sentry" "Read ${context_file} and execute the recovery procedure described in it. Follow every step exactly."
+    # Send the context reference (--force since this is a fresh sentry window)
+    tmux_safe_send "$CMUX_SESSION" "sentry" "Read ${context_file} and execute the recovery procedure described in it. Follow every step exactly." --force
 
     # Write lockfile and update state
     echo "blocking" > "$SENTRY_ACTIVE_FILE"

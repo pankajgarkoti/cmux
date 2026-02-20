@@ -230,10 +230,17 @@ route_message() {
 
         # Try exact session match first
         if [[ "$sess" == "$session" ]] && tmux_window_exists "$sess" "$window"; then
-            # Inject notification to target agent's tmux
-            tmux_send_keys "$sess" "$window" "[$from] $subject"
-            [[ -n "$body_path" ]] && tmux_send_keys "$sess" "$window" "  -> $body_path"
-            log_route "DELIVERED" "$from" "$to" "session=$sess"
+            # Build full message
+            local full_msg="[$from] $subject"
+            [[ -n "$body_path" ]] && full_msg="${full_msg}\n  -> $body_path"
+
+            local send_rc=0
+            tmux_safe_send "$sess" "$window" "$full_msg" --retry 3 --queue || send_rc=$?
+            if ((send_rc == 0)); then
+                log_route "DELIVERED" "$from" "$to" "session=$sess"
+            elif ((send_rc == 2)); then
+                log_route "QUEUED" "$from" "$to" "session=$sess (pane not at prompt)"
+            fi
             delivered=true
             break
         fi
@@ -244,9 +251,16 @@ route_message() {
         while IFS= read -r sess; do
             [[ -z "$sess" ]] && continue
             if tmux_window_exists "$sess" "$window"; then
-                tmux_send_keys "$sess" "$window" "[$from] $subject"
-                [[ -n "$body_path" ]] && tmux_send_keys "$sess" "$window" "  -> $body_path"
-                log_route "DELIVERED" "$from" "$to" "session=$sess (fallback)"
+                local full_msg="[$from] $subject"
+                [[ -n "$body_path" ]] && full_msg="${full_msg}\n  -> $body_path"
+
+                local send_rc=0
+                tmux_safe_send "$sess" "$window" "$full_msg" --retry 3 --queue || send_rc=$?
+                if ((send_rc == 0)); then
+                    log_route "DELIVERED" "$from" "$to" "session=$sess (fallback)"
+                elif ((send_rc == 2)); then
+                    log_route "QUEUED" "$from" "$to" "session=$sess (fallback, pane not at prompt)"
+                fi
                 delivered=true
                 break
             fi
@@ -339,6 +353,27 @@ process_mailbox() {
 }
 
 #-------------------------------------------------------------------------------
+# Queue Draining
+#-------------------------------------------------------------------------------
+
+drain_all_queues() {
+    local queue_dir="${CMUX_SEND_QUEUE_DIR:-.cmux/send-queue}"
+    [[ -d "$queue_dir" ]] || return 0
+
+    for queue_file in "$queue_dir"/*; do
+        [[ -f "$queue_file" ]] || continue
+
+        # Parse session:window from filename
+        local target
+        target=$(basename "$queue_file")
+        local session="${target%%:*}"
+        local window="${target#*:}"
+
+        tmux_drain_queue "$session" "$window" 2>/dev/null || true
+    done
+}
+
+#-------------------------------------------------------------------------------
 # Main
 #-------------------------------------------------------------------------------
 
@@ -360,6 +395,7 @@ main() {
 
     while true; do
         process_mailbox
+        drain_all_queues
         sleep "$POLL_INTERVAL"
     done
 }

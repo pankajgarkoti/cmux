@@ -212,10 +212,9 @@ EOF
     echo "[${timestamp}] system:health -> ${CMUX_SESSION}:supervisor: [ERROR] Auto-rollback occurred (body: ${body_path})" >> .cmux/mailbox
     mailbox_unlock
 
-    # Also send directly to tmux for immediate attention
+    # Also send directly to tmux for immediate attention (--force: rollback is critical)
     if tmux_window_exists "$CMUX_SESSION" "supervisor"; then
-        # Use tmux_send_keys function for proper two-step send
-        tmux_send_keys "$CMUX_SESSION" "supervisor" "$message"
+        tmux_safe_send "$CMUX_SESSION" "supervisor" "$message" --force
     fi
 
     log_info "Supervisor notified of rollback"

@@ -124,15 +124,20 @@ should_nudge() {
 send_nudge() {
     local agent_id="$1"
 
+    local msg
+    msg=$(nudge_message)
+
     # Find which session this agent lives in
     # First check the main session
     if tmux_window_exists "$CMUX_SESSION" "$agent_id"; then
-        local msg
-        msg=$(nudge_message)
-        tmux_send_keys "$CMUX_SESSION" "$agent_id" "$msg"
-        _set_last_nudge "$agent_id" "$(date +%s)"
-        log_info "Journal nudge sent to ${agent_id}"
-        return 0
+        local send_rc=0
+        tmux_safe_send "$CMUX_SESSION" "$agent_id" "$msg" --retry 1 --queue || send_rc=$?
+        if ((send_rc == 0 || send_rc == 2)); then
+            _set_last_nudge "$agent_id" "$(date +%s)"
+            log_info "Journal nudge sent to ${agent_id} (rc=${send_rc})"
+            return 0
+        fi
+        return 1
     fi
 
     # Check spawned sessions (cmux-*)
@@ -140,12 +145,14 @@ send_nudge() {
     sessions=$(tmux list-sessions -F "#{session_name}" 2>/dev/null | grep "^cmux-" || true)
     for session in $sessions; do
         if tmux_window_exists "$session" "$agent_id"; then
-            local msg
-            msg=$(nudge_message)
-            tmux_send_keys "$session" "$agent_id" "$msg"
-            _set_last_nudge "$agent_id" "$(date +%s)"
-            log_info "Journal nudge sent to ${agent_id} in session ${session}"
-            return 0
+            local send_rc=0
+            tmux_safe_send "$session" "$agent_id" "$msg" --retry 1 --queue || send_rc=$?
+            if ((send_rc == 0 || send_rc == 2)); then
+                _set_last_nudge "$agent_id" "$(date +%s)"
+                log_info "Journal nudge sent to ${agent_id} in session ${session} (rc=${send_rc})"
+                return 0
+            fi
+            return 1
         fi
     done
 

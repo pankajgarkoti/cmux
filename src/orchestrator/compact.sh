@@ -49,24 +49,14 @@ trap cleanup EXIT TERM HUP INT
 # Agent idle detection
 #-------------------------------------------------------------------------------
 
-# Check if an agent is at prompt (idle) by capturing the last lines of its pane.
-# Returns 0 if idle, 1 if busy.
+# Check if an agent is at prompt (idle) by checking pane state.
+# Delegates to unified tmux_pane_state(). Returns 0 if idle, 1 if busy.
 is_agent_idle() {
     local session="$1"
     local window="$2"
-
-    local pane_output
-    pane_output=$(tmux_capture_pane "$session" "$window" 20 2>/dev/null) || return 1
-
-    # Look for Claude Code prompt indicators:
-    # - "❯" prompt character
-    # - "bypass permissions" (dangerously-skip-permissions mode prompt)
-    # - "> " at start of line (basic prompt)
-    if echo "$pane_output" | grep -qE '❯|bypass permissions|^> '; then
-        return 0
-    fi
-
-    return 1
+    local state
+    state=$(tmux_pane_state "$session" "$window")
+    [[ "$state" == "PROMPT" ]]
 }
 
 #-------------------------------------------------------------------------------
@@ -163,22 +153,11 @@ compact_agent() {
         fi
     fi
 
-    # Acquire per-window lock to prevent races with router/journal-nudge
-    tmux_send_lock "$window"
-
-    # Re-check idle under lock (state may have changed)
-    if ! is_agent_idle "$session" "$window"; then
-        tmux_send_unlock
-        log_status "COMPACT" "Skipped ${window}: agent became busy before send"
+    # Send /compact command via safe send with retries
+    if ! tmux_safe_send "$session" "$window" "/compact" --retry 5; then
+        log_status "COMPACT" "Skipped ${window}: agent not at prompt after retries"
         return 1
     fi
-
-    # Send /compact command
-    tmux send-keys -t "${session}:${window}" -l "/compact"
-    sleep 0.1
-    tmux send-keys -t "${session}:${window}" Enter
-
-    tmux_send_unlock
 
     log_status "COMPACT" "Sent /compact to ${window}, waiting ${VERIFY_DELAY}s for verification"
 
@@ -207,21 +186,15 @@ compact_agent() {
     if $compaction_ok; then
         sleep "$RECOVERY_DELAY"
 
-        # Wait for agent to be idle again before injecting recovery message
-        if is_agent_idle "$session" "$window"; then
-            local today
-            today=$(date +%Y-%m-%d)
-            local recovery_msg="You were just compacted. Read your recovery context from .cmux/journal/${today}/artifacts/compaction-${window}-*.json (most recent one). Also check your conversation history via GET /api/agents/${window}/history if anything is unclear."
+        local today
+        today=$(date +%Y-%m-%d)
+        local recovery_msg="You were just compacted. Read your recovery context from .cmux/journal/${today}/artifacts/compaction-${window}-*.json (most recent one). Also check your conversation history via GET /api/agents/${window}/history if anything is unclear."
 
-            tmux_send_lock "$window"
-            tmux send-keys -t "${session}:${window}" -l "$recovery_msg"
-            sleep 0.1
-            tmux send-keys -t "${session}:${window}" Enter
-            tmux_send_unlock
-
+        if tmux_safe_send "$session" "$window" "$recovery_msg" --retry 3; then
             log_status "COMPACT" "Injected recovery message for ${window}"
         else
-            log_status "COMPACT" "WARN: ${window} not idle after compaction, skipping recovery message"
+            log_status "COMPACT" "WARN: ${window} not idle after compaction, queuing recovery message"
+            tmux_safe_send "$session" "$window" "$recovery_msg" --queue || true
         fi
 
         return 0

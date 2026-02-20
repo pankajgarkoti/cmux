@@ -29,22 +29,19 @@ tmux_create_window() {
     tmux new-window -t "${session}:" -n "$name"
 }
 
-# Send keys to a tmux window
+# Send keys to a tmux window (low-level primitive)
 # For long messages (>4KB), uses tmux load-buffer/paste-buffer for reliability
 # WARNING: Multiline content may cause "[Pasted text]" buffer issues in Claude Code
 # For worker tasks, prefer writing to a file and sending a read instruction
+#
+# Callers SHOULD use tmux_safe_send() instead — it checks pane state first.
+# Only use tmux_send_keys() directly for fresh windows or when state is known.
 tmux_send_keys() {
     local session="$1"
     local window="$2"
     shift 2
     local keys="$*"
     local msg_len=${#keys}
-
-    # Warn about multiline content (can cause paste buffer issues in Claude Code)
-    if [[ "$keys" == *$'\n'* ]] && [[ $msg_len -lt 4096 ]]; then
-        # Log warning for debugging but don't fail
-        : # Can uncomment for debugging: echo "[tmux.sh] NOTE: Sending multiline text" >&2
-    fi
 
     # For long messages (>4KB), use buffer-based approach
     # This avoids issues with send-keys -l on large text
@@ -65,11 +62,10 @@ tmux_send_keys() {
         tmux send-keys -t "${session}:${window}" -l "$keys"
 
         # Delay for paste to be processed by Claude Code
-        # Claude shows "[Pasted text #N +X lines]" and needs time before Enter
         if [[ "$keys" == *$'\n'* ]]; then
-            sleep 0.3  # 300ms delay for multiline (was 150ms - too short)
+            sleep 0.3
         else
-            sleep 0.1  # 100ms for single line (was 50ms)
+            sleep 0.1
         fi
     fi
 
@@ -114,4 +110,223 @@ tmux_clear_input() {
     # Send Escape to exit any special mode (like vim mode in Claude)
     tmux send-keys -t "${session}:${window}" Escape
     sleep 0.1
+}
+
+#═══════════════════════════════════════════════════════════════════════════════
+# Unified Pane State Detection & Safe Send
+#═══════════════════════════════════════════════════════════════════════════════
+
+# Queue directory for deferred messages
+CMUX_SEND_QUEUE_DIR="${CMUX_SEND_QUEUE_DIR:-.cmux/send-queue}"
+
+# Detect the current state of a tmux pane.
+# Returns one of: PROMPT, PERMISSION, CONFIRMATION, PLAN_APPROVAL, SELECTION, VIM, BUSY, UNKNOWN
+# Only PROMPT is safe for sending input.
+#
+# Usage: state=$(tmux_pane_state "$session" "$window")
+tmux_pane_state() {
+    local session="$1"
+    local window="$2"
+
+    local output
+    output=$(tmux_capture_pane "$session" "$window" 10 2>/dev/null) || {
+        echo "UNKNOWN"
+        return 0
+    }
+
+    # Empty output
+    if [[ -z "$output" ]]; then
+        echo "UNKNOWN"
+        return 0
+    fi
+
+    # Get last non-empty lines for pattern matching
+    local last_lines
+    last_lines=$(echo "$output" | grep -v '^$' | tail -5)
+
+    # VIM mode — check first (highest priority, very specific pattern)
+    if echo "$last_lines" | grep -qE '\-\- (INSERT|NORMAL|VISUAL) \-\-'; then
+        echo "VIM"
+        return 0
+    fi
+
+    # PERMISSION — Allow/Deny prompts from Claude Code
+    if echo "$last_lines" | grep -qiE 'allow once|allow always|allow|deny'; then
+        # Make sure it's actually a permission prompt, not just the word in output
+        if echo "$last_lines" | grep -qiE '(Allow|Deny|allow once|allow always)'; then
+            echo "PERMISSION"
+            return 0
+        fi
+    fi
+
+    # PLAN_APPROVAL — plan mode approval prompts
+    if echo "$last_lines" | grep -qiE '(approve|reject).*plan|plan.*(approve|reject)'; then
+        echo "PLAN_APPROVAL"
+        return 0
+    fi
+
+    # CONFIRMATION — y/n prompts
+    if echo "$last_lines" | grep -qE '\(y/n\)|\(Y/N\)|\[y/N\]|\[Y/n\]|\(yes/no\)|\(Yes/No\)'; then
+        echo "CONFIRMATION"
+        return 0
+    fi
+
+    # SELECTION — numbered option lists near end of output
+    if echo "$last_lines" | grep -qE '^[[:space:]]*[1-4][).] '; then
+        echo "SELECTION"
+        return 0
+    fi
+
+    # PROMPT — Claude Code is at prompt, safe to send
+    # Check for: ❯ prompt, "bypass permissions" text, ^> at start of line
+    if echo "$last_lines" | grep -qE '❯|bypass permissions|^> '; then
+        echo "PROMPT"
+        return 0
+    fi
+
+    # None matched — agent is mid-output or in unknown state
+    echo "BUSY"
+    return 0
+}
+
+# Safe send — checks pane state before sending.
+#
+# Usage: tmux_safe_send session window text [--force] [--retry N] [--queue]
+#
+# Returns:
+#   0 = sent successfully
+#   1 = unsafe (pane not at prompt, no flags to handle it)
+#   2 = queued for later delivery
+#
+# Flags:
+#   --force    Send regardless of pane state (for emergencies like sentry)
+#   --retry N  Wait 3s and retry up to N times if not at prompt
+#   --queue    Queue message for later delivery if not at prompt
+tmux_safe_send() {
+    local session="$1"
+    local window="$2"
+    local text="$3"
+    shift 3
+
+    local force=false
+    local retry=0
+    local queue=false
+
+    # Parse optional flags
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --force)  force=true; shift ;;
+            --retry)  retry="$2"; shift 2 ;;
+            --queue)  queue=true; shift ;;
+            *)        shift ;;
+        esac
+    done
+
+    # Force mode — skip all checks
+    if $force; then
+        tmux_send_keys "$session" "$window" "$text"
+        return 0
+    fi
+
+    # Check pane state
+    local state
+    state=$(tmux_pane_state "$session" "$window")
+
+    if [[ "$state" == "PROMPT" ]]; then
+        tmux_send_keys "$session" "$window" "$text"
+        return 0
+    fi
+
+    # Not at prompt — try retries
+    local attempt=0
+    while ((attempt < retry)); do
+        ((attempt++))
+        sleep 3
+        state=$(tmux_pane_state "$session" "$window")
+        if [[ "$state" == "PROMPT" ]]; then
+            tmux_send_keys "$session" "$window" "$text"
+            return 0
+        fi
+    done
+
+    # Still not at prompt — queue if requested
+    if $queue; then
+        _tmux_queue_message "$session" "$window" "$text"
+        return 2
+    fi
+
+    # Not safe, no retry left, no queue — report failure
+    echo "[tmux_safe_send] Cannot send to ${session}:${window} — pane state: ${state}" >&2
+    return 1
+}
+
+# Queue a message for later delivery (internal helper)
+_tmux_queue_message() {
+    local session="$1"
+    local window="$2"
+    local text="$3"
+
+    mkdir -p "$CMUX_SEND_QUEUE_DIR"
+    local queue_file="${CMUX_SEND_QUEUE_DIR}/${session}:${window}"
+
+    # Base64 encode to handle special chars and newlines
+    local encoded
+    if command -v base64 &>/dev/null; then
+        encoded=$(printf '%s' "$text" | base64)
+    else
+        echo "[tmux_safe_send] base64 not available, cannot queue message" >&2
+        return 1
+    fi
+
+    echo "$encoded" >> "$queue_file"
+}
+
+# Drain queued messages for a target window.
+# Called by router.sh on each cycle.
+#
+# Usage: tmux_drain_queue session window
+tmux_drain_queue() {
+    local session="$1"
+    local window="$2"
+
+    local queue_file="${CMUX_SEND_QUEUE_DIR}/${session}:${window}"
+    [[ -f "$queue_file" ]] || return 0
+
+    # Check if window is at prompt before draining
+    local state
+    state=$(tmux_pane_state "$session" "$window")
+    if [[ "$state" != "PROMPT" ]]; then
+        return 0  # Not ready, try again later
+    fi
+
+    # Read and process queued messages
+    local tmpfile
+    tmpfile=$(mktemp)
+    mv "$queue_file" "$tmpfile"
+
+    local delivered=0
+    while IFS= read -r encoded_line; do
+        [[ -z "$encoded_line" ]] && continue
+
+        local decoded
+        decoded=$(printf '%s' "$encoded_line" | base64 -d 2>/dev/null) || {
+            echo "[tmux_drain_queue] Failed to decode queued message" >&2
+            continue
+        }
+
+        # Send without --queue to avoid infinite loop
+        if tmux_safe_send "$session" "$window" "$decoded" --retry 1; then
+            ((delivered++))
+        else
+            # Re-queue failed messages
+            _tmux_queue_message "$session" "$window" "$decoded"
+            break  # Stop draining — pane is no longer at prompt
+        fi
+    done < "$tmpfile"
+
+    rm -f "$tmpfile"
+
+    if ((delivered > 0)); then
+        echo "[tmux_drain_queue] Delivered $delivered queued message(s) to ${session}:${window}" >&2
+    fi
 }
