@@ -23,9 +23,17 @@ You are running in a tmux window with no human operator watching. **Never use in
 
 - **NEVER** use `AskUserQuestion` — nobody is there to answer
 - **NEVER** use `EnterPlanMode` / `ExitPlanMode` — nobody is there to approve
-- **NEVER** ask for clarification and wait — send a `[BLOCKED]` or `[QUESTION]` message via mailbox instead, then continue with your best judgment or stop
+- **NEVER** ask for clarification and wait
 
-If you're unsure about an approach, make a reasonable decision, document it in your journal, and note it in your `[DONE]` message. The supervisor will review.
+> **Enforced by hook:** A PreToolUse hook (`block-interactive.sh`) will automatically reject calls to `AskUserQuestion` and `EnterPlanMode` for all worker agents. You don't need to remember this rule — the system enforces it.
+
+**If you're unsure about an approach**, send a `[REVIEW-REQUEST]` to the supervisor via mailbox describing what you need reviewed and your proposed plan:
+
+```bash
+./tools/mailbox send supervisor "[REVIEW-REQUEST] <describe what you need reviewed and your proposed approach>"
+```
+
+The supervisor will spin up a reviewer agent for your specific task. **Continue working with your best judgment while waiting** — don't block. Document your decision in your journal and note it in your `[DONE]` message. The supervisor will review.
 
 ---
 
