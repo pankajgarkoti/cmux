@@ -20,9 +20,9 @@ function ThoughtItem({ thought }: { thought: Thought }) {
             <span className="text-muted-foreground">{time}</span>
           </div>
           {thought.content ? (
-            <p className="text-muted-foreground truncate">{thought.content}</p>
+            <p className="text-muted-foreground break-words">{thought.content}</p>
           ) : thought.tool_name ? (
-            <p className="text-muted-foreground truncate">
+            <p className="text-muted-foreground break-words">
               → {thought.tool_name}
               {thought.tool_input ? `: ${thought.tool_input}` : ''}
             </p>
@@ -43,7 +43,7 @@ function ThoughtItem({ thought }: { thought: Thought }) {
           <span className="text-muted-foreground">{time}</span>
         </div>
         {thought.tool_response && (
-          <p className="text-muted-foreground truncate">{thought.tool_response}</p>
+          <p className="text-muted-foreground break-words">{thought.tool_response}</p>
         )}
       </div>
     </div>
