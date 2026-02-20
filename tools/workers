@@ -133,6 +133,36 @@ cmd_spawn() {
     # Lock window name
     tmux set-option -t "${CMUX_SESSION}:${name}" allow-rename off 2>/dev/null || true
 
+    # Inherit project_id from environment if not explicitly set via --project
+    if [[ -z "$project_id" ]] && [[ -n "${CMUX_PROJECT_ID:-}" ]]; then
+        project_id="$CMUX_PROJECT_ID"
+    fi
+
+    # Register in agent_registry.json so the API returns correct agent_id, role, project_id
+    local reg_file="${CMUX_PROJECT_ROOT}/.cmux/agent_registry.json"
+    if [[ ! -f "$reg_file" ]]; then
+        echo '{}' > "$reg_file"
+    fi
+    local reg_tmp
+    reg_tmp=$(mktemp)
+    local now
+    now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    local reg_project="${project_id:-cmux}"
+    jq --arg key "$name" \
+       --arg aid "$agent_id" \
+       --arg pid "$reg_project" \
+       --arg now "$now" \
+       '.[$key] = {
+           "registered_at": $now,
+           "type": "worker",
+           "created_by": "tools/workers",
+           "created_at": $now,
+           "agent_id": $aid,
+           "display_name": $key,
+           "role": "worker",
+           "project_id": $pid
+       }' "$reg_file" > "$reg_tmp" && mv "$reg_tmp" "$reg_file"
+
     # Build environment variable exports
     local env_vars="CMUX_AGENT=true CMUX_AGENT_ID=${agent_id} CMUX_AGENT_NAME=${name} CMUX_SESSION=${CMUX_SESSION} CMUX_HOME=${CMUX_PROJECT_ROOT} CMUX_PORT=${CMUX_PORT:-8000} CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false"
     if [[ -n "$project_id" ]]; then

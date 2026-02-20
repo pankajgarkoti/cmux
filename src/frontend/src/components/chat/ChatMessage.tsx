@@ -35,6 +35,14 @@ const HEARTBEAT_RESPONSE_PHRASES = [
   'No recovery context files',
   'Already consumed that output',
   'No action needed on this stale notification',
+  'Awaiting further instructions from the supervisor',
+  'Awaiting further instructions from supervisor',
+  'No pending work',
+  'Resuming normal operations',
+  'my task is fully complete',
+  'task is fully complete',
+  'Task completed. Awaiting',
+  'compaction summary',
 ];
 
 const SYSTEM_AGENTS = new Set(['health', 'monitor', 'system']);
@@ -59,10 +67,11 @@ export function getSystemNotificationInfo(message: Message): { label: string; ic
     }
   }
 
-  // Check for heartbeat RESPONSES from supervisor agents
-  const isSupervisorAgent = message.from_agent.startsWith('sup-') || message.from_agent === 'supervisor';
-  if (isSupervisorAgent && HEARTBEAT_RESPONSE_PHRASES.some(phrase => content.includes(phrase))) {
-    return { label: 'Heartbeat Response', icon: 'heartbeat', summary: getFirstSentence(content) };
+  // Check for heartbeat/compaction RESPONSES from any agent (supervisors AND workers)
+  if (HEARTBEAT_RESPONSE_PHRASES.some(phrase => content.includes(phrase))) {
+    const isSupervisorAgent = message.from_agent.startsWith('sup-') || message.from_agent === 'supervisor';
+    const label = isSupervisorAgent ? 'Heartbeat Response' : 'Agent Recovery';
+    return { label, icon: 'heartbeat', summary: getFirstSentence(content) };
   }
 
   return null;
