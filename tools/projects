@@ -389,6 +389,30 @@ cmd_activate() {
     tmux new-window -t "${session}:" -n "$sup_name"
     tmux set-option -t "${session}:${sup_name}" allow-rename off 2>/dev/null || true
 
+    # Register in agent_registry.json so the API returns correct agent_id, role, project_id
+    local reg_file="${CMUX_HOME}/.cmux/agent_registry.json"
+    local now
+    now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    if [[ ! -f "$reg_file" ]]; then
+        echo '{}' > "$reg_file"
+    fi
+    local reg_tmp
+    reg_tmp=$(mktemp)
+    jq --arg key "$sup_name" \
+       --arg aid "$agent_id" \
+       --arg pid "$id" \
+       --arg now "$now" \
+       '.[$key] = {
+           "registered_at": $now,
+           "type": "project-supervisor",
+           "created_by": "tools/projects",
+           "created_at": $now,
+           "agent_id": $aid,
+           "display_name": $key,
+           "role": "project-supervisor",
+           "project_id": $pid
+       }' "$reg_file" > "$reg_tmp" && mv "$reg_tmp" "$reg_file"
+
     # Build environment variables
     local port="${CMUX_PORT:-8000}"
     local env_vars="CMUX_AGENT=true CMUX_AGENT_ID=${agent_id} CMUX_AGENT_NAME=${sup_name} CMUX_AGENT_ROLE=project-supervisor CMUX_PROJECT_ID=${id} CMUX_SESSION=${session} CMUX_HOME=${CMUX_HOME} CMUX_PORT=${port} CMUX_MAILBOX=${CMUX_HOME}/.cmux/mailbox"
@@ -529,6 +553,14 @@ cmd_deactivate() {
         sleep 1
         tmux kill-window -t "${session}:${sup_name}" 2>/dev/null || true
         ok "Supervisor window killed"
+    fi
+
+    # Remove from agent_registry.json
+    local reg_file="${CMUX_HOME}/.cmux/agent_registry.json"
+    if [[ -f "$reg_file" ]]; then
+        local reg_tmp
+        reg_tmp=$(mktemp)
+        jq --arg key "$sup_name" 'del(.[$key])' "$reg_file" > "$reg_tmp" && mv "$reg_tmp" "$reg_file"
     fi
 
     # Remove heartbeat file
