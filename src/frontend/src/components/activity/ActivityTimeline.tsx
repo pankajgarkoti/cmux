@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useActivity } from '@/hooks/useActivity';
 import { useLayoutStore } from '@/stores/layoutStore';
+import { useProjectStore } from '@/stores/projectStore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -16,6 +17,7 @@ const MAX_DISPLAYED = 50;
 export function ActivityTimeline() {
   const { activities } = useActivity();
   const { activityPanelCollapsed, toggleActivityPanel } = useLayoutStore();
+  const { selectedProjectId } = useProjectStore();
   const [filters, setFilters] = useState<ActivityType[]>([]);
 
   // Filter activities
@@ -96,6 +98,7 @@ export function ActivityTimeline() {
                     key={activity.id}
                     activity={activity}
                     isLast={index === displayedActivities.length - 1}
+                    showProjectBadge={!selectedProjectId}
                   />
                 ))
               )}

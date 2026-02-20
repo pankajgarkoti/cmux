@@ -1,10 +1,12 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useMessages } from '@/hooks/useMessages';
 import { useAgentStore } from '@/stores/agentStore';
 import { useViewerStore } from '@/stores/viewerStore';
+import { useProjectStore } from '@/stores/projectStore';
 import { useAgents } from '@/hooks/useAgents';
+import { useProjectAgents } from '@/hooks/useProjects';
 import { useChatKeyboard } from '@/hooks/useChatKeyboard';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
@@ -17,8 +19,10 @@ import { MemoryViewer } from '@/components/explorer/MemoryViewer';
 export function ChatPanel() {
   const { selectedAgentId, viewingArchivedId } = useAgentStore();
   const { selectedFile } = useViewerStore();
+  const { selectedProjectId } = useProjectStore();
   const { data: messagesData } = useMessages();
   const { data: agentsData } = useAgents();
+  const { data: projectAgentsData } = useProjectAgents(selectedProjectId);
   const queryClient = useQueryClient();
 
   // Worker confirmation modal state
@@ -28,15 +32,36 @@ export function ChatPanel() {
   // Input ref for keyboard shortcuts
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Build set of agent IDs for the selected project
+  const projectAgentIds = useMemo(() => {
+    if (!selectedProjectId || !projectAgentsData?.agents) return null;
+    return new Set(projectAgentsData.agents);
+  }, [selectedProjectId, projectAgentsData]);
+
   // Filter messages for selected agent: show only user <-> agent conversation
+  // Also filter by project when a project is selected
   const allMessages = messagesData?.messages || [];
-  const messages = selectedAgentId
-    ? allMessages.filter(
+  const messages = useMemo(() => {
+    let filtered = allMessages;
+
+    // Filter by project (if selected)
+    if (projectAgentIds) {
+      filtered = filtered.filter(
+        (m) => projectAgentIds.has(m.from_agent) || projectAgentIds.has(m.to_agent)
+      );
+    }
+
+    // Filter by specific agent (if selected)
+    if (selectedAgentId) {
+      filtered = filtered.filter(
         (m) =>
           (m.from_agent === selectedAgentId && m.to_agent === 'user') ||
           (m.from_agent === 'user' && m.to_agent === selectedAgentId)
-      )
-    : allMessages;
+      );
+    }
+
+    return filtered;
+  }, [allMessages, selectedAgentId, projectAgentIds]);
 
   const targetAgent = selectedAgentId || 'supervisor';
 

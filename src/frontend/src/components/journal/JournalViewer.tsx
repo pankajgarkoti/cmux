@@ -6,14 +6,22 @@ import { Input } from '../ui/input';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
 import { useJournal, useJournalDates, useJournalSearch } from '@/hooks/useJournal';
+import { useProjects } from '@/hooks/useProjects';
+import { useProjectStore } from '@/stores/projectStore';
 
 export function JournalViewer() {
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [journalProjectFilter, setJournalProjectFilter] = useState<string | null>(null);
+  const { selectedProjectId } = useProjectStore();
+  const { data: projectsData } = useProjects();
+
+  // Use local filter if set, otherwise fall back to global project selection
+  const effectiveProjectId = journalProjectFilter ?? selectedProjectId;
 
   const { data: dates, isLoading: datesLoading } = useJournalDates();
-  const { data: journal, isLoading: journalLoading } = useJournal(selectedDate);
+  const { data: journal, isLoading: journalLoading } = useJournal(selectedDate, effectiveProjectId);
   const { data: searchResults } = useJournalSearch(searchQuery, isSearching);
 
   const handleDateSelect = (date: string) => {
@@ -69,21 +77,36 @@ export function JournalViewer() {
               ? formatDate(selectedDate)
               : 'Select a date'}
           </span>
-          <form onSubmit={handleSearch} className="flex gap-1">
-            <Input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                if (!e.target.value) setIsSearching(false);
-              }}
-              className="w-32 h-7 text-xs"
-            />
-            <Button type="submit" variant="outline" size="sm" className="h-7 text-xs">
-              Go
-            </Button>
-          </form>
+          <div className="flex items-center gap-1">
+            {/* Project filter dropdown */}
+            {projectsData && projectsData.projects.length > 0 && (
+              <select
+                value={journalProjectFilter ?? ''}
+                onChange={(e) => setJournalProjectFilter(e.target.value || null)}
+                className="h-7 text-xs rounded-md border bg-background px-2"
+              >
+                <option value="">All Projects</option>
+                {projectsData.projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
+            <form onSubmit={handleSearch} className="flex gap-1">
+              <Input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  if (!e.target.value) setIsSearching(false);
+                }}
+                className="w-32 h-7 text-xs"
+              />
+              <Button type="submit" variant="outline" size="sm" className="h-7 text-xs">
+                Go
+              </Button>
+            </form>
+          </div>
         </div>
 
         <ScrollArea className="flex-1">

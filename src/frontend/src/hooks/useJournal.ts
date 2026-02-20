@@ -2,10 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type { JournalEntryCreate } from '../types/journal';
 
-export function useJournal(date?: string) {
+export function useJournal(date?: string, projectId?: string | null) {
   return useQuery({
-    queryKey: ['journal', date],
-    queryFn: () => api.getJournal(date),
+    queryKey: ['journal', date, projectId],
+    queryFn: () => projectId ? api.getJournalForProject(date, projectId) : api.getJournal(date),
   });
 }
 

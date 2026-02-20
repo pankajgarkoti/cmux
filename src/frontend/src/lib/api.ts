@@ -4,6 +4,7 @@ import type { AgentEventsResponse } from '../types/agent_event';
 import type { JournalDayResponse, JournalDatesResponse, JournalSearchResponse } from '../types/journal';
 import type { FilesystemResponse } from '../types/filesystem';
 import type { SessionListResponse, Session, SessionCreateRequest } from '../types/session';
+import type { ProjectList, Project, ProjectCreate, ProjectAgentsResponse } from '../types/project';
 import { API_BASE } from './constants';
 
 export const api = {
@@ -219,6 +220,47 @@ export const api = {
       method: 'POST',
     });
     if (!res.ok) throw new Error('Failed to archive agent');
+    return res.json();
+  },
+
+  // Project API
+  async getProjects(): Promise<ProjectList> {
+    const res = await fetch(`${API_BASE}/api/projects`);
+    if (!res.ok) throw new Error('Failed to fetch projects');
+    return res.json();
+  },
+
+  async createProject(data: ProjectCreate): Promise<Project> {
+    const res = await fetch(`${API_BASE}/api/projects`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to create project');
+    return res.json();
+  },
+
+  async getProjectAgents(projectId: string): Promise<ProjectAgentsResponse> {
+    const res = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectId)}/agents`);
+    if (!res.ok) throw new Error('Failed to fetch project agents');
+    return res.json();
+  },
+
+  async activateProject(projectId: string): Promise<{ success: boolean }> {
+    const res = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectId)}/activate`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to activate project');
+    return res.json();
+  },
+
+  async getJournalForProject(date?: string, projectId?: string): Promise<JournalDayResponse> {
+    const params = new URLSearchParams();
+    if (date) params.set('date', date);
+    if (projectId) params.set('project', projectId);
+    const qs = params.toString();
+    const res = await fetch(`${API_BASE}/api/journal${qs ? `?${qs}` : ''}`);
+    if (!res.ok) throw new Error('Failed to fetch journal');
     return res.json();
   },
 

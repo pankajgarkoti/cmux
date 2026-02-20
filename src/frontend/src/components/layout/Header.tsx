@@ -1,13 +1,21 @@
 import { useState } from 'react';
-import { Terminal, Sun, Moon, GitBranch, Heart, Star } from 'lucide-react';
+import { Terminal, Sun, Moon, GitBranch, Heart, Star, FolderPlus } from 'lucide-react';
 import { useThemeStore } from '../../stores/themeStore';
+import { useProjectStore } from '../../stores/projectStore';
+import { useProjects } from '../../hooks/useProjects';
+import { RegisterProjectDialog } from '../projects/RegisterProjectDialog';
 import { Button } from '../ui/button';
 
 type HeartPhase = 'default' | 'red' | 'beating' | 'shining' | 'star';
 
 export function Header() {
   const { theme, toggleTheme } = useThemeStore();
+  const { selectedProjectId, selectProject } = useProjectStore();
+  const { data: projectsData } = useProjects();
   const [phase, setPhase] = useState<HeartPhase>('default');
+  const [registerOpen, setRegisterOpen] = useState(false);
+
+  const projects = projectsData?.projects || [];
 
   return (
     <header className="h-12 border-b border-border/50 flex items-center justify-between px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -27,6 +35,32 @@ export function Header() {
           <GitBranch className="h-3.5 w-3.5" />
           <span>main</span>
         </div>
+
+        {/* Project Selector */}
+        {projects.length > 0 && (
+          <>
+            <div className="h-4 w-px bg-border" />
+            <select
+              value={selectedProjectId ?? ''}
+              onChange={(e) => selectProject(e.target.value || null)}
+              className="h-7 text-xs font-mono rounded-md border bg-background px-2 text-foreground"
+            >
+              <option value="">All Projects</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={() => setRegisterOpen(true)}
+          title="Register project"
+        >
+          <FolderPlus className="h-3.5 w-3.5" />
+        </Button>
       </div>
 
       <div className="flex items-center gap-3">
@@ -76,6 +110,7 @@ export function Header() {
           <span className="sr-only">Toggle theme</span>
         </Button>
       </div>
+      <RegisterProjectDialog open={registerOpen} onOpenChange={setRegisterOpen} />
     </header>
   );
 }

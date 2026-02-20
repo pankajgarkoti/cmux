@@ -29,6 +29,7 @@ import type { Activity, ActivityType } from '@/types/activity';
 interface ActivityTimelineItemProps {
   activity: Activity;
   isLast?: boolean;
+  showProjectBadge?: boolean;
 }
 
 const typeConfig: Record<
@@ -91,7 +92,7 @@ const toolIcons: Record<string, typeof Terminal> = {
   WebSearch: Globe,
 };
 
-export function ActivityTimelineItem({ activity, isLast }: ActivityTimelineItemProps) {
+export function ActivityTimelineItem({ activity, isLast, showProjectBadge }: ActivityTimelineItemProps) {
   const [isOpen, setIsOpen] = useState(false);
   const config = typeConfig[activity.type];
   const time = formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true });
@@ -142,6 +143,14 @@ export function ActivityTimelineItem({ activity, isLast }: ActivityTimelineItemP
                   >
                     {activity.type === 'tool_call' && toolName ? toolName : config.label}
                   </Badge>
+                  {showProjectBadge && (activity.data?.session as string) && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] h-4 px-1 border-indigo-500/50 text-indigo-500"
+                    >
+                      {(activity.data.session as string).replace('cmux-', '')}
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground truncate">
                   {getActivitySummary(activity)}
