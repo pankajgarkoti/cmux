@@ -105,7 +105,7 @@ function renderWithMentions(text: string, className?: string) {
     parts.push(
       <span
         key={`${mentionName}-${matchIndex}`}
-        className="inline-flex items-center bg-primary/15 text-primary font-medium rounded px-1 py-0.5 text-[0.9em]"
+        className="inline-flex items-center bg-primary-foreground/20 text-primary-foreground font-medium rounded px-1 py-0.5 text-[0.9em]"
       >
         {mentionFull}
       </span>

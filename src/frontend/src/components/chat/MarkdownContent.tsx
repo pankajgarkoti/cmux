@@ -29,7 +29,7 @@ function renderMentionsInText(text: string): React.ReactNode {
     parts.push(
       <span
         key={key++}
-        className="inline-flex items-center bg-primary/15 text-primary font-medium rounded px-1 py-0.5 text-[0.9em]"
+        className="inline-flex items-center bg-primary/20 text-primary font-medium rounded px-1 py-0.5 text-[0.9em]"
       >
         {mentionFull}
       </span>
