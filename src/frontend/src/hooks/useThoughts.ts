@@ -59,11 +59,19 @@ export function useThoughts() {
     }
   }, [data, addThoughts]);
 
+  // Collect per-agent query data into a stable reference (useQueries returns
+  // a new array every render, which would cause the effect to fire constantly).
+  const agentThoughtData = useMemo(
+    () => agentThoughtQueries.map(q => q.data).filter(Boolean),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [agentThoughtQueries.map(q => q.dataUpdatedAt).join(',')],
+  );
+
   // Populate thought store with project-specific thoughts
   useEffect(() => {
-    for (const query of agentThoughtQueries) {
-      if (query.data?.thoughts && query.data.thoughts.length > 0) {
-        const thoughts: Thought[] = query.data.thoughts.map((t) => ({
+    for (const queryData of agentThoughtData) {
+      if (queryData?.thoughts && queryData.thoughts.length > 0) {
+        const thoughts: Thought[] = queryData.thoughts.map((t) => ({
           id: t.id,
           agent_name: t.agent_name,
           thought_type: t.thought_type as Thought['thought_type'],
@@ -76,7 +84,7 @@ export function useThoughts() {
         addThoughts(thoughts);
       }
     }
-  }, [agentThoughtQueries, addThoughts]);
+  }, [agentThoughtData, addThoughts]);
 
   return { thoughts: data?.thoughts || [], isLoading, error };
 }

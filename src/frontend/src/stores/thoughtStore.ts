@@ -11,7 +11,7 @@ export interface Thought {
   timestamp: string;
 }
 
-const MAX_THOUGHTS = 50;
+const MAX_THOUGHTS = 500;
 
 interface ThoughtState {
   thoughts: Thought[];
