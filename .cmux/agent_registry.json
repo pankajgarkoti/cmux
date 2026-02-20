@@ -1,62 +1,52 @@
 {
   "supervisor": {
-    "registered_at": "2026-02-20T15:53:53.310785+00:00",
+    "registered_at": "2026-02-20T17:13:24.614546+00:00",
     "type": "supervisor",
     "created_by": "monitor.sh",
     "agent_id": "ag_0000prim",
     "display_name": "supervisor",
     "role": "supervisor",
     "project_id": "cmux",
-    "created_at": "2026-02-20T15:53:53.310785+00:00"
+    "created_at": "2026-02-20T17:13:24.614546+00:00"
   },
   "sup-hero": {
-    "registered_at": "2026-02-20T15:53:53Z",
+    "registered_at": "2026-02-20T17:13:25Z",
     "type": "project-supervisor",
     "created_by": "tools/projects",
-    "created_at": "2026-02-20T15:53:53Z",
-    "agent_id": "ag_508obwc3",
+    "created_at": "2026-02-20T17:13:25Z",
+    "agent_id": "ag_o3ad4w12",
     "display_name": "sup-hero",
     "role": "project-supervisor",
     "project_id": "hero"
   },
   "sup-heroweb": {
-    "registered_at": "2026-02-20T15:53:56Z",
+    "registered_at": "2026-02-20T17:13:29Z",
     "type": "project-supervisor",
     "created_by": "tools/projects",
-    "created_at": "2026-02-20T15:53:56Z",
-    "agent_id": "ag_p3vw4a9g",
+    "created_at": "2026-02-20T17:13:29Z",
+    "agent_id": "ag_i3awvgsz",
     "display_name": "sup-heroweb",
     "role": "project-supervisor",
     "project_id": "heroweb"
   },
   "sup-todo-backend": {
-    "registered_at": "2026-02-20T16:19:46Z",
+    "registered_at": "2026-02-20T17:13:32Z",
     "type": "project-supervisor",
     "created_by": "tools/projects",
-    "created_at": "2026-02-20T16:19:46Z",
-    "agent_id": "ag_tiw0qkqg",
+    "created_at": "2026-02-20T17:13:32Z",
+    "agent_id": "ag_7qvj5wve",
     "display_name": "sup-todo-backend",
     "role": "project-supervisor",
     "project_id": "todo-backend"
   },
   "sup-todo-frontend": {
-    "registered_at": "2026-02-20T16:19:49Z",
+    "registered_at": "2026-02-20T17:13:35Z",
     "type": "project-supervisor",
     "created_by": "tools/projects",
-    "created_at": "2026-02-20T16:19:49Z",
-    "agent_id": "ag_znr3ie8n",
+    "created_at": "2026-02-20T17:13:35Z",
+    "agent_id": "ag_1mdrog9a",
     "display_name": "sup-todo-frontend",
     "role": "project-supervisor",
     "project_id": "todo-frontend"
-  },
-  "worker-fix-project-workers": {
-    "registered_at": "2026-02-20T17:00:47Z",
-    "type": "worker",
-    "created_by": "tools/workers",
-    "created_at": "2026-02-20T17:00:47Z",
-    "agent_id": "ag_fdx3cxfp",
-    "display_name": "worker-fix-project-workers",
-    "role": "worker",
-    "project_id": "cmux"
   }
 }
