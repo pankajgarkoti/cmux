@@ -10,7 +10,8 @@
 set -euo pipefail
 
 AGENT_NAME="${CMUX_AGENT_NAME:-}"
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# Prefer CMUX_HOME for workers in external directories
+PROJECT_ROOT="${CMUX_HOME:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 
 # Read stdin (required by hook protocol) but we primarily use env vars
 cat > /dev/null 2>&1 || true

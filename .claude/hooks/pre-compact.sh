@@ -12,7 +12,8 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# Prefer CMUX_HOME for workers in external directories
+PROJECT_ROOT="${CMUX_HOME:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 CMUX_PORT="${CMUX_PORT:-8000}"
 
 # --- Determine invocation mode and read stdin if available ---

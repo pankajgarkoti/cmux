@@ -11,8 +11,8 @@
 
 set -euo pipefail
 
-# Resolve project root
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# Resolve project root — prefer CMUX_HOME for workers in external directories
+PROJECT_ROOT="${CMUX_HOME:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 AUDIT_LOG="$PROJECT_ROOT/.cmux/audit.log"
 MAX_SIZE=$((10 * 1024 * 1024))  # 10MB
 

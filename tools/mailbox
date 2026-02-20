@@ -24,6 +24,7 @@ set -euo pipefail
 TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${TOOLS_DIR}/../src/orchestrator/lib/filelock.sh"
 
+CMUX_HOME="${CMUX_HOME:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 CMUX_MAILBOX="${CMUX_MAILBOX:-.cmux/mailbox}"
 CMUX_PORT="${CMUX_PORT:-8000}"
 CMUX_SESSION="${CMUX_SESSION:-cmux}"
@@ -63,7 +64,7 @@ normalize_to() {
 
 # Get today's attachments directory
 get_attachments_dir() {
-    local dir=".cmux/journal/$(date +%Y-%m-%d)/attachments"
+    local dir="${CMUX_HOME}/.cmux/journal/$(date +%Y-%m-%d)/attachments"
     mkdir -p "$dir"
     echo "$dir"
 }
