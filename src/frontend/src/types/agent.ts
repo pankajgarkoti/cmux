@@ -19,6 +19,9 @@ export interface Agent {
   created_at: string;
   last_activity: string | null;
   current_task: string | null;
+  display_name?: string;
+  role?: string;
+  project_id?: string;
 }
 
 export interface AgentListResponse {

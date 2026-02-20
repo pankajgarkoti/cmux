@@ -21,10 +21,10 @@ const statusColors: Record<AgentStatus, string> = {
 };
 
 export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps) {
-  const isSupervisor = agent.type === 'supervisor';
+  const isSupervisor = agent.type === 'supervisor' || agent.role === 'project-supervisor';
+  const isProjectSupervisor = agent.role === 'project-supervisor';
 
   // Check if this agent is actively working
-  // The session ID pattern typically includes the agent name or id
   const { latestEventBySession, isAgentActive } = useAgentEventStore();
   const isWorking = Object.keys(latestEventBySession).some((sessionId) => {
     const matchesAgent =
@@ -32,6 +32,14 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
       sessionId.toLowerCase().includes(agent.name.toLowerCase());
     return matchesAgent && isAgentActive(sessionId);
   });
+
+  // Use display_name if available, fall back to name
+  const displayName = agent.display_name || agent.name;
+
+  // Badge label
+  const badgeLabel = isSupervisor
+    ? (isProjectSupervisor ? 'P-SUP' : 'SUP')
+    : 'WRK';
 
   return (
     <button
@@ -54,13 +62,16 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
 
       {/* Icon */}
       {isSupervisor ? (
-        <Crown className="h-4 w-4 text-amber-500 flex-shrink-0" />
+        <Crown className={cn(
+          'h-4 w-4 flex-shrink-0',
+          isProjectSupervisor ? 'text-purple-500' : 'text-amber-500'
+        )} />
       ) : (
         <Bot className="h-4 w-4 text-muted-foreground flex-shrink-0" />
       )}
 
       {/* Name */}
-      <span className="truncate flex-1">{agent.name}</span>
+      <span className="truncate flex-1">{displayName}</span>
 
       {/* Working indicator */}
       {isWorking && (
@@ -75,10 +86,11 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
         variant="outline"
         className={cn(
           'text-[10px] h-4 px-1',
+          isProjectSupervisor ? 'border-purple-500/50 text-purple-600' :
           isSupervisor ? 'border-amber-500/50 text-amber-600' : 'border-muted'
         )}
       >
-        {isSupervisor ? 'SUP' : 'WRK'}
+        {badgeLabel}
       </Badge>
     </button>
   );

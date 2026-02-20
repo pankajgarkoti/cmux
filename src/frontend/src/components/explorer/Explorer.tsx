@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { ChevronRight, Bot, FolderOpen, RefreshCw, Inbox, Crown, Layers, Trash2, Pause, Play, Plus, MoreHorizontal, AlertCircle, Users, Archive, Mail, MessageSquare, ArrowRight } from 'lucide-react';
+import { ChevronRight, Bot, FolderOpen, RefreshCw, Inbox, Plus, Users, Archive, Mail, MessageSquare, ArrowRight, Package, ChevronDown } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -29,32 +29,24 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useAgents } from '@/hooks/useAgents';
+import { useProjects } from '@/hooks/useProjects';
 import { useAgentStore } from '@/stores/agentStore';
+import { useProjectStore } from '@/stores/projectStore';
 import { useViewerStore } from '@/stores/viewerStore';
 import { useFilesystem, buildFileTree } from '@/hooks/useFilesystem';
 import { FileTree, type FileTreeItem } from './FileTree';
 import { JournalTree } from './JournalTree';
+import { AgentTreeItem } from './AgentTreeItem';
 import { api } from '@/lib/api';
-import type { Agent, AgentStatus } from '@/types/agent';
-import type { SessionStatus } from '@/types/session';
+import type { Agent } from '@/types/agent';
+import type { Project } from '@/types/project';
 import type { Message } from '@/types/message';
 
-interface SessionGroup {
-  session: string;
-  isMain: boolean;
+interface ProjectGroup {
+  project: Project | null;
+  projectId: string;
   agents: Agent[];
-  status?: SessionStatus;
 }
-
-const statusColors: Record<AgentStatus, string> = {
-  PENDING: 'bg-gray-400',
-  IN_PROGRESS: 'bg-blue-500',
-  BLOCKED: 'bg-red-500',
-  TESTING: 'bg-yellow-500',
-  COMPLETE: 'bg-green-500',
-  FAILED: 'bg-red-600',
-  IDLE: 'bg-gray-300',
-};
 
 export function Explorer() {
   const [agentsOpen, setAgentsOpen] = useState(true);
@@ -66,8 +58,10 @@ export function Explorer() {
   const [newSessionTask, setNewSessionTask] = useState('');
 
   const { selectedAgentId, selectAgent, archivedAgents, setArchivedAgents, viewingArchivedId, viewArchive } = useAgentStore();
+  const { selectedProjectId, selectProject } = useProjectStore();
   const { selectedFile, setSelectedFile } = useViewerStore();
   const { data: agentsData, isLoading: agentsLoading, error: agentsError } = useAgents();
+  const { data: projectsData } = useProjects();
   const { data: filesystemData, isLoading: fsLoading, refetch: refetchFs } = useFilesystem();
   const queryClient = useQueryClient();
 
@@ -96,51 +90,108 @@ export function Explorer() {
   });
 
   const agents = agentsData?.agents || [];
+  const projects = projectsData?.projects || [];
 
-  // Group agents by session
-  const sessionGroups = useMemo((): SessionGroup[] => {
+  // Group agents by project
+  const projectGroups = useMemo((): ProjectGroup[] => {
     const groups = new Map<string, Agent[]>();
 
     for (const agent of agents) {
-      const session = agent.session || 'cmux';
-      if (!groups.has(session)) {
-        groups.set(session, []);
+      const projectId = agent.project_id || '_default';
+      if (!groups.has(projectId)) {
+        groups.set(projectId, []);
       }
-      groups.get(session)!.push(agent);
+      groups.get(projectId)!.push(agent);
     }
 
-    // Sort agents within each group (supervisors first, then by name)
+    // Sort agents within each group: supervisors first, then by display name
     for (const [, groupAgents] of groups) {
       groupAgents.sort((a, b) => {
-        if (a.type === 'supervisor' && b.type !== 'supervisor') return -1;
-        if (b.type === 'supervisor' && a.type !== 'supervisor') return 1;
-        return a.name.localeCompare(b.name);
+        const aIsSup = a.type === 'supervisor' || a.role === 'project-supervisor';
+        const bIsSup = b.type === 'supervisor' || b.role === 'project-supervisor';
+        if (aIsSup && !bIsSup) return -1;
+        if (bIsSup && !aIsSup) return 1;
+        const aName = a.display_name || a.name;
+        const bName = b.display_name || b.name;
+        return aName.localeCompare(bName);
       });
     }
 
-    // Convert to array, with main session first
-    const result: SessionGroup[] = [];
-    const mainSession = groups.get('cmux');
-    if (mainSession) {
-      result.push({ session: 'cmux', isMain: true, agents: mainSession });
-      groups.delete('cmux');
+    const result: ProjectGroup[] = [];
+
+    // If we have projects from the API, use them for ordering
+    if (projects.length > 0) {
+      // Self-project first
+      const selfProject = projects.find(p => p.is_self);
+      if (selfProject && groups.has(selfProject.id)) {
+        result.push({
+          project: selfProject,
+          projectId: selfProject.id,
+          agents: groups.get(selfProject.id)!,
+        });
+        groups.delete(selfProject.id);
+      }
+
+      // Other registered projects
+      for (const project of projects.filter(p => !p.is_self)) {
+        const projectAgents = groups.get(project.id);
+        if (projectAgents) {
+          result.push({
+            project,
+            projectId: project.id,
+            agents: projectAgents,
+          });
+          groups.delete(project.id);
+        } else {
+          // Project exists but has no agents
+          result.push({
+            project,
+            projectId: project.id,
+            agents: [],
+          });
+        }
+      }
     }
 
-    // Add other sessions sorted by name
-    const otherSessions = Array.from(groups.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([session, groupAgents]) => ({
-        session,
-        isMain: false,
-        agents: groupAgents,
-      }));
+    // Remaining agents not associated with any known project
+    // (includes the _default group for agents without project_id)
+    for (const [projectId, groupAgents] of groups) {
+      if (projectId === '_default' && result.length === 0) {
+        // No projects registered — show all agents under a single "CMUX" heading
+        result.push({
+          project: null,
+          projectId: '_default',
+          agents: groupAgents,
+        });
+      } else if (projectId !== '_default') {
+        result.push({
+          project: null,
+          projectId,
+          agents: groupAgents,
+        });
+      } else if (groupAgents.length > 0) {
+        // Default group has agents and projects exist — show as "Unassigned"
+        result.push({
+          project: null,
+          projectId: '_default',
+          agents: groupAgents,
+        });
+      }
+    }
 
-    return [...result, ...otherSessions];
-  }, [agents]);
+    return result;
+  }, [agents, projects]);
+
+  // Filter groups by selected project
+  const filteredGroups = useMemo(() => {
+    if (!selectedProjectId) return projectGroups;
+    return projectGroups.filter(g => g.projectId === selectedProjectId);
+  }, [projectGroups, selectedProjectId]);
+
+  // Total agent count
+  const totalAgents = agents.length;
 
   // Build file tree and separate mailbox and journal
-  // buildFileTree already returns the full recursive structure - pass it directly
-  // to FileTree which handles recursive rendering via FileTreeNode
   const allItems: FileTreeItem[] = filesystemData?.items
     ? buildFileTree(filesystemData.items)
     : [];
@@ -159,6 +210,16 @@ export function Explorer() {
     <div className="h-full flex flex-col">
       <ScrollArea className="flex-1">
         <div className="p-2">
+          {/* PROJECT SWITCHER */}
+          {projects.length > 0 && (
+            <ProjectSwitcher
+              projects={projects}
+              selectedProjectId={selectedProjectId}
+              onSelectProject={selectProject}
+              agentsByProject={projectGroups}
+            />
+          )}
+
           {/* AGENTS Section */}
           <Dialog open={createSessionOpen} onOpenChange={setCreateSessionOpen}>
             <Collapsible open={agentsOpen} onOpenChange={setAgentsOpen}>
@@ -174,7 +235,7 @@ export function Explorer() {
                     <Bot className="h-3.5 w-3.5" />
                     <span>Agents</span>
                     <span className="ml-auto text-[10px] font-normal text-muted-foreground">
-                      {agents.length}
+                      {totalAgents}
                     </span>
                   </button>
                 </CollapsibleTrigger>
@@ -218,13 +279,13 @@ export function Explorer() {
                 </div>
               ) : agentsError ? (
                 <p className="px-2 text-xs text-destructive">Failed to load agents</p>
-              ) : sessionGroups.length === 0 ? (
+              ) : filteredGroups.length === 0 ? (
                 <p className="px-2 text-xs text-muted-foreground">No agents running</p>
               ) : (
                 <div className="space-y-2">
-                  {sessionGroups.map((group) => (
-                    <SessionAgentGroup
-                      key={group.session}
+                  {filteredGroups.map((group) => (
+                    <ProjectAgentGroup
+                      key={group.projectId}
                       group={group}
                       selectedAgentId={selectedAgentId}
                       onSelectAgent={selectAgent}
@@ -403,213 +464,143 @@ export function Explorer() {
   );
 }
 
-function SessionAgentGroup({
+function ProjectSwitcher({
+  projects,
+  selectedProjectId,
+  onSelectProject,
+  agentsByProject,
+}: {
+  projects: Project[];
+  selectedProjectId: string | null;
+  onSelectProject: (id: string | null) => void;
+  agentsByProject: ProjectGroup[];
+}) {
+  const selectedProject = selectedProjectId
+    ? projects.find(p => p.id === selectedProjectId)
+    : null;
+
+  const getAgentCount = (projectId: string) => {
+    const group = agentsByProject.find(g => g.projectId === projectId);
+    return group?.agents.length ?? 0;
+  };
+
+  return (
+    <div className="mb-3">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="w-full flex items-center gap-2 px-2 py-2 text-sm rounded-md border border-border/50 hover:bg-sidebar-accent transition-colors">
+            <Package className="h-4 w-4 text-blue-500 flex-shrink-0" />
+            <span className="truncate flex-1 text-left font-medium">
+              {selectedProject ? selectedProject.name : 'All Projects'}
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-56">
+          <DropdownMenuItem
+            onClick={() => onSelectProject(null)}
+            className={cn(!selectedProjectId && 'bg-accent')}
+          >
+            <Users className="h-4 w-4 mr-2 text-blue-500" />
+            <span className="flex-1">All Projects</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {projects.map((project) => (
+            <DropdownMenuItem
+              key={project.id}
+              onClick={() => onSelectProject(project.id)}
+              className={cn(selectedProjectId === project.id && 'bg-accent')}
+            >
+              <Package className="h-4 w-4 mr-2 text-muted-foreground" />
+              <span className="flex-1 truncate">{project.name}</span>
+              <span className="text-[10px] text-muted-foreground ml-1">
+                {getAgentCount(project.id)}
+              </span>
+              {project.is_self && (
+                <Badge variant="outline" className="text-[9px] h-3.5 px-1 ml-1 border-blue-500/50 text-blue-500">
+                  self
+                </Badge>
+              )}
+              {project.active && (
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 ml-1 flex-shrink-0" />
+              )}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+function ProjectAgentGroup({
   group,
   selectedAgentId,
   onSelectAgent,
 }: {
-  group: SessionGroup;
+  group: ProjectGroup;
   selectedAgentId: string | null;
   onSelectAgent: (id: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(true);
-  const [confirmTerminate, setConfirmTerminate] = useState(false);
-  const queryClient = useQueryClient();
 
-  const terminateMutation = useMutation({
-    mutationFn: () => api.terminateSession(group.session),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-      queryClient.invalidateQueries({ queryKey: ['sessions'] });
-      setConfirmTerminate(false);
-    },
-  });
+  const { project, agents } = group;
+  const projectName = project?.name || (group.projectId === '_default' ? 'CMUX' : group.projectId);
+  const isSelfProject = project?.is_self ?? (group.projectId === '_default');
+  const isActive = project?.active ?? true;
 
-  const pauseMutation = useMutation({
-    mutationFn: () => api.pauseSession(group.session),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sessions'] }),
-  });
+  const blockedCount = agents.filter(a => a.status === 'BLOCKED').length;
 
-  const resumeMutation = useMutation({
-    mutationFn: () => api.resumeSession(group.session),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sessions'] }),
-  });
-
-  const isPaused = group.status === 'PAUSED';
-  const isLoading = terminateMutation.isPending || pauseMutation.isPending || resumeMutation.isPending;
-
-  // For main session, show agents directly without grouping header
-  if (group.isMain) {
-    return (
-      <div className="space-y-0.5">
-        <div className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground">
-          <Crown className="h-3 w-3 text-amber-500" />
-          <span>Main Session</span>
-        </div>
-        {group.agents.map((agent) => (
-          <AgentItem
-            key={agent.id}
-            agent={agent}
-            isSelected={selectedAgentId === agent.id}
-            onClick={() => onSelectAgent(agent.id)}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  // For spawned sessions, show collapsible group with actions
   return (
-    <Dialog open={confirmTerminate} onOpenChange={setConfirmTerminate}>
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <div className="flex items-center group">
-          <CollapsibleTrigger asChild>
-            <button className="flex-1 flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground">
-              <ChevronRight
-                className={cn(
-                  'h-3 w-3 transition-transform',
-                  isOpen && 'rotate-90'
-                )}
-              />
-              <Layers className="h-3 w-3" />
-              <span className="truncate">{group.session.replace('cmux-', '')}</span>
-              {isPaused && (
-                <Badge variant="outline" className="text-[9px] h-3.5 px-1 ml-1 border-yellow-500/50 text-yellow-600">
-                  PAUSED
-                </Badge>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div className="flex items-center group">
+        <CollapsibleTrigger asChild>
+          <button className="flex-1 flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground">
+            <ChevronRight
+              className={cn(
+                'h-3 w-3 transition-transform',
+                isOpen && 'rotate-90'
               )}
-              <span className="ml-auto text-[10px]">{group.agents.length}</span>
-            </button>
-          </CollapsibleTrigger>
+            />
+            <Package className={cn(
+              'h-3 w-3',
+              isSelfProject ? 'text-blue-500' : 'text-muted-foreground'
+            )} />
+            <span className="truncate font-medium">{projectName}</span>
+            {isSelfProject && (
+              <Badge variant="outline" className="text-[9px] h-3.5 px-1 border-blue-500/50 text-blue-500">
+                self
+              </Badge>
+            )}
+            {!isActive && (
+              <Badge variant="outline" className="text-[9px] h-3.5 px-1 border-gray-400/50 text-gray-500">
+                idle
+              </Badge>
+            )}
+            {blockedCount > 0 && (
+              <Badge variant="outline" className="text-[9px] h-3.5 px-1 border-red-500/50 text-red-500">
+                {blockedCount} blocked
+              </Badge>
+            )}
+            <span className="ml-auto text-[10px]">{agents.length}</span>
+          </button>
+        </CollapsibleTrigger>
+      </div>
 
-          {/* Session actions dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                disabled={isLoading}
-              >
-                <MoreHorizontal className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              {isPaused ? (
-                <DropdownMenuItem
-                  onClick={() => resumeMutation.mutate()}
-                  disabled={resumeMutation.isPending}
-                >
-                  <Play className="h-3.5 w-3.5 mr-2 text-green-500" />
-                  Resume
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem
-                  onClick={() => pauseMutation.mutate()}
-                  disabled={pauseMutation.isPending}
-                >
-                  <Pause className="h-3.5 w-3.5 mr-2 text-yellow-500" />
-                  Pause
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => setConfirmTerminate(true)}
-                className="text-red-600 focus:text-red-600"
-              >
-                <Trash2 className="h-3.5 w-3.5 mr-2" />
-                Terminate
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        <CollapsibleContent className="ml-2 space-y-0.5">
-          {group.agents.map((agent) => (
-            <AgentItem
+      <CollapsibleContent className="ml-2 space-y-0.5">
+        {agents.length === 0 ? (
+          <p className="px-3 py-1 text-xs text-muted-foreground">No agents</p>
+        ) : (
+          agents.map((agent) => (
+            <AgentTreeItem
               key={agent.id}
               agent={agent}
               isSelected={selectedAgentId === agent.id}
               onClick={() => onSelectAgent(agent.id)}
             />
-          ))}
-        </CollapsibleContent>
-      </Collapsible>
-
-      {/* Terminate confirmation dialog */}
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-red-500" />
-            Terminate Session
-          </DialogTitle>
-          <DialogDescription>
-            Are you sure you want to terminate <strong>{group.session}</strong>?
-            This will gracefully stop all {group.agents.length} agent(s) in this session.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setConfirmTerminate(false)}>
-            Cancel
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => terminateMutation.mutate()}
-            disabled={terminateMutation.isPending}
-          >
-            {terminateMutation.isPending ? 'Terminating...' : 'Terminate'}
-          </Button>
-        </DialogFooter>
-        {terminateMutation.isError && (
-          <p className="text-sm text-red-500 mt-2">
-            {terminateMutation.error?.message || 'Failed to terminate session'}
-          </p>
+          ))
         )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function AgentItem({
-  agent,
-  isSelected,
-  onClick
-}: {
-  agent: Agent;
-  isSelected: boolean;
-  onClick: () => void;
-}) {
-  const isSupervisor = agent.type === 'supervisor';
-
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors text-left',
-        'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-        isSelected && 'bg-sidebar-accent text-sidebar-accent-foreground'
-      )}
-    >
-      <span
-        className={cn('w-2 h-2 rounded-full flex-shrink-0', statusColors[agent.status])}
-        title={agent.status}
-      />
-      {isSupervisor ? (
-        <Crown className="h-4 w-4 text-amber-500 flex-shrink-0" />
-      ) : (
-        <Bot className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-      )}
-      <span className="truncate flex-1">{agent.name}</span>
-      <Badge
-        variant="outline"
-        className={cn(
-          'text-[10px] h-4 px-1',
-          isSupervisor ? 'border-amber-500/50 text-amber-600' : 'border-muted'
-        )}
-      >
-        {isSupervisor ? 'SUP' : 'WRK'}
-      </Badge>
-    </button>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
