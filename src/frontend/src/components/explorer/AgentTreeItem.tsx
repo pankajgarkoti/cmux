@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Bot, Crown } from 'lucide-react';
+import { Bot, Crown, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useAgentEventStore } from '@/stores/agentEventStore';
 import type { Agent, AgentStatus } from '@/types/agent';
@@ -73,12 +73,11 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
       {/* Name */}
       <span className="truncate flex-1">{displayName}</span>
 
-      {/* Working indicator */}
+      {/* Working indicator - animated spinner */}
       {isWorking && (
-        <span
-          className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse flex-shrink-0"
-          title="Processing..."
-        />
+        <span title="Processing...">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary flex-shrink-0" />
+        </span>
       )}
 
       {/* Type badge */}

@@ -250,7 +250,7 @@ export function Explorer() {
                 </Button>
               </div>
             <CollapsibleContent className="mt-1">
-              {/* All Agents - returns to overview showing all messages */}
+              {/* All Agents view - hidden, supervisor view is sufficient
               <button
                 onClick={() => selectAgent(null)}
                 className={cn(
@@ -271,6 +271,7 @@ export function Explorer() {
                   ALL
                 </Badge>
               </button>
+              */}
 
               {agentsLoading ? (
                 <div className="space-y-2 px-2">
