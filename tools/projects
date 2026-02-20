@@ -515,6 +515,7 @@ Save research, plans, and analysis as artifacts:
 - Stay focused on the '${id}' project. Do not modify files outside ${project_path}.
 - When idle with no tasks, say so briefly and wait. Do NOT produce lengthy status reports.
 - On heartbeat nudges or compaction recovery: check for pending work, act if found, otherwise stay quiet.
+- **[SYS] tag**: When responding to heartbeat nudges, compaction recovery, or any system event with no actionable work, prefix your response with \`[SYS]\`. Example: \`[SYS] No pending work. Idle.\` This renders as a compact notification in the dashboard instead of cluttering chat.
 CTXEOF
 
     # Wait for Claude to initialize

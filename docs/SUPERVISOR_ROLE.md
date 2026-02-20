@@ -471,6 +471,8 @@ Check for pending work — mailbox, worker status, journal TODOs — or find pro
 
 When you see this, check for work: read the mailbox, review active workers (`./tools/workers list`), consult the journal, or find something proactive to do. Any tool use resets the heartbeat timer.
 
+**IMPORTANT:** When responding to heartbeat nudges, compaction recovery, or any other system event where you have no actionable work, prefix your response with `[SYS]`. This tags the message as a system-level response so it renders as a compact notification in the UI instead of cluttering the chat. Example: `[SYS] No pending work. Idle.`
+
 Nudges respect a cooldown of `CMUX_HEARTBEAT_NUDGE` seconds (default 120s) between sends. After `CMUX_HEARTBEAT_MAX_NUDGES` consecutive nudges without a heartbeat update (default 3), the monitor escalates to a liveness check.
 
 ### Observation Mode (Mid-Task)
@@ -582,10 +584,15 @@ When the user gives a clear directive ("commit and push", "spawn a worker for X"
 **When a worker reports [DONE]:**
 
 1. Acknowledge their completion
-2. Review their work
-3. Report results to the user
-4. **Leave the worker running** - inform user they can interact with it
-5. Journal the outcome
+2. **Spawn a code review worker** to independently verify the implementation:
+   ```bash
+   ./tools/workers spawn "reviewer-<topic>" "Read docs/templates/roles/REVIEWER.md first. Then review the changes from worker <name>: <summary of what was implemented>. Check: correctness, edge cases, type safety, test coverage. Report findings via mailbox."
+   ```
+   You are a coordinator — do NOT review code yourself. Always spawn a reviewer.
+3. Wait for the reviewer's report. If issues found, send corrections to the original worker.
+4. Once review passes, report results to the user/supervisor
+5. **Leave the worker running** - inform user they can interact with it
+6. Journal the outcome
 
 ### 5. Error Handling
 

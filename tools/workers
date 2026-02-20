@@ -214,6 +214,10 @@ When you see a message like '[cmux:supervisor] Do X', that's the supervisor assi
 JOURNAL AS YOU WORK - use ./tools/journal log "what you did" after completing tasks,
 making decisions, or learning something important. This is the system's long-term memory.
 
+[SYS] TAG: If you respond to a heartbeat nudge, compaction recovery, or any system event
+where you have no actionable work, prefix your response with [SYS]. Example: [SYS] Task complete. Idle.
+This renders as a compact notification in the dashboard instead of cluttering chat.
+
 Read docs/WORKER_ROLE.md for full worker guidelines.
 
 YOUR TASK:

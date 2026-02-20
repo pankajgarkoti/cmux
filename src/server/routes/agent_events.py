@@ -53,13 +53,22 @@ async def receive_agent_event(event: AgentEvent):
 
     # For Stop events with response_content, create a message and broadcast it
     if event.event_type == AgentEventType.STOP and event.response_content:
+        response_content = event.response_content
+        msg_type = MessageType.RESPONSE
+
+        # Detect [SYS] tagged messages — agents prefix system-level responses
+        # (heartbeat acks, compaction recovery, idle status) with [SYS]
+        if response_content.strip().startswith("[SYS]"):
+            msg_type = MessageType.SYSTEM
+            response_content = response_content.strip().removeprefix("[SYS]").strip()
+
         msg = Message(
             id=str(uuid.uuid4()),
             timestamp=datetime.now(timezone.utc),
             from_agent=display_agent_id,
             to_agent="user",
-            type=MessageType.RESPONSE,
-            content=event.response_content,
+            type=msg_type,
+            content=response_content,
         )
         # Store in mailbox service for retrieval via /api/messages
         mailbox_service.store_message(msg)

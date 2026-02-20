@@ -11,6 +11,7 @@ class MessageType(str, Enum):
     ERROR = "error"
     USER = "user"
     MAILBOX = "mailbox"  # Agent-to-agent messages routed via mailbox
+    SYSTEM = "system"  # System-level messages (heartbeat acks, compaction recovery, idle status)
 
 
 class TaskStatus(str, Enum):

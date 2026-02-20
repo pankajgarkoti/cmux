@@ -17,33 +17,13 @@ import type { Message } from '@/types/message';
 import type { Activity } from '@/types/activity';
 import type { Thought } from '@/stores/thoughtStore';
 
-// System notification patterns for heartbeat pings, sentry briefings, health alerts
-const SYSTEM_PATTERNS = [
-  { test: (c: string) => c.startsWith('SENTRY BRIEFING'), label: 'Sentry Recovery', icon: 'shield' as const },
-  { test: (c: string) => c.startsWith('SYSTEM ALERT'), label: 'System Alert', icon: 'shield' as const },
-  { test: (c: string) => c.startsWith('[HEARTBEAT]'), label: 'Heartbeat', icon: 'heartbeat' as const },
-  { test: (c: string) => /^\[SYSTEM AUTO-JOURNAL/i.test(c), label: 'Journal Reminder', icon: 'radio' as const },
+// Fixed-prefix patterns for incoming system messages (heartbeat pings, sentry briefings)
+const SYSTEM_CONTENT_PREFIXES = [
+  { prefix: 'SENTRY BRIEFING', label: 'Sentry Recovery', icon: 'shield' as const },
+  { prefix: 'SYSTEM ALERT', label: 'System Alert', icon: 'shield' as const },
+  { prefix: '[HEARTBEAT]', label: 'Heartbeat', icon: 'heartbeat' as const },
+  { prefix: '[SYSTEM AUTO-JOURNAL', label: 'Journal Reminder', icon: 'radio' as const },
 ] as const;
-
-// Phrases that indicate a response to a heartbeat nudge (not real task content)
-const HEARTBEAT_RESPONSE_PHRASES = [
-  'Status: COMPLETE and IDLE',
-  'COMPLETE and IDLE',
-  'No new tasks in the mailbox',
-  'Waiting for next assignment from supervisor',
-  'Recovery complete. Status:',
-  'No recovery context files',
-  'Already consumed that output',
-  'No action needed on this stale notification',
-  'Awaiting further instructions from the supervisor',
-  'Awaiting further instructions from supervisor',
-  'No pending work',
-  'Resuming normal operations',
-  'my task is fully complete',
-  'task is fully complete',
-  'Task completed. Awaiting',
-  'compaction summary',
-];
 
 const SYSTEM_AGENTS = new Set(['health', 'monitor', 'system']);
 
@@ -51,6 +31,11 @@ type SystemIcon = 'heartbeat' | 'shield' | 'radio';
 
 export function getSystemNotificationInfo(message: Message): { label: string; icon: SystemIcon; summary: string } | null {
   const content = message.content.trim();
+
+  // Primary: check message.type === 'system' (set by backend when agent prefixes with [SYS])
+  if (message.type === 'system') {
+    return { label: 'System', icon: 'radio', summary: getFirstSentence(content) };
+  }
 
   // Check from_agent for system sources
   if (SYSTEM_AGENTS.has(message.from_agent)) {
@@ -60,18 +45,11 @@ export function getSystemNotificationInfo(message: Message): { label: string; ic
     return { label: 'System Message', icon: 'radio', summary: getFirstSentence(content) };
   }
 
-  // Check content patterns
-  for (const pattern of SYSTEM_PATTERNS) {
-    if (pattern.test(content)) {
-      return { label: pattern.label, icon: pattern.icon, summary: getFirstSentence(content) };
+  // Fallback: check fixed content prefixes for legacy/incoming system messages
+  for (const { prefix, label, icon } of SYSTEM_CONTENT_PREFIXES) {
+    if (content.startsWith(prefix)) {
+      return { label, icon, summary: getFirstSentence(content) };
     }
-  }
-
-  // Check for heartbeat/compaction RESPONSES from any agent (supervisors AND workers)
-  if (HEARTBEAT_RESPONSE_PHRASES.some(phrase => content.includes(phrase))) {
-    const isSupervisorAgent = message.from_agent.startsWith('sup-') || message.from_agent === 'supervisor';
-    const label = isSupervisorAgent ? 'Heartbeat Response' : 'Agent Recovery';
-    return { label, icon: 'heartbeat', summary: getFirstSentence(content) };
   }
 
   return null;
