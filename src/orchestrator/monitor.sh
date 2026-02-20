@@ -78,7 +78,9 @@ log_fail() {
 #───────────────────────────────────────────────────────────────────────────────
 
 is_server_running() {
-    curl -sf "http://localhost:${CMUX_PORT}/api/webhooks/health" >/dev/null 2>&1
+    # Verify the response is actually CMUX, not just any server on the port.
+    # A rogue process binding to CMUX_PORT would pass a simple connectivity check.
+    curl -sf "http://localhost:${CMUX_PORT}/api/webhooks/health" 2>/dev/null | grep -q '"api":"healthy"'
 }
 
 start_server() {

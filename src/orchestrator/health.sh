@@ -52,7 +52,9 @@ run_with_timeout() {
 }
 
 check_server_health() {
-    if curl -sf "http://localhost:${CMUX_PORT}/api/webhooks/health" >/dev/null 2>&1; then
+    # Verify the response is actually CMUX, not just any server on the port.
+    # A rogue process binding to CMUX_PORT would pass a simple connectivity check.
+    if curl -sf "http://localhost:${CMUX_PORT}/api/webhooks/health" 2>/dev/null | grep -q '"api":"healthy"'; then
         return 0
     else
         return 1
