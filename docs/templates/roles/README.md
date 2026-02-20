@@ -16,6 +16,7 @@ This directory contains role templates that define agent behavior, mindset, and 
 | [INFRA_WORKER](INFRA_WORKER.md) | Provisions infrastructure | Platform Team |
 | [DEVOPS_WORKER](DEVOPS_WORKER.md) | Builds CI/CD and automation | Platform Team |
 | [TESTER](TESTER.md) | Validates implementations | Squad, Feature Team |
+| [REVIEWER](REVIEWER.md) | Reviews decisions for workers | Any (short-lived) |
 
 ## How to Use
 

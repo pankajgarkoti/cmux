@@ -509,7 +509,7 @@ When a worker sends a `[REVIEW-REQUEST]` to you via mailbox, they need a decisio
 Naming convention: `reviewer-<topic>` (e.g., `reviewer-auth-approach`, `reviewer-locking-strategy`)
 
 ```bash
-./tools/workers spawn "reviewer-<topic>" "Read docs/REVIEWER_ROLE.md first. Then review: <paste the worker's REVIEW-REQUEST here>"
+./tools/workers spawn "reviewer-<topic>" "Read docs/templates/roles/REVIEWER.md first. Then review: <paste the worker's REVIEW-REQUEST here>"
 ```
 
 Include the full text of the worker's `[REVIEW-REQUEST]` so the reviewer has complete context.
@@ -523,7 +523,7 @@ agent status updates. My proposed approach: WebSockets via the existing connecti
 Relevant files: src/server/websocket/manager.py, src/frontend/src/hooks/useWebSocket.ts
 
 # You spawn:
-./tools/workers spawn "reviewer-realtime-transport" "Read docs/REVIEWER_ROLE.md first. Then review: [REVIEW-REQUEST] Whether to use WebSockets or SSE for real-time agent status updates. Worker's proposed approach: WebSockets via the existing connection manager. Relevant files: src/server/websocket/manager.py, src/frontend/src/hooks/useWebSocket.ts"
+./tools/workers spawn "reviewer-realtime-transport" "Read docs/templates/roles/REVIEWER.md first. Then review: [REVIEW-REQUEST] Whether to use WebSockets or SSE for real-time agent status updates. Worker's proposed approach: WebSockets via the existing connection manager. Relevant files: src/server/websocket/manager.py, src/frontend/src/hooks/useWebSocket.ts"
 ```
 
 ### After the Review
