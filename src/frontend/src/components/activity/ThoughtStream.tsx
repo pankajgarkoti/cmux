@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useThoughtStore, type Thought } from '@/stores/thoughtStore';
 import { useAgentStore } from '@/stores/agentStore';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -33,8 +33,6 @@ function ThoughtItem({ thought }: { thought: Thought }) {
 export function ThoughtStream() {
   const thoughts = useThoughtStore((s) => s.thoughts);
   const { selectedAgentId, agents } = useAgentStore();
-  const viewportRef = useRef<HTMLDivElement>(null);
-
   // Only show reasoning entries with actual content (agent's thinking text).
   // tool_result entries and empty reasoning entries are tool call data — they belong in Events.
   // When an agent is selected, filter thoughts to that agent only.
@@ -50,16 +48,8 @@ export function ThoughtStream() {
           t.agent_name.toLowerCase() === agentName.toLowerCase()
       );
     }
-    return filtered;
+    return [...filtered].reverse();
   }, [thoughts, selectedAgentId, agents]);
-
-  // Auto-scroll to bottom when new thoughts arrive
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, [reasoningThoughts.length]);
 
   if (reasoningThoughts.length === 0) {
     return (
@@ -75,7 +65,7 @@ export function ThoughtStream() {
   }
 
   return (
-    <ScrollArea className="h-full" viewportRef={viewportRef}>
+    <ScrollArea className="h-full">
       <div className="py-1">
         {reasoningThoughts.map((thought) => (
           <ThoughtItem key={thought.id} thought={thought} />

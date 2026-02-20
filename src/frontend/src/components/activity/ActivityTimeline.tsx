@@ -78,13 +78,17 @@ export function ActivityTimeline() {
         }
       />
 
-      <Tabs defaultValue="activity" className="flex-1 flex flex-col overflow-hidden">
+      <Tabs defaultValue="thoughts" className="flex-1 flex flex-col overflow-hidden">
         <div className="px-3 pt-1">
           <TabsList className="h-7 w-full">
-            <TabsTrigger value="activity" className="text-xs h-5 flex-1">Events</TabsTrigger>
             <TabsTrigger value="thoughts" className="text-xs h-5 flex-1">Thoughts</TabsTrigger>
+            <TabsTrigger value="activity" className="text-xs h-5 flex-1">Events</TabsTrigger>
           </TabsList>
         </div>
+
+        <TabsContent value="thoughts" className="flex-1 overflow-hidden mt-0">
+          <ThoughtStream />
+        </TabsContent>
 
         <TabsContent value="activity" className="flex-1 overflow-hidden mt-0">
           <ScrollArea className="flex-1 h-full">
@@ -112,10 +116,6 @@ export function ActivityTimeline() {
               )}
             </div>
           </ScrollArea>
-        </TabsContent>
-
-        <TabsContent value="thoughts" className="flex-1 overflow-hidden mt-0">
-          <ThoughtStream />
         </TabsContent>
       </Tabs>
     </div>
