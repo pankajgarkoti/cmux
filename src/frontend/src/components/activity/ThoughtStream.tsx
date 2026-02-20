@@ -1,5 +1,6 @@
 import { useEffect, useRef, useMemo } from 'react';
 import { useThoughtStore, type Thought } from '@/stores/thoughtStore';
+import { useAgentStore } from '@/stores/agentStore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Brain } from 'lucide-react';
 
@@ -31,14 +32,26 @@ function ThoughtItem({ thought }: { thought: Thought }) {
 
 export function ThoughtStream() {
   const thoughts = useThoughtStore((s) => s.thoughts);
+  const { selectedAgentId, agents } = useAgentStore();
   const viewportRef = useRef<HTMLDivElement>(null);
 
   // Only show reasoning entries with actual content (agent's thinking text).
   // tool_result entries and empty reasoning entries are tool call data — they belong in Events.
-  const reasoningThoughts = useMemo(
-    () => thoughts.filter((t) => t.thought_type === 'reasoning' && t.content),
-    [thoughts]
-  );
+  // When an agent is selected, filter thoughts to that agent only.
+  const reasoningThoughts = useMemo(() => {
+    let filtered = thoughts.filter((t) => t.thought_type === 'reasoning' && t.content);
+    if (selectedAgentId) {
+      const agent = agents.find((a) => a.id === selectedAgentId);
+      const agentName = agent?.name || agent?.display_name || selectedAgentId;
+      filtered = filtered.filter(
+        (t) =>
+          t.agent_name === selectedAgentId ||
+          t.agent_name === agentName ||
+          t.agent_name.toLowerCase() === agentName.toLowerCase()
+      );
+    }
+    return filtered;
+  }, [thoughts, selectedAgentId, agents]);
 
   // Auto-scroll to bottom when new thoughts arrive
   useEffect(() => {

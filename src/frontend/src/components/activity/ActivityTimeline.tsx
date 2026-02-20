@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useActivity } from '@/hooks/useActivity';
 import { useLayoutStore } from '@/stores/layoutStore';
 import { useProjectStore } from '@/stores/projectStore';
+import { useAgentStore } from '@/stores/agentStore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -18,7 +19,14 @@ export function ActivityTimeline() {
   const { activities } = useActivity();
   const { activityPanelCollapsed, toggleActivityPanel } = useLayoutStore();
   const { selectedProjectId } = useProjectStore();
+  const { selectedAgentId, agents } = useAgentStore();
   const [filters, setFilters] = useState<ActivityType[]>([]);
+
+  // Compute panel title based on selected agent
+  const selectedAgent = selectedAgentId ? agents.find((a) => a.id === selectedAgentId) : null;
+  const panelTitle = selectedAgent
+    ? `Activity: ${selectedAgent.display_name || selectedAgent.name}`
+    : 'Activity';
 
   // Filter activities
   const filteredActivities =
@@ -53,7 +61,7 @@ export function ActivityTimeline() {
   return (
     <div className="h-full flex flex-col">
       <PanelHeader
-        title="Activity"
+        title={panelTitle}
         actions={
           <div className="flex items-center gap-1">
             <ActivityFilters activeFilters={filters} onFiltersChange={setFilters} />

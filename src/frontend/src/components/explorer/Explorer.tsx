@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { ChevronRight, Bot, FolderOpen, RefreshCw, Plus, Archive, Package } from 'lucide-react';
+import { ChevronRight, Bot, FolderOpen, RefreshCw, Plus, Archive, Package, LayoutDashboard } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -223,6 +223,19 @@ export function Explorer() {
               </Button>
             </div>
             <div className="mt-1">
+              {/* Command Center - always visible at top */}
+              <button
+                onClick={() => selectAgent(null)}
+                className={cn(
+                  'w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md transition-colors text-left mb-1',
+                  'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                  !selectedAgentId && !viewingArchivedId && 'bg-sidebar-accent text-sidebar-accent-foreground'
+                )}
+              >
+                <LayoutDashboard className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                <span className="truncate flex-1 font-medium">Command Center</span>
+              </button>
+
               {agentsLoading ? (
                 <div className="space-y-2 px-2">
                   <Skeleton className="h-7 w-full" />
