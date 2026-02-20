@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { ChevronRight, Bot, FolderOpen, RefreshCw, Plus, Users, Archive, Package, ChevronDown } from 'lucide-react';
+import { ChevronRight, Bot, FolderOpen, RefreshCw, Plus, Archive, Package } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -11,13 +11,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -49,7 +42,6 @@ interface ProjectGroup {
 }
 
 export function Explorer() {
-  const [agentsOpen, setAgentsOpen] = useState(true);
   const [archivedOpen, setArchivedOpen] = useState(false);
   // const [mailboxOpen, setMailboxOpen] = useState(true); // Hidden: mailbox panel disabled
   const [memoryOpen, setMemoryOpen] = useState(true);
@@ -58,7 +50,7 @@ export function Explorer() {
   const [newSessionTask, setNewSessionTask] = useState('');
 
   const { selectedAgentId, selectAgent, archivedAgents, setArchivedAgents, viewingArchivedId, viewArchive } = useAgentStore();
-  const { selectedProjectId, selectProject } = useProjectStore();
+  const { selectedProjectId } = useProjectStore();
   const { selectedFile, setSelectedFile } = useViewerStore();
   const { data: agentsData, isLoading: agentsLoading, error: agentsError } = useAgents();
   const { data: projectsData } = useProjects();
@@ -210,69 +202,27 @@ export function Explorer() {
     <div className="h-full flex flex-col">
       <ScrollArea className="flex-1">
         <div className="p-2">
-          {/* PROJECT SWITCHER */}
-          {projects.length > 0 && (
-            <ProjectSwitcher
-              projects={projects}
-              selectedProjectId={selectedProjectId}
-              onSelectProject={selectProject}
-              agentsByProject={projectGroups}
-            />
-          )}
-
           {/* AGENTS Section */}
           <Dialog open={createSessionOpen} onOpenChange={setCreateSessionOpen}>
-            <Collapsible open={agentsOpen} onOpenChange={setAgentsOpen}>
-              <div className="flex items-center">
-                <CollapsibleTrigger asChild>
-                  <button className="flex-1 flex items-center gap-1 px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/70 hover:text-sidebar-foreground">
-                    <ChevronRight
-                      className={cn(
-                        'h-3.5 w-3.5 transition-transform',
-                        agentsOpen && 'rotate-90'
-                      )}
-                    />
-                    <Bot className="h-3.5 w-3.5" />
-                    <span>Agents</span>
-                    <span className="ml-auto text-[10px] font-normal text-muted-foreground">
-                      {totalAgents}
-                    </span>
-                  </button>
-                </CollapsibleTrigger>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 mr-1"
-                  onClick={() => setCreateSessionOpen(true)}
-                  title="Create new session"
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
+            <div className="flex items-center">
+              <div className="flex-1 flex items-center gap-1 px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/70">
+                <Bot className="h-3.5 w-3.5" />
+                <span>Agents</span>
+                <span className="ml-auto text-[10px] font-normal text-muted-foreground">
+                  {totalAgents}
+                </span>
               </div>
-            <CollapsibleContent className="mt-1">
-              {/* All Agents view - hidden, supervisor view is sufficient
-              <button
-                onClick={() => selectAgent(null)}
-                className={cn(
-                  'w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors text-left mb-2',
-                  'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                  selectedAgentId === null && 'bg-sidebar-accent text-sidebar-accent-foreground'
-                )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 mr-1"
+                onClick={() => setCreateSessionOpen(true)}
+                title="Create new session"
               >
-                <Users className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                <span className="truncate flex-1">All Agents</span>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    'text-[10px] h-4 px-1',
-                    selectedAgentId === null ? 'border-blue-500/50 text-blue-600' : 'border-muted'
-                  )}
-                >
-                  ALL
-                </Badge>
-              </button>
-              */}
-
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+            <div className="mt-1">
               {agentsLoading ? (
                 <div className="space-y-2 px-2">
                   <Skeleton className="h-7 w-full" />
@@ -294,8 +244,7 @@ export function Explorer() {
                   ))}
                 </div>
               )}
-            </CollapsibleContent>
-            </Collapsible>
+            </div>
 
             {/* Create Session Dialog */}
             <DialogContent>
@@ -462,74 +411,6 @@ export function Explorer() {
           </Collapsible>
         </div>
       </ScrollArea>
-    </div>
-  );
-}
-
-function ProjectSwitcher({
-  projects,
-  selectedProjectId,
-  onSelectProject,
-  agentsByProject,
-}: {
-  projects: Project[];
-  selectedProjectId: string | null;
-  onSelectProject: (id: string | null) => void;
-  agentsByProject: ProjectGroup[];
-}) {
-  const selectedProject = selectedProjectId
-    ? projects.find(p => p.id === selectedProjectId)
-    : null;
-
-  const getAgentCount = (projectId: string) => {
-    const group = agentsByProject.find(g => g.projectId === projectId);
-    return group?.agents.length ?? 0;
-  };
-
-  return (
-    <div className="mb-3">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="w-full flex items-center gap-2 px-2 py-2 text-sm rounded-md border border-border/50 hover:bg-sidebar-accent transition-colors">
-            <Package className="h-4 w-4 text-blue-500 flex-shrink-0" />
-            <span className="truncate flex-1 text-left font-medium">
-              {selectedProject ? selectedProject.name : 'All Projects'}
-            </span>
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56">
-          <DropdownMenuItem
-            onClick={() => onSelectProject(null)}
-            className={cn(!selectedProjectId && 'bg-accent')}
-          >
-            <Users className="h-4 w-4 mr-2 text-blue-500" />
-            <span className="flex-1">All Projects</span>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          {projects.map((project) => (
-            <DropdownMenuItem
-              key={project.id}
-              onClick={() => onSelectProject(project.id)}
-              className={cn(selectedProjectId === project.id && 'bg-accent')}
-            >
-              <Package className="h-4 w-4 mr-2 text-muted-foreground" />
-              <span className="flex-1 truncate">{project.name}</span>
-              <span className="text-[10px] text-muted-foreground ml-1">
-                {getAgentCount(project.id)}
-              </span>
-              {project.is_self && (
-                <Badge variant="outline" className="text-[9px] h-3.5 px-1 ml-1 border-blue-500/50 text-blue-500">
-                  self
-                </Badge>
-              )}
-              {project.active && (
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 ml-1 flex-shrink-0" />
-              )}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
     </div>
   );
 }
