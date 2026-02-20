@@ -48,5 +48,35 @@
     "display_name": "sup-todo-frontend",
     "role": "project-supervisor",
     "project_id": "todo-frontend"
+  },
+  "worker-mention-fix": {
+    "registered_at": "2026-02-20T23:40:04Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-20T23:40:04Z",
+    "agent_id": "ag_pu3dyn7j",
+    "display_name": "worker-mention-fix",
+    "role": "worker",
+    "project_id": "cmux"
+  },
+  "worker-health-resilience": {
+    "registered_at": "2026-02-20T23:40:14Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-20T23:40:14Z",
+    "agent_id": "ag_7a7h2w00",
+    "display_name": "worker-health-resilience",
+    "role": "worker",
+    "project_id": "cmux"
+  },
+  "worker-task-system": {
+    "registered_at": "2026-02-20T23:40:26Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-20T23:40:26Z",
+    "agent_id": "ag_29yha9ad",
+    "display_name": "worker-task-system",
+    "role": "worker",
+    "project_id": "cmux"
   }
 }

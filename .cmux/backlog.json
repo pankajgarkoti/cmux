@@ -38,5 +38,65 @@
     "status": "in_progress",
     "created_at": "2026-02-20T05:46:21Z",
     "completed_at": null
+  },
+  {
+    "id": 5,
+    "title": "Rewrite heartbeat system",
+    "description": "Escalate to sentry faster, auto-spawn work when idle, not just nudge endlessly at a dead prompt",
+    "priority": 1,
+    "source": "self",
+    "status": "pending",
+    "created_at": "2026-02-20T23:40:57Z",
+    "completed_at": null
+  },
+  {
+    "id": 6,
+    "title": "Port reservation enforcement",
+    "description": "Reject or warn when workers try to bind port 8000 — CMUX reserved port",
+    "priority": 2,
+    "source": "self",
+    "status": "pending",
+    "created_at": "2026-02-20T23:40:57Z",
+    "completed_at": null
+  },
+  {
+    "id": 7,
+    "title": "Dashboard @mention routing",
+    "description": "Parse @agent-name mentions in dashboard messages and route to tagged agents directly instead of treating as plain text",
+    "priority": 3,
+    "source": "self",
+    "status": "pending",
+    "created_at": "2026-02-20T23:40:57Z",
+    "completed_at": null
+  },
+  {
+    "id": 8,
+    "title": "Research long-running agent architectures",
+    "description": "Study how others build persistent autonomous agents — memory systems, self-improvement loops, failure recovery patterns. Check papers, blog posts, open-source projects. Save findings as artifact and use to evolve CMUX role docs.",
+    "priority": 2,
+    "source": "self",
+    "status": "pending",
+    "created_at": "2026-02-20T23:45:15Z",
+    "completed_at": null
+  },
+  {
+    "id": 9,
+    "title": "Evolve role docs from observed failures",
+    "description": "Review today's failures (5hr idle, port conflict, no auto-recovery, compaction loops) and update SUPERVISOR_ROLE.md, WORKER_ROLE.md, and monitor docs with lessons learned. Make the docs encode hard-won knowledge.",
+    "priority": 2,
+    "source": "self",
+    "status": "pending",
+    "created_at": "2026-02-20T23:45:15Z",
+    "completed_at": null
+  },
+  {
+    "id": 10,
+    "title": "Implement heartbeat redesign",
+    "description": "Rewrite monitor.sh heartbeat to inject autonomy-check results + force-feed backlog tasks instead of just nudging. No compaction on idle. See journal decision for full spec.",
+    "priority": 1,
+    "source": "self",
+    "status": "pending",
+    "created_at": "2026-02-20T23:45:15Z",
+    "completed_at": null
   }
 ]

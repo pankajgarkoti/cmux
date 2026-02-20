@@ -98,3 +98,33 @@ Investigated two issues reported by user. (1) CMUX crash: previous supervisor to
 
 ## 04:54 - Reported findings to user
 Presented root cause analysis for both issues to the user. CMUX crash caused by port 8000 conflict (todo-backend replaced CMUX server). Auto-recovery failed because health.sh is orphaned dead code never started by the system, and monitor.sh health check is a generic port probe with no service identity verification. @ mention rendering bug traced to bg-primary/15 text-primary CSS in ChatMessage.tsx:108 and MarkdownContent.tsx:32 — zero contrast on dark bubble background. Proposed three fixes: mention CSS contrast, health check identity verification, and port guard policy. Awaiting user decision on spawning workers.
+
+## 05:10 - Decision: Proactive execution mandate
+**Decision:** Proactive execution mandate
+
+**Rationale:** User reinforced that Supervisor Prime must act as CEO — drive work proactively, create own tasks, never ask permission for obvious next steps. Previous supervisor sat idle 5+ hours ignoring heartbeat nudges. Three workers spawned immediately without asking: worker-mention-fix (CSS contrast bug), worker-health-resilience (health check identity + port guard + health.sh integration), worker-task-system (enhanced task management with delegation tracking, hierarchy, priorities). Going forward: see problem, spawn worker, report results. No more 'want me to do X?'
+
+## 05:10 - Starting: Fix invisible @mention rendering bug in user message bubbles
+
+## 05:11 - Starting: Enhance CMUX task management system with priority, source tracking, dashboard, and backlog import
+
+## 05:11 - Starting health resilience tasks: 1) Fix health check identity verification, 2) Add port guard warnings, 3) Merge health.sh recovery logic into monitor.sh
+
+## 05:12 - Health resilience: merged recovery logic
+Merged health.sh's multi-stage recovery (restart → healthy commit rollback → progressive rollback) into monitor.sh's attempt_recovery(). Added helper functions for healthy commit tracking, pre-rollback journaling, supervisor notification, and server stop/restart. Also added identity verification to health checks (grep for api:healthy) and port reservation warnings to worker/project supervisor context templates.
+
+## 05:13 - Fixed @mention visibility bug. User message mentions now use text-primary-foreground (dark) instead of text-primary (light=invisible). Agent message mentions bumped to bg-primary/20 for stronger tint. Commit 37a9f41.
+
+## 05:13 - Mention badge visibility fix complete
+Fixed the invisible @mention rendering bug in the CMUX dashboard. The root cause was that user message bubbles use bg-primary (which resolves to light rgb(248,250,252) in dark mode) and mention badges used text-primary (same light color), creating zero contrast. Changed ChatMessage.tsx renderWithMentions to use bg-primary-foreground/20 text-primary-foreground for dark text on light bubbles. Also bumped MarkdownContent.tsx agent-side mentions from bg-primary/15 to bg-primary/20 for slightly stronger badge tint. Verified via typecheck, build, and Chrome MCP computed style inspection. Commit 37a9f41.
+
+## 05:14 - Task system enhancement in progress
+Enhancing tools/tasks with priority levels (critical/high/medium/low), source tracking (user/backlog/self-generated/worker-escalation/system), new statuses (review/failed), dashboard command, import-backlog command, and --task flag for tools/workers spawn. DB migration handles existing .cmux/tasks.db by adding priority and source columns via ALTER TABLE.
+
+## 05:15 - Decision: Heartbeat redesign: no compaction, task injection instead
+**Decision:** Heartbeat redesign: no compaction, task injection instead
+
+**Rationale:** User vetoed the compaction-on-idle approach — morning session had infinite compact loops that broke everything. New approach: heartbeat escalation should inject work, not restart/compact. Escalation ladder: (1) nudge with autonomy-check results, (2) force-feed highest-priority backlog item into prompt, (3) only compact when context is genuinely full. The idle autonomy loop: check mailbox → check workers → spot-check project supervisors → check backlog → self-improvement research → maintenance. Compaction is a last resort for context limits, never an idle response.
+
+## 05:16 - Task system enhancement complete
+Enhanced tools/tasks with: (1) priority levels (critical/high/medium/low) with colored output and sort ordering, (2) source tracking (user/backlog/self-generated/worker-escalation/system), (3) review and failed statuses, (4) tasks dashboard command, (5) tasks import-backlog command, (6) --task flag on workers spawn for task linking, (7) DB migration for existing tasks.db. All features tested with full integration test. Commit: 7bfaa92.
