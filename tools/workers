@@ -138,6 +138,11 @@ cmd_spawn() {
         worktree_branch="feat/${name}"
         worktree_path="${HOME}/.cmux/worktrees/${wt_project}/${name}"
 
+        # NOTE: The worktree branches from HEAD (the currently checked out branch).
+        # For the branching model to work correctly, the supervisor MUST checkout
+        # their integration branch (e.g. feat/<batch-name>) BEFORE spawning workers.
+        # Workers then branch from the integration branch, not from main.
+
         if [[ -d "$worktree_path" ]]; then
             info "Reusing existing worktree at $worktree_path"
         else
@@ -280,7 +285,9 @@ EOF
         cat >> "$context_file" << WTEOF
 
 WORKTREE:
-You are working in a git worktree at ${worktree_path} on branch ${worktree_branch}. Commit your work to this branch. Do not switch branches. Your supervisor will handle merging.
+You are on branch ${worktree_branch}, branched from the supervisor's integration branch.
+Commit your work here. Do not switch branches. Do not merge into main.
+Your supervisor will merge your branch back into the integration branch when you report [DONE].
 WTEOF
     fi
 
