@@ -287,7 +287,7 @@ launch_project_supervisors() {
             continue
         fi
 
-        info "Activating project supervisor: $project_id"
+        log_step "Activating project supervisor: $project_id"
         # Use tools/projects activate which handles the full lifecycle
         "${CMUX_PROJECT_ROOT}/tools/projects" activate "$project_id" || {
             log_warn "Failed to activate project: $project_id"
