@@ -10,6 +10,7 @@ import { TooltipProvider } from './components/ui/tooltip';
 import { OnboardingModal } from './components/onboarding/OnboardingModal';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useAgentEvents } from './hooks/useAgentEvents';
+import { useThoughts } from './hooks/useThoughts';
 import { useThemeStore } from './stores/themeStore';
 
 const queryClient = new QueryClient({
@@ -24,6 +25,7 @@ const queryClient = new QueryClient({
 function Dashboard() {
   useWebSocket();
   useAgentEvents(); // Load historical events on app start
+  useThoughts(); // Load historical thoughts so they persist across refreshes
   const theme = useThemeStore((state) => state.theme);
 
   // Apply theme on mount and when it changes

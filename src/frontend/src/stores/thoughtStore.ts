@@ -16,6 +16,7 @@ const MAX_THOUGHTS = 50;
 interface ThoughtState {
   thoughts: Thought[];
   addThought: (thought: Thought) => void;
+  addThoughts: (thoughts: Thought[]) => void;
   clear: () => void;
 }
 
@@ -31,6 +32,18 @@ export const useThoughtStore = create<ThoughtState>((set) => ({
       return {
         thoughts: [...state.thoughts, thought].slice(-MAX_THOUGHTS),
       };
+    }),
+
+  addThoughts: (newThoughts) =>
+    set((state) => {
+      const existingIds = new Set(state.thoughts.map((t) => t.id));
+      const unique = newThoughts.filter((t) => !existingIds.has(t.id));
+      if (unique.length === 0) return state;
+      // Merge and sort by timestamp, keep most recent MAX_THOUGHTS
+      const merged = [...state.thoughts, ...unique]
+        .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+        .slice(-MAX_THOUGHTS);
+      return { thoughts: merged };
     }),
 
   clear: () => set({ thoughts: [] }),
