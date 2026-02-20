@@ -15,7 +15,7 @@ export function useActivity() {
 
     // Filter by project first (if a project is selected)
     if (selectedProjectId && projectAgentsData?.agents) {
-      const projectAgentIds = new Set(projectAgentsData.agents);
+      const projectAgentIds = new Set(projectAgentsData.agents.map(a => a.key));
       filtered = filtered.filter((a) => projectAgentIds.has(a.agent_id));
     }
 

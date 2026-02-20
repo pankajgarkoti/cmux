@@ -265,7 +265,7 @@ export const api = {
     return res.json();
   },
 
-  async getThoughts(limit = 200): Promise<{ thoughts: Array<{
+  async getThoughts(limit = 200, agentName?: string): Promise<{ thoughts: Array<{
     id: string;
     agent_name: string;
     thought_type: string;
@@ -275,7 +275,9 @@ export const api = {
     tool_response?: string | null;
     timestamp: string;
   }>; count: number }> {
-    const res = await fetch(`${API_BASE}/api/thoughts?limit=${limit}`);
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (agentName) params.set('agent_name', agentName);
+    const res = await fetch(`${API_BASE}/api/thoughts?${params}`);
     if (!res.ok) throw new Error('Failed to fetch thoughts');
     return res.json();
   },

@@ -23,8 +23,18 @@ export interface ProjectCreate {
   description?: string;
 }
 
+export interface ProjectAgent {
+  key: string;
+  registered_at: string;
+  type: string;
+  agent_id: string;
+  display_name: string;
+  role: string;
+  project_id: string;
+}
+
 export interface ProjectAgentsResponse {
   project_id: string;
-  agents: string[];
+  agents: ProjectAgent[];
   total: number;
 }

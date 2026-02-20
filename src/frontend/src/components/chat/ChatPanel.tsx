@@ -35,7 +35,7 @@ export function ChatPanel() {
   // Build set of agent IDs for the selected project
   const projectAgentIds = useMemo(() => {
     if (!selectedProjectId || !projectAgentsData?.agents) return null;
-    return new Set(projectAgentsData.agents);
+    return new Set(projectAgentsData.agents.map(a => a.key));
   }, [selectedProjectId, projectAgentsData]);
 
   // Filter messages for selected agent: show only user <-> agent conversation

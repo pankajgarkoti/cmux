@@ -25,10 +25,7 @@ export function AgentActivityIndicator({
     Object.entries(latestEventBySession).filter(
       ([sessionId, event]) => {
         if (!agentId) return isAgentActive(sessionId);
-        const matchesAgent =
-          sessionId.toLowerCase().includes(agentId.toLowerCase()) ||
-          event.agent_id === agentId;
-        return matchesAgent && isAgentActive(sessionId);
+        return event.agent_id === agentId && isAgentActive(sessionId);
       }
     ),
     [agentId, latestEventBySession, isAgentActive]
