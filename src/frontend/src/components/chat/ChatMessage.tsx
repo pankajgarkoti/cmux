@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/tooltip';
 import { MarkdownContent } from './MarkdownContent';
 import { MessageActions } from './MessageActions';
+import { useAgentStore } from '@/stores/agentStore';
 import { Bot, User, ChevronDown, ChevronUp, HeartPulse, ShieldAlert, Radio } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { InterleavedTimeline } from './InterleavedTimeline';
@@ -207,6 +208,7 @@ function SystemNotification({ message, info, collapseCount }: { message: Message
 
 export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: ChatMessageProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const agents = useAgentStore((s) => s.agents);
 
   // Check if this is a system notification (heartbeat ping, sentry briefing, etc.)
   const systemInfo = getSystemNotificationInfo(message);
@@ -270,7 +272,10 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
               variant="outline"
               className="text-[10px] h-4 px-1 border-current/20"
             >
-              {message.from_agent === 'supervisor' ? 'SUP' : 'WRK'}
+              {(() => {
+                const agentData = agents.find(a => a.name === message.from_agent || a.id === message.from_agent);
+                return agentData?.type === 'supervisor' || agentData?.role === 'project-supervisor' ? 'SUP' : 'WRK';
+              })()}
             </Badge>
           )}
           <Tooltip>
