@@ -112,19 +112,20 @@ async def send_message_to_agent(agent_id: str, message: AgentMessage):
     # Also broadcast the full message for chat UI
     await ws_manager.broadcast("new_message", msg.model_dump(mode="json"))
 
-    # Silently route @mentions to mentioned agents
-    mentioned_names = MENTION_PATTERN.findall(message.content)
-    for name in set(mentioned_names):
-        if name == agent_id:
-            continue
-        mentioned_agent = await agent_manager.get_agent(name)
-        if mentioned_agent:
-            mention_content = f"[cmux:user] @you: {message.content}"
-            await tmux_service.send_input(
-                mentioned_agent.tmux_window, mention_content,
-                session=mentioned_agent.session,
-            )
-            logger.info(f"@mention routed message to {name}")
+    # Silently route @mentions to mentioned agents (only in Command Center)
+    if agent_id == "supervisor":
+        mentioned_names = MENTION_PATTERN.findall(message.content)
+        for name in set(mentioned_names):
+            if name == agent_id:
+                continue
+            mentioned_agent = await agent_manager.get_agent(name)
+            if mentioned_agent:
+                mention_content = f"[cmux:user] @you: {message.content}"
+                await tmux_service.send_input(
+                    mentioned_agent.tmux_window, mention_content,
+                    session=mentioned_agent.session,
+                )
+                logger.info(f"@mention routed message to {name}")
 
     return {"success": True, "agent_id": agent_id, "message_id": msg.id}
 
