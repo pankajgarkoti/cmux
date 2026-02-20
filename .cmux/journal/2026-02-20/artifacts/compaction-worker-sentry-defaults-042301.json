@@ -1,0 +1,20 @@
+{
+  "agent_name": "worker-sentry-defaults",
+  "timestamp": "2026-02-19T22:53:01Z",
+  "files_modified": [
+    ".cmux/.log_markers/cmux-server.log.marker",
+    ".cmux/.log_markers/router.log.marker",
+    ".cmux/.router_line",
+    ".cmux/agent_registry.json",
+    ".cmux/conversations.db",
+    ".cmux/mailbox"
+  ],
+  "current_task": "",
+  "open_questions": [],
+  "git_branch": "main",
+  "uncommitted_changes": true,
+  "git_status": " M .cmux/.log_markers/cmux-server.log.marker\n M .cmux/.log_markers/router.log.marker\n M .cmux/.router_line\n M .cmux/agent_registry.json\n M .cmux/conversations.db\n M .cmux/mailbox\n?? .cmux/.supervisor-heartbeat\n?? .cmux/journal/2026-02-19/\n?? .cmux/journal/2026-02-20/\n?? .cmux/worker-contexts/worker-audit-log-context.md\n?? .cmux/worker-contexts/worker-compact-daemon-context.md\n?? .cmux/worker-contexts/worker-compact-investigate-context.md\n?? .cmux/worker-contexts/worker-compact-recovery-context.md\n?? .cmux/worker-contexts/worker-filter-button-context.md\n?? .cmux/worker-contexts/worker-filter-menu-context.md\n?? .cmux/worker-contexts/worker-flock-mailbox-context.md\n?? .cmux/worker-contexts/worker-health-timeout-context.md\n?? .cmux/worker-contexts/worker-heart-button-context.md\n?? .cmux/worker-contexts/worker-inline-thoughts-context.md\n?? .cmux/worker-contexts/worker-sentry-defaults-context.md\n?? .cmux/worker-contexts/worker-sqlite-wal-context.md\n?? .cmux/worker-contexts/worker-stop-gate-context.md\n?? .cmux/worker-contexts/worker-structured-compaction-context.md\n?? .cmux/worker-contexts/worker-supervisor-heartbeat-context.md\n?? .cmux/worker-contexts/worker-task-lifecycle-context.md\n?? .cmux/worker-contexts/worker-thought-stream-context.md\n?? .cmux/worker-contexts/worker-thoughts-persist-context.md\n?? .cmux/worker-contexts/worker-thoughts-scroll-context.md\n?? .cmux/worker-contexts/worker-timezone-fix-context.md\n?? .cmux/worker-contexts/worker-update-role-docs-context.md",
+  "terminal_snapshot": "\n    ✻\n    |\n   ▟█▙     Claude Code v2.1.47\n ▐▛███▜▌   Opus 4.6 · Claude Max\n▝▜█████▛▘  ~/Desktop/code/oss/cmux\n  ▘▘ ▝▝\n\n✻ Conversation compacted (ctrl+o for history)\n\n\n❯ /compact\n  ⎿  Compacted (ctrl+o to see full summary)\n     PreCompact [$(git rev-parse --show-toplevel)/.claude/hooks/pre-compact.sh] completed successfully:\n     /Users/pankajgarkoti/Desktop/code/oss/cmux/.cmux/journal/2026-02-20/artifacts/compaction-4ae631a6-25b4-45ae-9ca3-de57c60b2c72-041240.json\n     Tip: You have access to Opus 1M with 5x more context · Billed as extra usage\n  ⎿  Referenced file src/orchestrator/monitor.sh\n  ⎿  Read .cmux/worker-contexts/worker-sentry-defaults-context.md (20 lines)\n  ⎿  Read docs/WORKER_ROLE.md (280 lines)\n\n❯ You were just compacted. Read your recovery context from .cmux/journal/2026-02-20/artifacts/compaction-worker-sentry-defaults-*.json (most recent one). Also check your conversation history via GET\n  /api/agents/worker-sentry-defaults/history if anything is unclear.\n\n⏺ My task was already completed before compaction. Commit d9fa124 made both changes to src/orchestrator/monitor.sh:\n\n  1. Sentry variables now use ${VAR:-default} syntax for env configurability\n  2. Added else branch showing Sentry: ● inactive in dim color\n\n  Reported done via mailbox. Awaiting further instructions from the supervisor.\n\n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n❯ \n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n  ⏵⏵ bypass permissions on (shift+tab to cycle) · 39 files +30 -191",
+  "recent_reasoning": "",
+  "transcript_path": ""
+}

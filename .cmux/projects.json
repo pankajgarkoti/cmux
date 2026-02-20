@@ -1,0 +1,17 @@
+{
+  "projects": [
+    {
+      "id": "cmux",
+      "name": "CMUX",
+      "path": "/Users/pankajgarkoti/Desktop/code/oss/cmux",
+      "is_self": true,
+      "active": true,
+      "supervisor_agent_id": "ag_0000prim",
+      "hooks_installed": true,
+      "added_at": "2026-02-20T00:00:00Z",
+      "git_remote": "git@github.com:pankajgarkoti/cmux.git",
+      "language": "python",
+      "description": "Self-improving multi-agent orchestration system"
+    }
+  ]
+}

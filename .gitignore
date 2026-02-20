@@ -1,9 +1,6 @@
 # Multiclaude working directory
 .multiclaude/
 
-# CMUX runtime data
-.cmux/
-
 # Environment
 .env
 .env.local

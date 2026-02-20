@@ -1,0 +1,8 @@
+{
+  "supervisor": {
+    "registered_at": "2026-02-20T00:46:36.086177+00:00",
+    "type": "supervisor",
+    "created_by": "monitor.sh",
+    "created_at": "2026-02-20T00:46:36.086177+00:00"
+  }
+}
