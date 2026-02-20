@@ -53,7 +53,11 @@ async def get_archived_agent(archive_id: str):
 
 @router.get("/{agent_id}", response_model=Agent)
 async def get_agent(agent_id: str):
-    """Get details of a specific agent."""
+    """Get details of a specific agent.
+
+    Accepts both agent IDs (ag_xxxxxxxx) and window-based names.
+    Agent ID lookup is tried first, then falls back to name.
+    """
     agent = await agent_manager.get_agent(agent_id)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
@@ -215,15 +219,38 @@ async def websocket_endpoint(websocket: WebSocket):
 async def register_agent(
     agent_id: str = Body(...),
     agent_type: str = Body("worker"),
-    created_by: str = Body("system")
+    created_by: str = Body("system"),
+    display_name: str = Body(None),
+    role: str = Body(None),
+    project_id: str = Body("cmux"),
+    unique_id: str = Body(None),
 ):
-    """Internal endpoint for registering agents from shell scripts."""
-    agent_registry.register(agent_id, {
+    """Internal endpoint for registering agents from shell scripts.
+
+    Args:
+        agent_id: Window-based identifier (name or session:name).
+        agent_type: Legacy type field ("worker" or "supervisor").
+        created_by: Who created this agent.
+        display_name: Human-readable name (defaults to agent_id).
+        role: Agent role ("worker", "supervisor", "project-supervisor").
+        project_id: Project this agent belongs to.
+        unique_id: Pre-assigned agent ID (ag_xxx). Generated if not provided.
+    """
+    metadata = {
         "type": agent_type,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "created_by": created_by
-    })
-    return {"registered": agent_id}
+        "created_by": created_by,
+        "project_id": project_id,
+    }
+    if display_name:
+        metadata["display_name"] = display_name
+    if role:
+        metadata["role"] = role
+    if unique_id:
+        metadata["agent_id"] = unique_id
+
+    entry = agent_registry.register(agent_id, metadata)
+    return {"registered": agent_id, "agent_id": entry.get("agent_id")}
 
 
 @router.delete("/register/{agent_id:path}")

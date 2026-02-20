@@ -19,11 +19,21 @@ class AgentType(str, Enum):
     WORKER = "worker"
 
 
+class AgentRole(str, Enum):
+    WORKER = "worker"
+    SUPERVISOR = "supervisor"
+    PROJECT_SUPERVISOR = "project-supervisor"
+
+
 class Agent(BaseModel):
-    id: str
-    name: str
+    id: str  # window-based ID for backward compat (e.g. "supervisor", "cmux:worker-1")
+    agent_id: Optional[str] = None  # unique agent ID (e.g. "ag_0000prim", "ag_7f3k2m9p")
+    name: str  # tmux window name
+    display_name: Optional[str] = None  # human-readable name (defaults to name)
     type: AgentType
+    role: AgentRole = AgentRole.WORKER
     status: AgentStatus = AgentStatus.IDLE
+    project_id: str = "cmux"
     tmux_window: str
     session: str = "cmux"  # tmux session this agent belongs to
     created_at: datetime = Field(default_factory=datetime.utcnow)

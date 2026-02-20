@@ -40,6 +40,32 @@ is_supervisor() {
     [[ "$1" == "supervisor" ]] || [[ "$1" == supervisor-* ]]
 }
 
+generate_agent_id() {
+    # Generate ag_ + 8 random alphanumeric chars
+    # Check agent registry for collisions and regenerate if needed
+    local registry_file="${CMUX_PROJECT_ROOT}/.cmux/agent_registry.json"
+    local attempt=0
+    local id
+
+    while [[ $attempt -lt 100 ]]; do
+        id="ag_$(head -c 6 /dev/urandom | base64 | tr -dc 'a-z0-9' | head -c 8)"
+        # Ensure we got 8 chars (base64 filtering can sometimes produce fewer)
+        if [[ ${#id} -ne 11 ]]; then
+            ((attempt++))
+            continue
+        fi
+        # Check for collision in registry
+        if [[ -f "$registry_file" ]] && grep -q "\"$id\"" "$registry_file" 2>/dev/null; then
+            ((attempt++))
+            continue
+        fi
+        echo "$id"
+        return 0
+    done
+
+    die "failed to generate unique agent ID after 100 attempts"
+}
+
 #───────────────────────────────────────────────────────────────────────────────
 # Commands
 #───────────────────────────────────────────────────────────────────────────────
@@ -96,7 +122,10 @@ cmd_spawn() {
         die "worker '$name' already exists"
     fi
 
-    info "Creating worker: $name"
+    # Generate unique agent ID
+    local agent_id
+    agent_id=$(generate_agent_id)
+    info "Creating worker: $name (${agent_id})"
 
     # Create tmux window
     tmux new-window -t "${CMUX_SESSION}:" -n "$name"
@@ -105,7 +134,7 @@ cmd_spawn() {
     tmux set-option -t "${CMUX_SESSION}:${name}" allow-rename off 2>/dev/null || true
 
     # Build environment variable exports
-    local env_vars="CMUX_AGENT=true CMUX_AGENT_NAME=${name} CMUX_SESSION=${CMUX_SESSION} CMUX_HOME=${CMUX_PROJECT_ROOT} CMUX_PORT=${CMUX_PORT:-8000}"
+    local env_vars="CMUX_AGENT=true CMUX_AGENT_ID=${agent_id} CMUX_AGENT_NAME=${name} CMUX_SESSION=${CMUX_SESSION} CMUX_HOME=${CMUX_PROJECT_ROOT} CMUX_PORT=${CMUX_PORT:-8000}"
     if [[ -n "$project_id" ]]; then
         env_vars="${env_vars} CMUX_PROJECT_ID=${project_id}"
     fi
@@ -172,6 +201,7 @@ EOF
 
     ok "Worker '$name' spawned and task assigned"
     echo ""
+    echo "Agent ID: $agent_id"
     echo "Task: $task"
     [[ -n "$worker_dir" ]] && echo "Directory: $cd_target"
     [[ -n "$project_id" ]] && echo "Project: $project_id"
