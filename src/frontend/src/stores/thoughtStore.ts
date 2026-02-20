@@ -23,9 +23,15 @@ export const useThoughtStore = create<ThoughtState>((set) => ({
   thoughts: [],
 
   addThought: (thought) =>
-    set((state) => ({
-      thoughts: [...state.thoughts, thought].slice(-MAX_THOUGHTS),
-    })),
+    set((state) => {
+      // Deduplicate by ID
+      if (state.thoughts.some((t) => t.id === thought.id)) {
+        return state;
+      }
+      return {
+        thoughts: [...state.thoughts, thought].slice(-MAX_THOUGHTS),
+      };
+    }),
 
   clear: () => set({ thoughts: [] }),
 }));

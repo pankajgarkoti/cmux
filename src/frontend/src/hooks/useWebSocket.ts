@@ -81,7 +81,7 @@ export function useWebSocket() {
         // Handle agent thought stream
         if (data.event === 'agent_thought') {
           addThought({
-            id: crypto.randomUUID(),
+            id: data.data.id || crypto.randomUUID(),
             agent_name: data.data.agent_name,
             thought_type: data.data.thought_type,
             content: data.data.content,
