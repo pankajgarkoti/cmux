@@ -50,10 +50,13 @@ export const api = {
     return res.json();
   },
 
-  async getMessages(limit = 50, offset = 0): Promise<MessageListResponse> {
-    const res = await fetch(
-      `${API_BASE}/api/messages?limit=${limit}&offset=${offset}`
-    );
+  async getMessages(limit = 50, offset = 0, agentId?: string): Promise<MessageListResponse> {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+    });
+    if (agentId) params.set('agent_id', agentId);
+    const res = await fetch(`${API_BASE}/api/messages?${params}`);
     if (!res.ok) throw new Error('Failed to fetch messages');
     return res.json();
   },
@@ -67,7 +70,7 @@ export const api = {
     const data: MessageListResponse = await res.json();
     // Filter to only mailbox messages
     const mailboxMessages = data.messages.filter(m => m.type === 'mailbox');
-    return { messages: mailboxMessages, total: mailboxMessages.length };
+    return { messages: mailboxMessages, total: mailboxMessages.length, has_more: false };
   },
 
   async getAgentEvents(sessionId?: string, limit = 50): Promise<AgentEventsResponse> {

@@ -13,6 +13,7 @@ export interface Message {
 export interface MessageListResponse {
   messages: Message[];
   total: number;
+  has_more: boolean;
 }
 
 export interface UserMessagePayload {

@@ -147,6 +147,18 @@ class ConversationStore:
                 )
             )
 
+    def count_messages(self, agent_id: Optional[str] = None) -> int:
+        """Count total messages in the database, optionally filtered by agent."""
+        with self._get_connection() as conn:
+            if agent_id:
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM messages WHERE from_agent = ? OR to_agent = ?",
+                    (agent_id, agent_id),
+                )
+            else:
+                cursor = conn.execute("SELECT COUNT(*) FROM messages")
+            return cursor.fetchone()[0]
+
     def get_messages(
         self,
         limit: int = 50,

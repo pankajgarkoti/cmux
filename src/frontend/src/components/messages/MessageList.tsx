@@ -3,7 +3,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { UserMessage } from './UserMessage';
 
 export function MessageList() {
-  const { data, isLoading, error } = useMessages();
+  const { messages, isLoading, error } = useMessages();
 
   if (isLoading) {
     return (
@@ -20,8 +20,6 @@ export function MessageList() {
       </div>
     );
   }
-
-  const messages = data?.messages || [];
 
   return (
     <div className="h-full flex flex-col">

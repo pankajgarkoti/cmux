@@ -6,6 +6,7 @@ import uuid
 from ..models.message import Message, MessageList, UserMessage, InternalMessage, MessageType, TaskStatus, StatusUpdateRequest
 from ..services.mailbox import mailbox_service
 from ..services.conversation_store import conversation_store
+
 from ..websocket.manager import ws_manager
 
 router = APIRouter()
@@ -17,13 +18,15 @@ async def get_messages(
     offset: int = Query(default=0, ge=0),
     agent_id: Optional[str] = None
 ):
-    """Get message history with optional filtering."""
-    messages = await mailbox_service.get_messages(
+    """Get message history with optional filtering and pagination."""
+    total = conversation_store.count_messages(agent_id=agent_id)
+    messages = conversation_store.get_messages(
         limit=limit,
         offset=offset,
         agent_id=agent_id
     )
-    return MessageList(messages=messages, total=len(messages))
+    has_more = (offset + len(messages)) < total
+    return MessageList(messages=messages, total=total, has_more=has_more)
 
 
 @router.get("/tasks", response_model=MessageList)

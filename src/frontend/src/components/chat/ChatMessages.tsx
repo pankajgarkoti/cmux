@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChatMessage, getSystemNotificationInfo } from './ChatMessage';
-import { MessageSquare, ArrowDown } from 'lucide-react';
+import { MessageSquare, ArrowDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useActivityStore } from '@/stores/activityStore';
@@ -14,6 +14,9 @@ import type { Activity } from '@/types/activity';
 interface ChatMessagesProps {
   messages: Message[];
   onSuggestionClick?: (text: string) => void;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
 }
 
 const suggestions = [
@@ -24,8 +27,9 @@ const suggestions = [
 
 const SCROLL_THRESHOLD = 100; // pixels from bottom to consider "near bottom"
 
-export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps) {
+export function ChatMessages({ messages, onSuggestionClick, onLoadMore, hasMore, isLoadingMore }: ChatMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -298,6 +302,41 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
     messagesRef.current = messages;
   }, [messages, scrollToBottom]);
 
+  // Infinite scroll: load older messages when user scrolls to top
+  useEffect(() => {
+    const sentinel = topSentinelRef.current;
+    const viewport = viewportRef.current;
+    if (!sentinel || !viewport || !onLoadMore || !hasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting && !isLoadingMore) {
+          // Save scroll height before loading more so we can restore position
+          const prevScrollHeight = viewport.scrollHeight;
+          const prevScrollTop = viewport.scrollTop;
+
+          onLoadMore();
+
+          // After new messages are prepended, restore scroll position
+          requestAnimationFrame(() => {
+            const newScrollHeight = viewport.scrollHeight;
+            const heightDiff = newScrollHeight - prevScrollHeight;
+            viewport.scrollTop = prevScrollTop + heightDiff;
+          });
+        }
+      },
+      {
+        root: viewport,
+        rootMargin: '100px 0px 0px 0px',
+        threshold: 0,
+      }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [onLoadMore, hasMore, isLoadingMore]);
+
   if (messages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
@@ -336,6 +375,14 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
         onScroll={handleScroll}
       >
         <div className="p-4 space-y-4">
+          {/* Top sentinel for infinite scroll */}
+          <div ref={topSentinelRef} className="h-1" />
+          {isLoadingMore && (
+            <div className="flex items-center justify-center py-2">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-xs text-muted-foreground">Loading older messages...</span>
+            </div>
+          )}
           {collapsedMessages.map(({ message, collapseCount }) => (
             <ChatMessage
               key={message.id}

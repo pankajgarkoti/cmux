@@ -14,7 +14,7 @@ type Tab = 'chat' | 'journal';
 export function CommandCenter() {
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState<Tab>('chat');
-  const { data: messagesData } = useMessages();
+  const { messages: loadedMessages } = useMessages();
 
   const sendMutation = useMutation({
     mutationFn: (content: string) => api.sendMessageToAgent('supervisor', content),
@@ -68,7 +68,7 @@ export function CommandCenter() {
           {/* Message History */}
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-4">
-              {(!messagesData?.messages || messagesData.messages.length === 0) ? (
+              {loadedMessages.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="text-4xl mb-4">🤖</div>
                   <h3 className="text-lg font-medium mb-2">Ready to work</h3>
@@ -89,7 +89,7 @@ export function CommandCenter() {
                   </div>
                 </div>
               ) : (
-                messagesData.messages.map((msg) => (
+                loadedMessages.map((msg) => (
                   <MessageBubble key={msg.id} message={msg} />
                 ))
               )}

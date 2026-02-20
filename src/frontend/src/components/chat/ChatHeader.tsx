@@ -97,7 +97,7 @@ export function ChatHeader({
   const { isConnected, isReconnecting } = useConnectionStore();
   const { getActiveSessions, latestEventBySession } = useAgentEventStore();
   const agents = useAgentStore((state) => state.agents);
-  const { data: messagesData } = useMessages();
+  const { total: totalMessagesCount } = useMessages();
 
   const isCommandCenter = !agentId;
 
@@ -128,7 +128,7 @@ export function ChatHeader({
     (a) => a.status === 'IN_PROGRESS' || a.status === 'IDLE'
   ).length;
   const workerCount = agents.filter((a) => a.type === 'worker').length;
-  const totalMessages = messagesData?.total ?? 0;
+  const totalMessages = totalMessagesCount;
 
   const displayName = agentId || 'supervisor';
   const title = agentId ? displayName : 'Command Center';

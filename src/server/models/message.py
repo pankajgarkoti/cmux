@@ -36,6 +36,7 @@ class Message(BaseModel):
 class MessageList(BaseModel):
     messages: list[Message]
     total: int
+    has_more: bool = False
 
 
 class UserMessage(BaseModel):

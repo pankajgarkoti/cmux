@@ -20,7 +20,12 @@ export function ChatPanel() {
   const { selectedAgentId, viewingArchivedId } = useAgentStore();
   const { selectedFile } = useViewerStore();
   const { selectedProjectId } = useProjectStore();
-  const { data: messagesData } = useMessages();
+  const {
+    messages: allLoadedMessages,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useMessages();
   const { data: agentsData } = useAgents();
   const { data: projectAgentsData } = useProjectAgents(selectedProjectId);
   const queryClient = useQueryClient();
@@ -51,9 +56,8 @@ export function ChatPanel() {
 
   // Filter messages for selected agent
   // Also filter by project when a project is selected
-  const allMessages = messagesData?.messages || [];
   const messages = useMemo(() => {
-    let filtered = allMessages;
+    let filtered = allLoadedMessages;
 
     // Filter by project (if selected)
     if (projectAgentIds) {
@@ -80,7 +84,7 @@ export function ChatPanel() {
     }
 
     return filtered;
-  }, [allMessages, selectedAgentId, projectAgentIds, showAllMessages]);
+  }, [allLoadedMessages, selectedAgentId, projectAgentIds, showAllMessages]);
 
   const targetAgent = selectedAgentId || 'supervisor';
 
@@ -169,6 +173,9 @@ export function ChatPanel() {
       <ChatMessages
         messages={messages}
         onSuggestionClick={handleSuggestionClick}
+        onLoadMore={fetchNextPage}
+        hasMore={hasNextPage ?? false}
+        isLoadingMore={isFetchingNextPage}
       />
 
       {/* Activity Indicator - shows when agent is working */}
