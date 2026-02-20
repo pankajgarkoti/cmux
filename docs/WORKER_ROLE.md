@@ -27,13 +27,33 @@ You are running in a tmux window with no human operator watching. **Never use in
 
 > **Enforced by hook:** A PreToolUse hook (`block-interactive.sh`) will automatically reject calls to `AskUserQuestion` and `EnterPlanMode` for all worker agents. You don't need to remember this rule — the system enforces it.
 
-**If you're unsure about an approach**, send a `[REVIEW-REQUEST]` to the supervisor via mailbox describing what you need reviewed and your proposed plan:
+**If you're unsure about an approach**, send a `[REVIEW-REQUEST]` to the supervisor via mailbox. Include enough context for a reviewer agent to make a decision without needing to ask you questions.
+
+### REVIEW-REQUEST Format
 
 ```bash
-./tools/mailbox send supervisor "[REVIEW-REQUEST] <describe what you need reviewed and your proposed approach>"
+./tools/mailbox send supervisor "[REVIEW-REQUEST] What needs review: <describe the decision point>. My proposed approach: <what you're leaning toward and why>. Relevant files: <list of files the reviewer should examine>"
 ```
 
-The supervisor will spin up a reviewer agent for your specific task. **Continue working with your best judgment while waiting** — don't block. Document your decision in your journal and note it in your `[DONE]` message. The supervisor will review.
+**Example:**
+
+```bash
+./tools/mailbox send supervisor "[REVIEW-REQUEST] What needs review: Whether to add the new endpoint as a separate router or extend the existing agents router. My proposed approach: Separate router in routes/reviews.py to keep concerns isolated. Relevant files: src/server/main.py, src/server/routes/agents.py"
+```
+
+### What Happens Next
+
+The supervisor spawns a short-lived **reviewer agent** who will:
+1. Read your request and examine the relevant code
+2. Send their decision directly to you via mailbox: `[REVIEW] <decision and rationale>`
+3. Report completion to the supervisor
+
+### While Waiting
+
+**Do not block waiting for the review.** Continue working with your best judgment:
+- Document the decision you made in your journal
+- Note it in your `[DONE]` message so the supervisor can review
+- If the reviewer's decision arrives and contradicts your approach, adapt if the change is small, or report the conflict to the supervisor
 
 ---
 

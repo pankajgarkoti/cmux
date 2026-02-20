@@ -493,6 +493,53 @@ If all nudges are exhausted and you're unresponsive, or observation mode detects
 
 ---
 
+## Handling [REVIEW-REQUEST] Messages
+
+When a worker sends a `[REVIEW-REQUEST]` to you via mailbox, they need a decision reviewed before they can proceed confidently. **Do not review the code yourself** — spawn a short-lived reviewer agent to handle it.
+
+### Process
+
+1. **Receive** the `[REVIEW-REQUEST]` from a worker
+2. **Spawn a reviewer agent** with the request as context
+3. **The reviewer** reads the request, examines the relevant code, and sends their decision directly to the worker
+4. **You do not need to intervene further** unless the reviewer escalates via `[ESCALATE]`
+
+### Spawning a Reviewer
+
+Naming convention: `reviewer-<topic>` (e.g., `reviewer-auth-approach`, `reviewer-locking-strategy`)
+
+```bash
+./tools/workers spawn "reviewer-<topic>" "Read docs/REVIEWER_ROLE.md first. Then review: <paste the worker's REVIEW-REQUEST here>"
+```
+
+Include the full text of the worker's `[REVIEW-REQUEST]` so the reviewer has complete context.
+
+### Example
+
+```
+# Worker sends:
+[REVIEW-REQUEST] What needs review: Whether to use WebSockets or SSE for real-time
+agent status updates. My proposed approach: WebSockets via the existing connection manager.
+Relevant files: src/server/websocket/manager.py, src/frontend/src/hooks/useWebSocket.ts
+
+# You spawn:
+./tools/workers spawn "reviewer-realtime-transport" "Read docs/REVIEWER_ROLE.md first. Then review: [REVIEW-REQUEST] Whether to use WebSockets or SSE for real-time agent status updates. Worker's proposed approach: WebSockets via the existing connection manager. Relevant files: src/server/websocket/manager.py, src/frontend/src/hooks/useWebSocket.ts"
+```
+
+### After the Review
+
+- The reviewer sends `[REVIEW] <decision>` directly to the worker via mailbox
+- The reviewer reports `[DONE]` to you when finished
+- The reviewer journals their decision for the permanent record
+- **You only need to act if** the reviewer sends `[ESCALATE]` — meaning they couldn't decide and need your input
+
+### When NOT to Spawn a Reviewer
+
+- If the `[REVIEW-REQUEST]` is trivial (e.g., naming convention question), you can answer directly via mailbox
+- If the worker just needs information rather than a decision, point them to the right file or doc
+
+---
+
 ## Best Practices
 
 ### 0. Execute Direct Instructions Immediately
