@@ -131,14 +131,25 @@ cmd_spawn() {
     local worktree_path=""
     local worktree_branch=""
     if [[ "$use_worktree" == true ]]; then
-        [[ -n "$worker_dir" ]] && die "--worktree and --dir are mutually exclusive"
+        # Determine the source repo for the worktree.
+        # If --dir was provided, use that as the source repo to branch from.
+        # Otherwise, use the CWD's git root — this is critical for project
+        # supervisors who cd into their project directory. Without this,
+        # the worktree would branch from the inherited CMUX_PROJECT_ROOT
+        # (the CMUX repo) instead of the project repo.
+        local worktree_repo
+        if [[ -n "$worker_dir" ]]; then
+            worktree_repo="$worker_dir"
+        else
+            worktree_repo="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+        fi
 
         # Inherit project_id early for worktree path calculation
         local wt_project="${project_id:-${CMUX_PROJECT_ID:-cmux}}"
         worktree_branch="feat/${name}"
         worktree_path="${HOME}/.cmux/worktrees/${wt_project}/${name}"
 
-        # NOTE: The worktree branches from HEAD (the currently checked out branch).
+        # NOTE: The worktree branches from HEAD of the source repo.
         # For the branching model to work correctly, the supervisor MUST checkout
         # their integration branch (e.g. feat/<batch-name>) BEFORE spawning workers.
         # Workers then branch from the integration branch, not from main.
@@ -150,12 +161,12 @@ cmd_spawn() {
             mkdir -p "$(dirname "$worktree_path")"
             # Create worktree with a new branch from HEAD
             # If the branch already exists (leftover from previous run), reuse it
-            if git -C "$cd_target" branch --list "$worktree_branch" | grep -q "$worktree_branch"; then
-                git -C "$cd_target" worktree add "$worktree_path" "$worktree_branch"
+            if git -C "$worktree_repo" branch --list "$worktree_branch" | grep -q "$worktree_branch"; then
+                git -C "$worktree_repo" worktree add "$worktree_path" "$worktree_branch"
             else
-                git -C "$cd_target" worktree add -b "$worktree_branch" "$worktree_path" HEAD
+                git -C "$worktree_repo" worktree add -b "$worktree_branch" "$worktree_path" HEAD
             fi
-            ok "Worktree created"
+            ok "Worktree created (from $(basename "$worktree_repo"))"
         fi
 
         # Override working directory to the worktree
@@ -459,7 +470,8 @@ SPAWN OPTIONS:
     --project <id>     Associate worker with a project (sets CMUX_PROJECT_ID env var)
     --worktree         Create a git worktree for branch-isolated work.
                        Creates ~/.cmux/worktrees/<project>/<name> on branch feat/<name>.
-                       Mutually exclusive with --dir. Worktrees are preserved on kill.
+                       When combined with --dir, uses --dir as the source repo.
+                       Worktrees are preserved on kill.
 
 EXAMPLES:
     workers spawn auth-worker "Implement JWT authentication in src/auth/"
