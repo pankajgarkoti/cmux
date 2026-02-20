@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChatMessage } from './ChatMessage';
+import { ChatMessage, getSystemNotificationInfo } from './ChatMessage';
 import { MessageSquare, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -187,6 +187,39 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
     return map;
   }, [sortedMessages, allThoughts]);
 
+  // Collapse consecutive system notifications of the same type into a single entry with count
+  const collapsedMessages = useMemo(() => {
+    const result: { message: Message; collapseCount?: number }[] = [];
+
+    for (let i = 0; i < sortedMessages.length; i++) {
+      const msg = sortedMessages[i];
+      const info = getSystemNotificationInfo(msg);
+
+      if (!info) {
+        result.push({ message: msg });
+        continue;
+      }
+
+      // Count consecutive system notifications with the same label
+      let count = 1;
+      while (i + count < sortedMessages.length) {
+        const nextMsg = sortedMessages[i + count];
+        const nextInfo = getSystemNotificationInfo(nextMsg);
+        if (nextInfo && nextInfo.label === info.label) {
+          count++;
+        } else {
+          break;
+        }
+      }
+
+      // Show only the last message of the group, with a count badge
+      result.push({ message: sortedMessages[i + count - 1], collapseCount: count });
+      i += count - 1; // skip past the grouped messages
+    }
+
+    return result;
+  }, [sortedMessages]);
+
   // Track scroll position to determine if user is near bottom
   const handleScroll = useCallback(() => {
     const viewport = viewportRef.current;
@@ -303,12 +336,13 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
         onScroll={handleScroll}
       >
         <div className="p-4 space-y-4">
-          {sortedMessages.map((message) => (
+          {collapsedMessages.map(({ message, collapseCount }) => (
             <ChatMessage
               key={message.id}
               message={message}
               toolCalls={toolCallsByMessage.get(message.id)}
               thoughts={thoughtsByMessage.get(message.id)}
+              collapseCount={collapseCount}
             />
           ))}
           <div ref={bottomRef} />

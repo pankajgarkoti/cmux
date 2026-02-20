@@ -25,11 +25,23 @@ const SYSTEM_PATTERNS = [
   { test: (c: string) => /^\[SYSTEM AUTO-JOURNAL/i.test(c), label: 'Journal Reminder', icon: 'radio' as const },
 ] as const;
 
+// Phrases that indicate a response to a heartbeat nudge (not real task content)
+const HEARTBEAT_RESPONSE_PHRASES = [
+  'Status: COMPLETE and IDLE',
+  'COMPLETE and IDLE',
+  'No new tasks in the mailbox',
+  'Waiting for next assignment from supervisor',
+  'Recovery complete. Status:',
+  'No recovery context files',
+  'Already consumed that output',
+  'No action needed on this stale notification',
+];
+
 const SYSTEM_AGENTS = new Set(['health', 'monitor', 'system']);
 
 type SystemIcon = 'heartbeat' | 'shield' | 'radio';
 
-function getSystemNotificationInfo(message: Message): { label: string; icon: SystemIcon; summary: string } | null {
+export function getSystemNotificationInfo(message: Message): { label: string; icon: SystemIcon; summary: string } | null {
   const content = message.content.trim();
 
   // Check from_agent for system sources
@@ -45,6 +57,12 @@ function getSystemNotificationInfo(message: Message): { label: string; icon: Sys
     if (pattern.test(content)) {
       return { label: pattern.label, icon: pattern.icon, summary: getFirstSentence(content) };
     }
+  }
+
+  // Check for heartbeat RESPONSES from supervisor agents
+  const isSupervisorAgent = message.from_agent.startsWith('sup-') || message.from_agent === 'supervisor';
+  if (isSupervisorAgent && HEARTBEAT_RESPONSE_PHRASES.some(phrase => content.includes(phrase))) {
+    return { label: 'Heartbeat Response', icon: 'heartbeat', summary: getFirstSentence(content) };
   }
 
   return null;
@@ -69,6 +87,7 @@ interface ChatMessageProps {
   message: Message;
   toolCalls?: Activity[];
   thoughts?: Thought[];
+  collapseCount?: number;
 }
 
 const COLLAPSE_THRESHOLD = 500;
@@ -102,7 +121,7 @@ function getPreviewContent(content: string): string {
   return truncated;
 }
 
-function SystemNotification({ message, info }: { message: Message; info: { label: string; icon: SystemIcon; summary: string } }) {
+function SystemNotification({ message, info, collapseCount }: { message: Message; info: { label: string; icon: SystemIcon; summary: string }; collapseCount?: number }) {
   const [expanded, setExpanded] = useState(false);
   const messageDate = new Date(message.timestamp);
   const relativeTime = formatDistanceToNow(messageDate, { addSuffix: true });
@@ -118,6 +137,11 @@ function SystemNotification({ message, info }: { message: Message; info: { label
         >
           <SystemIconComponent icon={info.icon} />
           <span className="font-medium">{info.label}</span>
+          {collapseCount && collapseCount > 1 && (
+            <span className="bg-muted-foreground/20 text-muted-foreground px-1.5 py-0 rounded-full text-[10px] font-medium">
+              ×{collapseCount}
+            </span>
+          )}
           {!expanded && (
             <span className="max-w-[200px] truncate opacity-60">
               {info.summary}
@@ -148,13 +172,13 @@ function SystemNotification({ message, info }: { message: Message; info: { label
   );
 }
 
-export function ChatMessage({ message, toolCalls, thoughts }: ChatMessageProps) {
+export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: ChatMessageProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Check if this is a system notification (heartbeat ping, sentry briefing, etc.)
   const systemInfo = getSystemNotificationInfo(message);
   if (systemInfo) {
-    return <SystemNotification message={message} info={systemInfo} />;
+    return <SystemNotification message={message} info={systemInfo} collapseCount={collapseCount} />;
   }
 
   const isUser = message.type === 'user' || message.from_agent === 'user';
