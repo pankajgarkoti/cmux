@@ -159,6 +159,7 @@ export function ChatPanel() {
         isPending={sendMutation.isPending}
         placeholder={`Message ${targetAgent}...`}
         inputRef={inputRef}
+        agents={agentsData?.agents || []}
       />
       {sendMutation.isError && (
         <p className="px-4 pb-2 text-sm text-destructive">

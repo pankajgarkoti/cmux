@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
@@ -5,6 +6,45 @@ import { cn } from '@/lib/utils';
 interface MarkdownContentProps {
   content: string;
   className?: string;
+}
+
+const MENTION_REGEX = /@([\w-]+)/g;
+
+/**
+ * Splits a text string into parts, highlighting @mentions.
+ */
+function renderMentionsInText(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let key = 0;
+
+  for (const match of text.matchAll(MENTION_REGEX)) {
+    const mentionFull = match[0];
+    const matchIndex = match.index!;
+
+    if (matchIndex > lastIndex) {
+      parts.push(<Fragment key={key++}>{text.slice(lastIndex, matchIndex)}</Fragment>);
+    }
+
+    parts.push(
+      <span
+        key={key++}
+        className="inline-flex items-center bg-primary/15 text-primary font-medium rounded px-1 py-0.5 text-[0.9em]"
+      >
+        {mentionFull}
+      </span>
+    );
+
+    lastIndex = matchIndex + mentionFull.length;
+  }
+
+  if (parts.length === 0) return text;
+
+  if (lastIndex < text.length) {
+    parts.push(<Fragment key={key++}>{text.slice(lastIndex)}</Fragment>);
+  }
+
+  return <>{parts}</>;
 }
 
 export function MarkdownContent({ content, className }: MarkdownContentProps) {
@@ -65,6 +105,13 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
               {children}
             </p>
           ),
+          // Highlight @mentions in text nodes
+          text: ({ children }) => {
+            if (typeof children === 'string' && children.includes('@')) {
+              return renderMentionsInText(children);
+            }
+            return <>{children}</>;
+          },
         }}
       >
         {content}

@@ -80,6 +80,52 @@ interface ChatMessageProps {
 const COLLAPSE_THRESHOLD = 500;
 const PREVIEW_LENGTH = 200;
 
+// Regex to match @mentions (agent names are alphanumeric with hyphens)
+const MENTION_REGEX = /@([\w-]+)/g;
+
+/**
+ * Renders text with @mentions highlighted as colored badges.
+ */
+function renderWithMentions(text: string, className?: string) {
+  const parts: (string | JSX.Element)[] = [];
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(MENTION_REGEX)) {
+    const mentionFull = match[0];
+    const mentionName = match[1];
+    const matchIndex = match.index!;
+
+    // Add text before this match
+    if (matchIndex > lastIndex) {
+      parts.push(text.slice(lastIndex, matchIndex));
+    }
+
+    // Add highlighted mention
+    parts.push(
+      <span
+        key={`${mentionName}-${matchIndex}`}
+        className="inline-flex items-center bg-primary/15 text-primary font-medium rounded px-1 py-0.5 text-[0.9em]"
+      >
+        {mentionFull}
+      </span>
+    );
+
+    lastIndex = matchIndex + mentionFull.length;
+  }
+
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  // If no mentions found, return plain text
+  if (parts.length === 0) {
+    return <p className={className}>{text}</p>;
+  }
+
+  return <p className={className}>{parts}</p>;
+}
+
 // Get preview content, trying to not break markdown
 function getPreviewContent(content: string): string {
   // If there's a code block near the start, include it
@@ -266,7 +312,7 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
 
         {/* Content */}
         {isUser ? (
-          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+          renderWithMentions(message.content, 'text-sm whitespace-pre-wrap')
         ) : (
           <>
             <MarkdownContent
