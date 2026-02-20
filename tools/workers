@@ -48,7 +48,7 @@ generate_agent_id() {
     local id
 
     while [[ $attempt -lt 100 ]]; do
-        id="ag_$(head -c 6 /dev/urandom | base64 | tr -dc 'a-z0-9' | head -c 8)"
+        id="ag_$(head -c 32 /dev/urandom | base64 | tr -dc 'a-z0-9' | head -c 8)"
         # Ensure we got 8 chars (base64 filtering can sometimes produce fewer)
         if [[ ${#id} -ne 11 ]]; then
             ((attempt++))
