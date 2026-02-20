@@ -21,7 +21,7 @@ import type { Thought } from '@/stores/thoughtStore';
 const SYSTEM_PATTERNS = [
   { test: (c: string) => c.startsWith('SENTRY BRIEFING'), label: 'Sentry Recovery', icon: 'shield' as const },
   { test: (c: string) => c.startsWith('SYSTEM ALERT'), label: 'System Alert', icon: 'shield' as const },
-  { test: (c: string) => c.startsWith('You have been idle for') || /^Nudge #\d+:/.test(c), label: 'Nudge', icon: 'heartbeat' as const },
+  { test: (c: string) => /^You have been idle for \d+s\.$/.test(c) || /^Nudge #\d+: Still idle/.test(c), label: 'Nudge', icon: 'heartbeat' as const },
   { test: (c: string) => /^\[SYSTEM AUTO-JOURNAL/i.test(c), label: 'Journal Reminder', icon: 'radio' as const },
 ] as const;
 

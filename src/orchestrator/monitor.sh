@@ -402,7 +402,7 @@ check_supervisor_heartbeat() {
         NUDGE_SENT_AT=$now
         printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - sending productivity nudge (#${NUDGE_COUNT})\n"
         log_status "HEARTBEAT" "Supervisor idle (${staleness}s), sending nudge #${NUDGE_COUNT}"
-        tmux_send_keys "$CMUX_SESSION" "supervisor" "You have been idle for ${staleness}s. Check your mailbox for pending messages, review active workers with './tools/workers list', consult the journal for pending items, or find proactive work to do."
+        tmux_send_keys "$CMUX_SESSION" "supervisor" "You have been idle for ${staleness}s."
         return
     fi
 
@@ -421,7 +421,7 @@ check_supervisor_heartbeat() {
         NUDGE_SENT_AT=$now
         printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - sending productivity nudge (#${NUDGE_COUNT}/${HEARTBEAT_MAX_NUDGES})\n"
         log_status "HEARTBEAT" "Supervisor idle (${staleness}s), sending nudge #${NUDGE_COUNT}/${HEARTBEAT_MAX_NUDGES}"
-        tmux_send_keys "$CMUX_SESSION" "supervisor" "Nudge #${NUDGE_COUNT}: You have been idle for ${staleness}s with no tool activity. Please check for pending work — mailbox, worker status, journal TODOs — or report your status."
+        tmux_send_keys "$CMUX_SESSION" "supervisor" "Nudge #${NUDGE_COUNT}: Still idle (${staleness}s). No tool activity detected."
         return
     fi
 
