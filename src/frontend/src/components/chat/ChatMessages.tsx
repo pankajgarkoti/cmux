@@ -211,18 +211,36 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
     setUnreadCount(0);
   }, []);
 
-  // Track new messages - never auto-scroll, just update unread count
+  // Scroll to bottom on initial mount when messages exist
+  const initialScrollDone = useRef(false);
+  useEffect(() => {
+    if (!initialScrollDone.current && messages.length > 0) {
+      initialScrollDone.current = true;
+      requestAnimationFrame(() => {
+        scrollToBottom(false);
+      });
+    }
+  }, [messages.length, scrollToBottom]);
+
+  // Track new messages - auto-scroll if near bottom, otherwise update unread count
   useEffect(() => {
     const newMessageCount = messages.length;
     const newMessages = newMessageCount - prevMessageCountRef.current;
 
-    if (newMessages > 0 && !isNearBottom) {
-      // User is reading history, increment unread count
-      setUnreadCount((prev) => prev + newMessages);
+    if (newMessages > 0) {
+      if (isNearBottom) {
+        // User is at bottom, keep them there
+        requestAnimationFrame(() => {
+          scrollToBottom(false);
+        });
+      } else {
+        // User is reading history, increment unread count
+        setUnreadCount((prev) => prev + newMessages);
+      }
     }
 
     prevMessageCountRef.current = newMessageCount;
-  }, [messages.length, isNearBottom]);
+  }, [messages.length, isNearBottom, scrollToBottom]);
 
   // Scroll to bottom on agent switch (messages array reference changes)
   const messagesRef = useRef(messages);
@@ -237,6 +255,7 @@ export function ChatMessages({ messages, onSuggestionClick }: ChatMessagesProps)
     if (isAgentSwitch) {
       // Reset unread count and scroll to bottom for new agent
       setUnreadCount(0);
+      initialScrollDone.current = true; // Don't double-scroll
       prevMessageCountRef.current = messages.length;
       requestAnimationFrame(() => {
         scrollToBottom(false);
