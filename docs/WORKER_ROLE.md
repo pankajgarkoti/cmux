@@ -166,6 +166,30 @@ Files modified:
 Tests: all passing
 ```
 
+### Message Tags Reference
+
+All tags used in the CMUX system, consolidated for quick reference.
+
+#### Communication Tags (mailbox messages)
+
+| Tag | Direction | Purpose |
+|-----|-----------|---------|
+| `[STATUS]` | Worker → Supervisor | Progress update |
+| `[DONE]` | Worker → Supervisor | Task completion report |
+| `[BLOCKED]` | Worker → Supervisor | Stuck, needs help |
+| `[QUESTION]` | Worker → Supervisor | Needs clarification |
+| `[REVIEW-REQUEST]` | Worker → Supervisor | Requests a reviewer agent for a decision |
+| `[REVIEW]` | Reviewer → Worker | Reviewer's decision on a review request |
+| `[ESCALATE]` | Reviewer → Supervisor | Reviewer couldn't decide, needs supervisor input |
+| `[TASK]` | Supervisor → Worker | Task assignment |
+
+#### UI/System Tags (affect dashboard rendering)
+
+| Tag | Who Uses It | Effect |
+|-----|-------------|--------|
+| `[SYS]` | Any agent (prefix) | Backend strips it, sets `type=system`. Frontend renders as compact notification instead of full chat message. Use for heartbeat acks, compaction recovery, idle confirmations. |
+| `[HEARTBEAT]` | System → Agent | Idle nudge from the monitor daemon. Not sent by agents — agents receive this. |
+
 ## Journaling (Use the `/journal` skill)
 
 **Journal instinctively.** The journal is the system's long-term memory — it survives compaction, restarts, and rollbacks. If you don't journal it, it's lost forever.
