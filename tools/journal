@@ -11,13 +11,14 @@
 #
 # Designed for agents to journal instinctively with minimal friction.
 # Every command is one line - no excuses not to journal.
+#
+# Writes directly to the filesystem — no API dependency.
 #===============================================================================
 
 set -euo pipefail
 
-CMUX_PORT="${CMUX_PORT:-8000}"
-CMUX_AGENT_NAME="${CMUX_AGENT_NAME:-unknown}"
-API="http://localhost:${CMUX_PORT}/api/journal"
+CMUX_HOME="${CMUX_HOME:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+JOURNAL_DIR="${CMUX_HOME}/.cmux/journal"
 
 # Colors
 RED='\033[0;31m'
@@ -30,6 +31,40 @@ die() { echo -e "${RED}error:${NC} $1" >&2; exit 1; }
 ok() { echo -e "${GREEN}✓${NC} $1"; }
 
 #-------------------------------------------------------------------------------
+# Helpers
+#-------------------------------------------------------------------------------
+
+ensure_day_dir() {
+    local target_date="$1"
+    local day_dir="${JOURNAL_DIR}/${target_date}"
+    mkdir -p "${day_dir}/artifacts"
+
+    local journal_file="${day_dir}/journal.md"
+    if [[ ! -f "$journal_file" ]]; then
+        printf '# Journal - %s\n' "$target_date" > "$journal_file"
+    fi
+}
+
+append_entry() {
+    local title="$1"
+    local content="${2:-}"
+    local target_date
+    target_date="$(date +%Y-%m-%d)"
+    local time_str
+    time_str="$(date +%H:%M)"
+
+    ensure_day_dir "$target_date"
+
+    local journal_file="${JOURNAL_DIR}/${target_date}/journal.md"
+
+    if [[ -n "$content" ]]; then
+        printf '\n## %s - %s\n%s\n' "$time_str" "$title" "$content" >> "$journal_file"
+    else
+        printf '\n## %s - %s\n' "$time_str" "$title" >> "$journal_file"
+    fi
+}
+
+#-------------------------------------------------------------------------------
 # Commands
 #-------------------------------------------------------------------------------
 
@@ -37,18 +72,8 @@ cmd_log() {
     local entry="${1:-}"
     [[ -z "$entry" ]] && die "usage: journal log \"<what you did>\""
 
-    # Title becomes the heading; no body needed for quick logs
-    local payload
-    payload=$(jq -n --arg title "${entry}" --arg content "" \
-        '{title: $title, content: $content}')
-
-    if curl -sf -X POST "${API}/entry" \
-        -H "Content-Type: application/json" \
-        -d "$payload" >/dev/null 2>&1; then
-        ok "Logged: ${entry:0:60}"
-    else
-        die "Failed to write journal (API unavailable)"
-    fi
+    append_entry "$entry" ""
+    ok "Logged: ${entry:0:60}"
 }
 
 cmd_note() {
@@ -57,17 +82,8 @@ cmd_note() {
     [[ -z "$title" ]] && die "usage: journal note \"<title>\" \"<detail>\""
     [[ -z "$detail" ]] && die "usage: journal note \"<title>\" \"<detail>\""
 
-    local payload
-    payload=$(jq -n --arg title "$title" --arg content "$detail" \
-        '{title: $title, content: $content}')
-
-    if curl -sf -X POST "${API}/entry" \
-        -H "Content-Type: application/json" \
-        -d "$payload" >/dev/null 2>&1; then
-        ok "Noted: $title"
-    else
-        die "Failed to write journal (API unavailable)"
-    fi
+    append_entry "$title" "$detail"
+    ok "Noted: $title"
 }
 
 cmd_decision() {
@@ -76,50 +92,47 @@ cmd_decision() {
     [[ -z "$what" ]] && die "usage: journal decision \"<what>\" \"<why>\""
     [[ -z "$why" ]] && die "usage: journal decision \"<what>\" \"<why>\""
 
-    local content="**Decision:** ${what}\n\n**Rationale:** ${why}"
-    local payload
-    payload=$(jq -n --arg title "Decision: $what" --arg content "$content" \
-        '{title: $title, content: $content}')
+    local content
+    content="$(printf '**Decision:** %s\n\n**Rationale:** %s' "$what" "$why")"
 
-    if curl -sf -X POST "${API}/entry" \
-        -H "Content-Type: application/json" \
-        -d "$payload" >/dev/null 2>&1; then
-        ok "Decision recorded: $what"
-    else
-        die "Failed to write journal (API unavailable)"
-    fi
+    append_entry "Decision: $what" "$content"
+    ok "Decision recorded: $what"
 }
 
 cmd_read() {
     local target_date="${1:-$(date +%Y-%m-%d)}"
+    local journal_file="${JOURNAL_DIR}/${target_date}/journal.md"
 
-    local response
-    response=$(curl -sf "${API}?date=${target_date}" 2>/dev/null) || die "Failed to read journal (API unavailable)"
-
-    local content
-    content=$(echo "$response" | jq -r '.content // ""')
-
-    if [[ -z "$content" ]] || [[ "$content" == "null" ]]; then
+    if [[ ! -f "$journal_file" ]]; then
         echo -e "${DIM}No journal entries for ${target_date}${NC}"
-    else
-        echo -e "${CYAN}Journal - ${target_date}${NC}"
-        echo ""
-        echo "$content"
+        return
     fi
+
+    echo -e "${CYAN}Journal - ${target_date}${NC}"
+    echo ""
+    cat "$journal_file"
 }
 
 cmd_dates() {
-    local response
-    response=$(curl -sf "${API}/dates" 2>/dev/null) || die "Failed to list dates (API unavailable)"
-
-    local dates
-    dates=$(echo "$response" | jq -r '.dates[]? // empty')
-
-    if [[ -z "$dates" ]]; then
+    if [[ ! -d "$JOURNAL_DIR" ]]; then
         echo -e "${DIM}No journal entries found${NC}"
-    else
-        echo -e "${CYAN}Journal dates:${NC}"
-        echo "$dates"
+        return
+    fi
+
+    local found=0
+    # List directories matching YYYY-MM-DD that contain journal.md, sorted reverse
+    for dir in $(ls -1d "${JOURNAL_DIR}"/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] 2>/dev/null | sort -r); do
+        if [[ -f "${dir}/journal.md" ]]; then
+            if [[ $found -eq 0 ]]; then
+                echo -e "${CYAN}Journal dates:${NC}"
+                found=1
+            fi
+            basename "$dir"
+        fi
+    done
+
+    if [[ $found -eq 0 ]]; then
+        echo -e "${DIM}No journal entries found${NC}"
     fi
 }
 
@@ -160,8 +173,7 @@ EXAMPLES:
     journal read 2026-02-18
 
 ENVIRONMENT:
-    CMUX_AGENT_NAME    This agent's name (shown in entries)
-    CMUX_PORT          API server port (default: 8000)
+    CMUX_HOME          Project root (default: git rev-parse --show-toplevel)
 EOF
 }
 
