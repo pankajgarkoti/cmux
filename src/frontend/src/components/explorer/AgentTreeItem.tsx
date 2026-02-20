@@ -24,12 +24,15 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
   const isSupervisor = agent.type === 'supervisor' || agent.role === 'project-supervisor';
   const isProjectSupervisor = agent.role === 'project-supervisor';
 
-  // Check if this agent is actively working
+  // Check if this agent is actively working by matching event agent_id
+  // (CMUX_AGENT_NAME set by orchestrator) against agent identifiers
   const { latestEventBySession, isAgentActive } = useAgentEventStore();
-  const isWorking = Object.keys(latestEventBySession).some((sessionId) => {
+  const isWorking = Object.entries(latestEventBySession).some(([sessionId, event]) => {
+    const eventAgentId = (event.agent_id || '').toLowerCase();
     const matchesAgent =
-      sessionId.toLowerCase().includes(agent.id.toLowerCase()) ||
-      sessionId.toLowerCase().includes(agent.name.toLowerCase());
+      eventAgentId === agent.id.toLowerCase() ||
+      eventAgentId === agent.name.toLowerCase() ||
+      (agent.display_name && eventAgentId === agent.display_name.toLowerCase());
     return matchesAgent && isAgentActive(sessionId);
   });
 
