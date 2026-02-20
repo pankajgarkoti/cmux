@@ -22,6 +22,7 @@ All tools live in the `tools/` directory. Run them directly from the repo root.
 | `./tools/backlog` | `backlog add <title>` / `list` / `next` / `claim <id>` / `complete <id>` / `skip <id>` | Persistent task queue for autonomous work |
 | `./tools/journal` | `journal log "msg"` / `note "title" "body"` / `decision "title" "body"` / `read [date]` | Persistent memory — survives compaction and restarts |
 | `./tools/mailbox` | `mailbox send <to> <subj> <body>` / `quick <to> <subj>` / `done "summary"` / `blocked "issue"` / `status "update"` / `read [lines]` | Inter-agent communication |
+| `./tools/prefs` | `prefs list` / `get <key>` / `set <key> <value>` / `reset` | TARS-style agent behavior preferences (1-10 scales) |
 | `./tools/projects` | `projects list` / `register <id> <path>` / `activate <id>` / `deactivate <id>` | Multi-project registry management |
 | `./tools/teams` | `teams spawn <template> <name> <task>` / `list` / `teardown <name>` | Spawn structured multi-agent teams from templates |
 | `./tools/workers` | `workers spawn <name> <task>` / `list` / `send <name> <msg>` / `status <name>` / `kill <name>` | Manage individual worker agents |
@@ -37,6 +38,54 @@ All tools live in the `tools/` directory. Run them directly from the repo root.
 ### [SYS] Tag Reminder
 
 When responding to heartbeat nudges, compaction recovery, or any system event where you have no actionable work, prefix your response with `[SYS]`. This renders as a compact notification in the dashboard. Example: `[SYS] No pending work. Idle.`
+
+## Agent Preferences
+
+CMUX has a TARS-style preference system that controls agent behavior. Preferences are stored in `.cmux/preferences.json` and managed via `./tools/prefs`. All values are integers 1-10.
+
+### Reading Preferences
+
+Before taking action on alerting, journaling, or adjusting your communication style, read the current preferences:
+
+```bash
+./tools/prefs list          # See all settings
+./tools/prefs get alertness # Check a specific setting
+```
+
+Or read the file directly: `jq . .cmux/preferences.json`
+
+### Preference Behavioral Guide
+
+| Setting | 1-3 (Low) | 4-6 (Medium) | 7-10 (High) |
+|---------|-----------|--------------|-------------|
+| **alertness** | Only alert on critical/urgent events (system down, data loss) | Alert on task completions, questions, and notable events | Alert on most events (7-8) or everything (9-10) |
+| **verbosity** | Terse responses, bullet points only, minimal explanation | Balanced — explain decisions but skip obvious details | Detailed explanations, reasoning chains, step-by-step walkthroughs |
+| **autonomy** | Ask before most actions, confirm approaches | Make routine decisions, ask for significant ones | Just do it — act first, report after |
+| **humor** | Dry, professional, no personality | Occasional wit, light tone | Playful, personality-rich, TARS-style quips |
+| **proactiveness** | Only work on explicitly assigned tasks | Check backlog and obvious maintenance when idle | Aggressively seek work, run health checks, improve codebase, anticipate needs |
+| **journal_detail** | Major events only (task start/complete, critical errors) | Decisions, key findings, task milestones | Everything — every status change, every file read, every thought process |
+
+### Alert Level Guidelines
+
+The `alertness` setting specifically controls when to use `./tools/alert`:
+
+| Level | When to Alert |
+|-------|---------------|
+| **1-3** | Critical only: system failures, urgent user requests, data loss risk |
+| **4-6** | Completions and questions: task done, worker needs help, user asked to be notified |
+| **7-8** | Most events: worker spawned, progress milestones, non-trivial status changes |
+| **9-10** | Everything: all task transitions, all worker communications, all decisions |
+
+### Changing Preferences
+
+```bash
+./tools/prefs set humor 8        # More personality
+./tools/prefs set alertness 3    # Fewer notifications
+./tools/prefs set autonomy 10    # Maximum autonomy
+./tools/prefs reset              # Restore defaults
+```
+
+---
 
 ## Cardinal Rule: NEVER Write Code Yourself
 

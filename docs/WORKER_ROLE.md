@@ -29,6 +29,7 @@ All tools live in the `tools/` directory. Run them directly from the repo root.
 | `./tools/mailbox` | `mailbox send <to> <subj> <body>` / `done "summary"` / `blocked "issue"` / `status "update"` / `read [lines]` | Communicate with supervisor and other agents |
 | `./tools/alert` | `alert both "msg"` / `ping` | Get user's attention (only if user asked to be notified) |
 | `./tools/agents` | `agents list` / `get <id>` / `find <name>` | Look up agents in the registry |
+| `./tools/prefs` | `prefs list` / `get <key>` | Read agent behavior preferences (1-10 scales) |
 
 ### Supervisor-only tools (not for workers)
 
@@ -56,6 +57,24 @@ All tools live in the `tools/` directory. Run them directly from the repo root.
 # Send a review request to supervisor
 ./tools/mailbox send supervisor "[REVIEW-REQUEST] <details>"
 ```
+
+## Preferences
+
+CMUX has a TARS-style preference system in `.cmux/preferences.json`. On startup, read this file to calibrate your behavior:
+
+```bash
+./tools/prefs list    # or: jq . .cmux/preferences.json
+```
+
+Workers should adjust for these settings:
+
+- **verbosity** (1-10): Controls how detailed your responses and status updates are. At 1-3, be terse. At 7-10, explain your reasoning.
+- **humor** (1-10): Controls tone. At 1-3, stay dry and professional. At 7-10, add personality.
+- **journal_detail** (1-10): Controls journaling frequency. At 1-3, only journal major events. At 7-10, journal everything.
+
+Workers don't need to act on `alertness`, `autonomy`, or `proactiveness` — those are supervisor-level concerns.
+
+---
 
 ## CRITICAL: You Run Unattended
 

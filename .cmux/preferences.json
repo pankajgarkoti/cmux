@@ -1,0 +1,12 @@
+{
+  "alertness": 7,
+  "verbosity": 5,
+  "autonomy": 7,
+  "humor": 3,
+  "proactiveness": 6,
+  "journal_detail": 5,
+  "_meta": {
+    "updated_at": "2026-02-20T11:43:19Z",
+    "updated_by": "worker-prefs"
+  }
+}
