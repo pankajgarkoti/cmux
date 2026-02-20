@@ -188,6 +188,65 @@ cmd_remove() {
 
     info "Removing project: $id"
 
+    # Step 1: Deactivate (kill supervisor) if active
+    local is_active
+    is_active=$(jq -r --arg id "$id" '.projects[] | select(.id == $id) | .active' "$REGISTRY")
+    if [[ "$is_active" == "true" ]]; then
+        info "Deactivating project supervisor..."
+        cmd_deactivate "$id" || warn "Failed to deactivate project (continuing removal)"
+    fi
+
+    # Step 2: Kill all workers whose CMUX_PROJECT_ID matches this project
+    local session="${CMUX_SESSION:-cmux}"
+    if tmux has-session -t "$session" 2>/dev/null; then
+        local windows
+        windows=$(tmux list-windows -t "$session" -F '#{window_name}' 2>/dev/null || true)
+        while IFS= read -r wname; do
+            [[ -z "$wname" ]] && continue
+            [[ "$wname" == "monitor" ]] && continue
+            [[ "$wname" == "supervisor" ]] && continue
+            [[ "$wname" == "sentry" ]] && continue
+            [[ "$wname" == sup-* ]] && continue
+
+            # Check if this window's CMUX_PROJECT_ID matches
+            local pane_pid
+            pane_pid=$(tmux list-panes -t "${session}:${wname}" -F '#{pane_pid}' 2>/dev/null | head -1) || continue
+            [[ -z "$pane_pid" ]] && continue
+
+            # Check environment of the shell process for CMUX_PROJECT_ID
+            local worker_project
+            worker_project=$(ps -p "$pane_pid" -o command= 2>/dev/null | grep -o "CMUX_PROJECT_ID=${id}" 2>/dev/null || true)
+            if [[ -z "$worker_project" ]]; then
+                # Also check via /proc or lsof — try capturing from tmux env
+                worker_project=$(tmux show-environment -t "${session}:${wname}" CMUX_PROJECT_ID 2>/dev/null | grep -o "=${id}$" || true)
+            fi
+
+            if [[ -n "$worker_project" ]]; then
+                info "Killing worker '$wname' (project: $id)"
+                tmux send-keys -t "${session}:${wname}" C-c 2>/dev/null || true
+                sleep 0.5
+                tmux kill-window -t "${session}:${wname}" 2>/dev/null || true
+            fi
+        done <<< "$windows"
+    fi
+
+    # Step 3: Remove .claude/settings.json if hooks were installed
+    local hooks_installed
+    hooks_installed=$(jq -r --arg id "$id" '.projects[] | select(.id == $id) | .hooks_installed' "$REGISTRY")
+    if [[ "$hooks_installed" == "true" ]]; then
+        local project_path
+        project_path=$(jq -r --arg id "$id" '.projects[] | select(.id == $id) | .path' "$REGISTRY")
+        local settings_file="${project_path}/.claude/settings.json"
+        if [[ -f "$settings_file" ]]; then
+            info "Removing installed hooks: $settings_file"
+            rm -f "$settings_file"
+            # Remove .claude dir if empty
+            rmdir "${project_path}/.claude" 2>/dev/null || true
+            ok "Hooks removed"
+        fi
+    fi
+
+    # Step 4: Remove from registry
     local tmp
     tmp=$(mktemp)
     jq --arg id "$id" '.projects |= map(select(.id != $id))' "$REGISTRY" > "$tmp" && mv "$tmp" "$REGISTRY"
