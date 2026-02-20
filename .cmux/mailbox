@@ -127,3 +127,6 @@
 {"id":"871fbd9e-a008-49eb-8319-321c69a29265","ts":"2026-02-20T22:00:23+05:30","from":"cmux:sup-todo-backend","to":"cmux:supervisor","subject":"[DONE]","body":"/Users/pankajgarkoti/Desktop/code/oss/cmux/.cmux/journal/2026-02-20/attachments/sup-todo-backend-1771605023.md","status":"submitted"}
 [2026-02-20T22:04:04+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'build-todo-api' missing from tmux
 [2026-02-20T22:09:04+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'build-todo-api' missing from tmux
+[2026-02-20T22:14:05+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'build-todo-api' missing from tmux
+[2026-02-20T22:19:05+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'build-todo-api' missing from tmux
+[2026-02-20T22:24:05+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'worker-safe-send' missing from tmux
