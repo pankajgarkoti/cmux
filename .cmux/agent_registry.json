@@ -48,5 +48,15 @@
     "display_name": "sup-todo-frontend",
     "role": "project-supervisor",
     "project_id": "todo-frontend"
+  },
+  "worker-testing-policy": {
+    "registered_at": "2026-02-20T22:44:45Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-20T22:44:45Z",
+    "agent_id": "ag_3kr5g712",
+    "display_name": "worker-testing-policy",
+    "role": "worker",
+    "project_id": "cmux"
   }
 }
