@@ -133,14 +133,28 @@ export function useWebSocket() {
           queryClient.invalidateQueries({ queryKey: ['agents'] });
         }
 
-        // Add to general activity feed
-        addActivity({
-          id: crypto.randomUUID(),
-          timestamp: data.timestamp || new Date().toISOString(),
-          type: mapEventToActivityType(data.event, data.data as Record<string, unknown>),
-          agent_id: data.data?.agent_id || data.data?.session_id || data.data?.from_agent || 'system',
-          data: data.data,
-        });
+        // Add to general activity feed — but skip events that have dedicated handlers
+        // to avoid duplicates. agent_event is polled from API by useAgentEvents which
+        // has stable IDs; agent_thought has its own store; session/archive events update
+        // their own stores and aren't meaningful activity items.
+        const handledEvents = new Set([
+          'agent_event',
+          'agent_thought',
+          'session_created',
+          'session_terminated',
+          'session_status_changed',
+          'agent_archived',
+        ]);
+
+        if (!handledEvents.has(data.event)) {
+          addActivity({
+            id: data.data?.id || data.id || crypto.randomUUID(),
+            timestamp: data.timestamp || new Date().toISOString(),
+            type: mapEventToActivityType(data.event, data.data as Record<string, unknown>),
+            agent_id: data.data?.agent_id || data.data?.session_id || data.data?.from_agent || 'system',
+            data: data.data,
+          });
+        }
       } catch (e) {
         console.error('Failed to parse WebSocket message:', e);
       }

@@ -14,8 +14,8 @@ export function useAgentEvents() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['agent-events'],
     queryFn: () => api.getAgentEvents(undefined, 100),
-    staleTime: 30000,
-    refetchInterval: 30000,
+    staleTime: 60000,
+    refetchInterval: 60000,
   });
 
   // Populate activity store with historical events on load

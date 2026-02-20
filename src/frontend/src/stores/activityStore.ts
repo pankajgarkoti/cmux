@@ -16,14 +16,29 @@ function buildSeenIds(activities: Activity[]): Set<string> {
   return new Set(activities.map((a) => a.id));
 }
 
+// Content-based fingerprint for secondary dedup — catches duplicates
+// that arrive from different sources (WebSocket vs API) with different IDs
+function activityFingerprint(a: Activity): string {
+  return `${a.type}|${a.agent_id}|${a.timestamp}`;
+}
+
+function buildSeenFingerprints(activities: Activity[]): Set<string> {
+  return new Set(activities.map(activityFingerprint));
+}
+
 export const useActivityStore = create<ActivityState>((set, get) => ({
   activities: [],
 
   addActivity: (activity) =>
     set((state) => {
-      // Check against current activities to deduplicate
+      // Deduplicate by ID
       const existingIds = buildSeenIds(state.activities);
       if (existingIds.has(activity.id)) {
+        return state;
+      }
+      // Secondary dedup by content fingerprint (type + agent_id + timestamp)
+      const existingFingerprints = buildSeenFingerprints(state.activities);
+      if (existingFingerprints.has(activityFingerprint(activity))) {
         return state;
       }
       return {
@@ -33,13 +48,16 @@ export const useActivityStore = create<ActivityState>((set, get) => ({
 
   addActivities: (activities) =>
     set((state) => {
-      // Build set from current activities
+      // Build dedup sets from current activities
       const existingIds = buildSeenIds(state.activities);
+      const existingFingerprints = buildSeenFingerprints(state.activities);
       const newActivities: Activity[] = [];
 
       for (const activity of activities) {
-        if (!existingIds.has(activity.id)) {
+        const fp = activityFingerprint(activity);
+        if (!existingIds.has(activity.id) && !existingFingerprints.has(fp)) {
           existingIds.add(activity.id);
+          existingFingerprints.add(fp);
           newActivities.push(activity);
         }
       }
