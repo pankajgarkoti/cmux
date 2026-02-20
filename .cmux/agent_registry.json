@@ -48,5 +48,15 @@
     "display_name": "sup-todo-frontend",
     "role": "project-supervisor",
     "project_id": "todo-frontend"
+  },
+  "worker-fix-project-workers": {
+    "registered_at": "2026-02-20T17:00:47Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-20T17:00:47Z",
+    "agent_id": "ag_fdx3cxfp",
+    "display_name": "worker-fix-project-workers",
+    "role": "worker",
+    "project_id": "cmux"
   }
 }

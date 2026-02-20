@@ -730,3 +730,11 @@ All 10 steps executed by worker build-todo-api. 10 commits on feat/todo-rest-api
 
 ## 22:09 - Todo app builds complete
 Both todo builds finished successfully. Backend (sup-todo-backend): 10 commits on feat/todo-rest-api, 11/11 tests passing, worker build-todo-api did the work. Frontend (sup-todo-frontend): 10 commits on feat/todo-app-frontend, production build verified (207KB JS + 25KB CSS), supervisor executed steps directly without spawning workers. Total time: backend ~10min, frontend ~13min. Both on feature branches ready for merge.
+
+## 22:34 - Starting: Fix 4 issues with project supervisor worker spawning and reporting in tools/workers and tools/projects
+
+## 22:36 - Fixed project supervisor worker spawning
+Completed 4 fixes: (1) worktrees now branch from CWD git root instead of inherited CMUX_PROJECT_ROOT, (2) --worktree and --dir no longer mutually exclusive, (3) project supervisor context forbids direct coding, (4) project supervisors instructed to send [DONE] reports. Commit 39e5ede.
+
+## 22:37 - Project worker fixes
+worker-fix-project-workers delivered commit 39e5ede. Four fixes: (1) worktree branches from CWD git root not CMUX, (2) --worktree and --dir no longer conflict, (3) CRITICAL delegation language in project supervisor template, (4) mandatory mailbox done reporting. 8 files, +36/-10. bash -n passes.
