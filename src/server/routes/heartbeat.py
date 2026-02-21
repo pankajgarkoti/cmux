@@ -155,7 +155,19 @@ async def get_heartbeat_history(
 
 @router.get("")
 async def get_heartbeat():
-    """Return latest heartbeat data (fast in-memory path)."""
+    """Return latest heartbeat data.
+
+    Uses in-memory cache first, falls back to latest DB record
+    (survives server restart).
+    """
+    global _latest_heartbeat
+    if _latest_heartbeat is None:
+        with _get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM heartbeat_history ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            if row:
+                _latest_heartbeat = _row_to_heartbeat(row)
     if _latest_heartbeat is None:
         return {"status": "no_data", "message": "No heartbeat received yet"}
     return _latest_heartbeat.model_dump()
