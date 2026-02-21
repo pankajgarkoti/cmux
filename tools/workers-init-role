@@ -15,6 +15,9 @@ set -euo pipefail
 
 CMUX_PROJECT_ROOT="${CMUX_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 
+# Source shared scanning library
+source "${CMUX_PROJECT_ROOT}/tools/lib/scan-project.sh"
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -106,11 +109,8 @@ if [[ -n "$scan_dir" ]]; then
     [[ -d "$scan_dir" ]] || die "directory does not exist: $scan_dir"
     scan_dir="$(cd "$scan_dir" && pwd)"
 elif [[ -n "$project_id" ]]; then
-    local_projects="${CMUX_PROJECT_ROOT}/.cmux/projects.json"
-    [[ -f "$local_projects" ]] || die "projects registry not found: $local_projects"
-    scan_dir=$(jq -r --arg id "$project_id" '.projects[] | select(.id == $id) | .path' "$local_projects")
-    [[ -z "$scan_dir" || "$scan_dir" == "null" ]] && die "project '$project_id' not found in registry"
-    [[ -d "$scan_dir" ]] || die "project path does not exist: $scan_dir"
+    scan_dir=$(resolve_project_path "$project_id" "$CMUX_PROJECT_ROOT") || \
+        die "project '$project_id' not found in registry"
 else
     scan_dir="$CMUX_PROJECT_ROOT"
     project_id="cmux"
@@ -128,160 +128,10 @@ fi
 info "Scanning: $scan_dir (project: $project_id)"
 
 #───────────────────────────────────────────────────────────────────────────────
-# Scan project
+# Scan project (uses shared lib)
 #───────────────────────────────────────────────────────────────────────────────
 
-# --- README / CLAUDE.md summary ---
-project_desc=""
-if [[ -f "$scan_dir/README.md" ]]; then
-    # First 10 non-empty lines as summary
-    project_desc=$(head -40 "$scan_dir/README.md" | head -10)
-fi
-claude_md_notes=""
-if [[ -f "$scan_dir/CLAUDE.md" ]]; then
-    claude_md_notes="CLAUDE.md present — contains project-specific instructions for Claude agents."
-fi
-
-# --- Package manager & dependencies ---
-tech_stack=""
-build_cmd=""
-test_cmd=""
-lint_cmd=""
-dev_cmd=""
-deps_summary=""
-
-if [[ -f "$scan_dir/package.json" ]]; then
-    info "Found package.json"
-    pkg="$scan_dir/package.json"
-
-    # Framework detection
-    frameworks=""
-    for fw in react next vue svelte angular vite expo react-native express fastify hono; do
-        if jq -e ".dependencies[\"$fw\"] // .devDependencies[\"$fw\"]" "$pkg" >/dev/null 2>&1; then
-            frameworks="${frameworks:+$frameworks, }$fw"
-        fi
-    done
-
-    # Language
-    has_ts=false
-    if jq -e '.devDependencies["typescript"]' "$pkg" >/dev/null 2>&1; then
-        has_ts=true
-    fi
-
-    lang="JavaScript"
-    [[ "$has_ts" == true ]] && lang="TypeScript"
-    tech_stack="${lang}${frameworks:+ ($frameworks)}"
-
-    # Scripts
-    build_cmd=$(jq -r '.scripts.build // empty' "$pkg")
-    test_cmd=$(jq -r '.scripts.test // empty' "$pkg")
-    lint_cmd=$(jq -r '.scripts.lint // empty' "$pkg")
-    dev_cmd=$(jq -r '.scripts.dev // empty' "$pkg")
-
-    # Top deps (up to 15)
-    deps_summary=$(jq -r '[(.dependencies // {} | keys[]), (.devDependencies // {} | keys[])] | .[0:15] | join(", ")' "$pkg" 2>/dev/null)
-fi
-
-if [[ -f "$scan_dir/pyproject.toml" ]]; then
-    info "Found pyproject.toml"
-    # Python project
-    py_deps=""
-    if command -v python3 >/dev/null 2>&1; then
-        py_deps=$(python3 -c "
-import tomllib, sys
-with open('$scan_dir/pyproject.toml', 'rb') as f:
-    d = tomllib.load(f)
-deps = d.get('project', {}).get('dependencies', [])
-print(', '.join(deps[:15]))
-" 2>/dev/null || echo "")
-    fi
-    if [[ -z "$py_deps" ]]; then
-        # Fallback: grep for dependencies
-        py_deps=$(grep -A 20 '^\[project\]' "$scan_dir/pyproject.toml" 2>/dev/null | grep -oP '"[^"]*"' | tr -d '"' | head -15 | paste -sd ", " -)
-    fi
-
-    # Detect Python frameworks
-    py_fw=""
-    for fw in fastapi django flask starlette; do
-        if grep -qi "$fw" "$scan_dir/pyproject.toml" 2>/dev/null; then
-            py_fw="${py_fw:+$py_fw, }$fw"
-        fi
-    done
-
-    if [[ -n "$tech_stack" ]]; then
-        tech_stack="${tech_stack} + Python${py_fw:+ ($py_fw)}"
-    else
-        tech_stack="Python${py_fw:+ ($py_fw)}"
-    fi
-    deps_summary="${deps_summary:+$deps_summary; Python: }${py_deps:-<see pyproject.toml>}"
-    [[ -z "$test_cmd" ]] && test_cmd="uv run pytest"
-fi
-
-if [[ -f "$scan_dir/go.mod" ]]; then
-    info "Found go.mod"
-    go_module=$(head -1 "$scan_dir/go.mod" | awk '{print $2}')
-    tech_stack="${tech_stack:+$tech_stack + }Go ($go_module)"
-    [[ -z "$test_cmd" ]] && test_cmd="go test ./..."
-    [[ -z "$build_cmd" ]] && build_cmd="go build ./..."
-fi
-
-[[ -z "$tech_stack" ]] && tech_stack="Unknown — check manually"
-
-# --- Directory structure ---
-info "Scanning directory structure"
-dir_tree=$(ls -1 "$scan_dir" | head -30 | while read -r entry; do
-    if [[ -d "$scan_dir/$entry" ]]; then
-        echo "  $entry/"
-    else
-        echo "  $entry"
-    fi
-done)
-
-# --- Key source files (entry points, routes, components) ---
-info "Finding key source files"
-key_files=""
-for pattern in "src/index.*" "src/main.*" "src/app.*" "src/server/main.*" "src/server/app.*" \
-               "index.*" "main.*" "app.*" "server.*" \
-               "src/routes/*" "src/server/routes/*" "routes/*" "api/*" \
-               "src/components/*" "src/pages/*" "src/views/*"; do
-    matches=$(find "$scan_dir" -path "$scan_dir/node_modules" -prune -o \
-              -path "$scan_dir/.git" -prune -o \
-              -path "$scan_dir/dist" -prune -o \
-              -path "$scan_dir/build" -prune -o \
-              -path "$scan_dir/.next" -prune -o \
-              -path "$scan_dir/__pycache__" -prune -o \
-              -path "$scan_dir/$pattern" -print 2>/dev/null | head -5)
-    if [[ -n "$matches" ]]; then
-        while IFS= read -r f; do
-            # Make path relative to scan_dir
-            rel="${f#$scan_dir/}"
-            key_files="${key_files:+$key_files\n}  - $rel"
-        done <<< "$matches"
-    fi
-done
-[[ -z "$key_files" ]] && key_files="  - <none detected — check manually>"
-
-# --- Config files / conventions ---
-info "Checking conventions"
-conventions=""
-for cfg in .eslintrc .eslintrc.js .eslintrc.json eslint.config.js eslint.config.mjs \
-           tsconfig.json jsconfig.json \
-           pytest.ini pyproject.toml setup.cfg \
-           .prettierrc .prettierrc.json prettier.config.js \
-           .editorconfig \
-           Makefile Dockerfile docker-compose.yml; do
-    if [[ -e "$scan_dir/$cfg" ]]; then
-        conventions="${conventions:+$conventions, }$cfg"
-    fi
-done
-[[ -z "$conventions" ]] && conventions="None detected"
-
-# --- Git recent activity ---
-info "Reading git log"
-git_summary=""
-if [[ -d "$scan_dir/.git" ]]; then
-    git_summary=$(git -C "$scan_dir" log --oneline -20 2>/dev/null || echo "Could not read git log")
-fi
+scan_project "$scan_dir"
 
 #───────────────────────────────────────────────────────────────────────────────
 # Role-type specific specialization templates
@@ -509,80 +359,13 @@ role_label_lower=$(echo "$role_label" | tr '[:upper:]' '[:lower:]')
     gen_specialization "$role_type"
     echo ""
 
-    echo "## Project Context"
-    echo ""
-    echo "### Tech Stack"
-    echo ""
-    echo "$tech_stack"
-    echo ""
-    echo "### Key Dependencies"
-    echo ""
-    echo "${deps_summary:-<none detected>}"
-    echo ""
-    echo "### Directory Structure"
-    echo ""
-    echo '```'
-    echo "$dir_tree"
-    echo '```'
-    echo ""
-    echo "### Key Files"
-    echo ""
-    echo -e "$key_files"
-    echo ""
-
-    # Commands table (only if any commands found)
-    if [[ -n "$build_cmd" || -n "$test_cmd" || -n "$lint_cmd" || -n "$dev_cmd" ]]; then
-        echo "### Commands"
-        echo ""
-        echo "| Action | Command |"
-        echo "|--------|---------|"
-        [[ -n "$dev_cmd" ]]   && echo "| Dev server | \`$dev_cmd\` |"
-        [[ -n "$build_cmd" ]] && echo "| Build | \`$build_cmd\` |"
-        [[ -n "$test_cmd" ]]  && echo "| Test | \`$test_cmd\` |"
-        [[ -n "$lint_cmd" ]]  && echo "| Lint | \`$lint_cmd\` |"
-        echo ""
-    fi
-
-    echo "### Config & Conventions"
-    echo ""
-    echo "$conventions"
-    echo ""
-    [[ -n "$claude_md_notes" ]] && echo "> $claude_md_notes" && echo ""
-
-    echo "### Recent Git Activity"
-    echo ""
-    echo '```'
-    echo "${git_summary:-No git history available}"
-    echo '```'
+    write_project_context
     echo ""
 
     gen_standards "$role_type"
     echo ""
 
-    cat << 'STATIC'
-## As a Permanent Worker
-
-You persist across tasks. You receive work via `[TASK]` messages with task IDs from the supervisor.
-
-### On receiving a [TASK] message:
-1. Read the task details from the task system if a task ID is provided
-2. Acknowledge with `[STATUS] Starting task <id>`
-3. Do the work
-4. Commit with a descriptive message
-5. Report `[DONE]` with a summary via `./tools/mailbox done "summary"`
-
-### Between tasks:
-- You remain idle and responsive
-- When nudged by heartbeat, respond with `[SYS] Idle — awaiting task.`
-
-### Context resets:
-- Your supervisor may reset your context periodically
-- After reset, re-read this file and check for any in-progress tasks
-
-## Team Reference
-
-See [docs/TEAM.md](../../docs/TEAM.md) for the full team architecture, topology, and coordination protocols.
-STATIC
+    write_permanent_worker_section
 } > "$output_file"
 
 ok "Generated: $output_file"
