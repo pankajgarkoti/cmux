@@ -3,8 +3,10 @@
 # workers - Manage worker agents from the supervisor
 #
 # Usage:
-#   workers spawn <name> <task> [--dir <path>] [--project <id>] [--task <id>] [--worktree]
-#   workers kill <name>            - Terminate a worker
+#   workers spawn <name> <task> [--dir <path>] [--project <id>] [--task <id>] [--worktree] [--permanent <role-ctx>]
+#   workers kill <name> [--force]  - Terminate a worker (--force for permanent workers)
+#   workers reset <name>           - Reset a permanent worker's context
+#   workers assign <task-id> <name> - Assign a task and notify worker
 #   workers list                   - List all workers
 #   workers send <name> <message>  - Send message to a worker
 #   workers status <name>          - Get worker terminal output
@@ -77,8 +79,9 @@ cmd_spawn() {
     local project_id=""
     local task_id=""
     local use_worktree=false
+    local permanent_role_ctx=""
 
-    # Parse arguments: workers spawn <name> <task> [--dir <path>] [--project <id>] [--task <task-id>] [--worktree]
+    # Parse arguments: workers spawn <name> <task> [--dir <path>] [--project <id>] [--task <task-id>] [--worktree] [--permanent <role-ctx>]
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --dir)
@@ -94,6 +97,11 @@ cmd_spawn() {
             --task)
                 [[ -z "${2:-}" ]] && die "--task requires a task ID argument"
                 task_id="$2"
+                shift 2
+                ;;
+            --permanent)
+                [[ -z "${2:-}" ]] && die "--permanent requires a role context path"
+                permanent_role_ctx="$2"
                 shift 2
                 ;;
             --worktree)
@@ -236,6 +244,15 @@ cmd_spawn() {
 
     jq "${jq_args[@]}" "$jq_filter" "$reg_file" > "$reg_tmp" && mv "$reg_tmp" "$reg_file"
 
+    # Add permanent worker fields if --permanent was specified
+    if [[ -n "${permanent_role_ctx}" ]]; then
+        local ptmp
+        ptmp=$(mktemp)
+        jq --arg k "$name" --arg rctx "$permanent_role_ctx" \
+            '.[$k].permanent = true | .[$k].role = "permanent-worker" | .[$k].role_context = $rctx | .[$k].tasks_since_reset = 0 | .[$k].reset_count = 0' \
+            "$reg_file" > "$ptmp" && mv "$ptmp" "$reg_file"
+    fi
+
     # Build environment variable exports
     local supervisor_name="${CMUX_AGENT_NAME:-supervisor}"
     local env_vars="CMUX_AGENT=true CMUX_AGENT_ID=${agent_id} CMUX_AGENT_NAME=${name} CMUX_SESSION=${CMUX_SESSION} CMUX_HOME=${CMUX_PROJECT_ROOT} CMUX_PORT=${CMUX_PORT:-8000} CMUX_SUPERVISOR=${supervisor_name} CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false"
@@ -264,6 +281,11 @@ cmd_spawn() {
         tmux send-keys -t "${CMUX_SESSION}:${name}" -l "/vim"
         tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
         sleep 1
+    fi
+
+    # Override task content for permanent workers
+    if [[ -n "${permanent_role_ctx}" ]]; then
+        task="Read ${permanent_role_ctx} for your permanent role. You are a permanent worker — you persist across tasks and receive work via [TASK] messages. Read docs/WORKER_ROLE.md for guidelines."
     fi
 
     # Write worker context to temp file to avoid multiline paste issues
@@ -353,9 +375,25 @@ WTEOF
 }
 
 cmd_kill() {
-    local name="${1:-}"
+    local name=""
+    local force_flag=false
 
-    [[ -z "$name" ]] && die "usage: workers kill <name>"
+    # Parse arguments: workers kill <name> [--force]
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --force) force_flag=true; shift ;;
+            *)
+                if [[ -z "$name" ]]; then
+                    name="$1"
+                else
+                    die "unexpected argument: $1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    [[ -z "$name" ]] && die "usage: workers kill <name> [--force]"
 
     if is_supervisor "$name"; then
         die "cannot kill supervisor agents"
@@ -363,6 +401,26 @@ cmd_kill() {
 
     if ! window_exists "$name"; then
         die "worker '$name' not found"
+    fi
+
+    # Check for permanent worker protection
+    local reg_file="${CMUX_PROJECT_ROOT}/.cmux/agent_registry.json"
+    local is_perm=false
+    if [[ -f "$reg_file" ]]; then
+        is_perm=$(jq -r --arg k "$name" '.[$k].permanent // false' "$reg_file" 2>/dev/null)
+    fi
+    if [[ "$is_perm" == "true" ]]; then
+        if [[ "$force_flag" != "true" ]]; then
+            die "Cannot kill permanent worker '$name'.\n  Use 'workers reset $name' to reset context, or\n  Use 'workers kill $name --force' to permanently remove."
+        fi
+        # Silent audit log
+        local deletion_log="${CMUX_PROJECT_ROOT}/.cmux/permanent-worker-deletions.json"
+        [[ -f "$deletion_log" ]] || echo '[]' > "$deletion_log"
+        local dtmp
+        dtmp=$(mktemp)
+        jq --arg name "$name" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '. + [{"worker": $name, "deleted_at": $ts}]' "$deletion_log" > "$dtmp" && mv "$dtmp" "$deletion_log"
+        warn "Permanently removing '$name'"
     fi
 
     info "Terminating worker: $name"
@@ -474,6 +532,140 @@ cmd_status() {
     tmux capture-pane -t "${CMUX_SESSION}:${name}" -p -S "-${lines}"
 }
 
+cmd_reset() {
+    local name="${1:-}"
+    [[ -z "$name" ]] && die "usage: workers reset <name>"
+
+    # Verify it's a permanent worker
+    local reg_file="${CMUX_PROJECT_ROOT}/.cmux/agent_registry.json"
+    local is_perm
+    is_perm=$(jq -r --arg k "$name" '.[$k].permanent // false' "$reg_file" 2>/dev/null)
+    [[ "$is_perm" != "true" ]] && die "'$name' is not a permanent worker (use 'workers kill' instead)"
+
+    if ! window_exists "$name"; then
+        die "worker '$name' window not found"
+    fi
+
+    info "Resetting permanent worker: $name"
+
+    # Step 1: Capture pre-reset state (reuse pre-compact hook)
+    local artifact_file=""
+    local pre_compact_hook="${CMUX_PROJECT_ROOT}/.claude/hooks/pre-compact.sh"
+    if [[ -x "$pre_compact_hook" ]]; then
+        artifact_file=$("$pre_compact_hook" "$name" 2>/dev/null) || true
+        [[ -n "$artifact_file" ]] && info "State captured: $artifact_file"
+    fi
+
+    # Step 2: Mark current task as blocked (if any)
+    local db="${CMUX_PROJECT_ROOT}/.cmux/tasks.db"
+    if [[ -f "$db" ]]; then
+        local active_task
+        active_task=$(sqlite3 "$db" \
+            "SELECT id FROM tasks WHERE (assigned_to='${name}' OR linked_workers LIKE '%${name}%') AND status='in-progress' LIMIT 1;" \
+            2>/dev/null || echo "")
+        if [[ -n "$active_task" ]]; then
+            sqlite3 "$db" "UPDATE tasks SET status='blocked', updated_at='$(date -u +%Y-%m-%dT%H:%M:%SZ)' WHERE id='${active_task}';"
+            warn "Task $active_task marked as blocked during reset"
+        fi
+    fi
+
+    # Step 3: Archive conversation
+    info "Archiving conversation..."
+    curl -sX POST "http://localhost:${CMUX_PORT:-8000}/api/agents/${name}/archive" > /dev/null 2>&1 || \
+        warn "Failed to archive (server may be down)"
+
+    # Step 4: Gracefully exit Claude, then restart
+    info "Stopping Claude process..."
+    tmux send-keys -t "${CMUX_SESSION}:${name}" -l "/exit"
+    sleep 0.1
+    tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
+
+    # Wait for Claude to exit (up to 10 seconds)
+    local wait=0
+    while ((wait < 10)); do
+        sleep 1
+        ((wait++))
+        local pane_output
+        pane_output=$(tmux capture-pane -t "${CMUX_SESSION}:${name}" -p -S -3 2>/dev/null || echo "")
+        if echo "$pane_output" | grep -qE '^\$|^%|❯'; then
+            break
+        fi
+    done
+
+    # If /exit didn't work, force with Ctrl+C
+    if ((wait >= 10)); then
+        warn "/exit timed out, sending Ctrl+C"
+        tmux send-keys -t "${CMUX_SESSION}:${name}" C-c
+        sleep 2
+    fi
+
+    # Step 5: Restart Claude in the same window
+    info "Restarting Claude..."
+    local agent_id
+    agent_id=$(jq -r --arg k "$name" '.[$k].agent_id' "$reg_file")
+    local project_id
+    project_id=$(jq -r --arg k "$name" '.[$k].project_id // "cmux"' "$reg_file")
+
+    local supervisor_name="${CMUX_AGENT_NAME:-supervisor}"
+    local env_vars="CMUX_AGENT=true CMUX_AGENT_ID=${agent_id} CMUX_AGENT_NAME=${name} CMUX_SESSION=${CMUX_SESSION} CMUX_HOME=${CMUX_PROJECT_ROOT} CMUX_PORT=${CMUX_PORT:-8000} CMUX_SUPERVISOR=${supervisor_name} CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false"
+    [[ -n "$project_id" && "$project_id" != "null" ]] && env_vars="${env_vars} CMUX_PROJECT_ID=${project_id}"
+
+    tmux send-keys -t "${CMUX_SESSION}:${name}" -l "export ${env_vars} && claude --dangerously-skip-permissions"
+    sleep 0.1
+    tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
+
+    # Wait for Claude to initialize
+    info "Waiting ${STARTUP_DELAY}s for Claude to initialize..."
+    sleep "$STARTUP_DELAY"
+
+    # Disable vim mode if needed
+    if tmux capture-pane -t "${CMUX_SESSION}:${name}" -p | grep -qE "\-\- (INSERT|NORMAL|VISUAL) \-\-"; then
+        tmux send-keys -t "${CMUX_SESSION}:${name}" -l "/vim"
+        tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
+        sleep 1
+    fi
+
+    # Step 6: Re-inject role context
+    local role_ctx
+    role_ctx=$(jq -r --arg k "$name" '.[$k].role_context // empty' "$reg_file")
+    [[ -z "$role_ctx" ]] && die "No role_context found in registry for $name"
+
+    local recovery_instruction="Read ${CMUX_PROJECT_ROOT}/.cmux/worker-contexts/${name}-context.md for your identity. Then read ${role_ctx} for your permanent role."
+    if [[ -n "$artifact_file" ]]; then
+        recovery_instruction="${recovery_instruction} Then read ${artifact_file} for your pre-reset state — you may have an in-progress task to resume."
+    fi
+
+    info "Sending role context..."
+    tmux send-keys -t "${CMUX_SESSION}:${name}" -l "$recovery_instruction"
+    sleep 0.1
+    tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
+
+    # Step 7: Update registry counters
+    local now
+    now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    local tmp
+    tmp=$(mktemp)
+    jq --arg k "$name" --arg ts "$now" \
+        '.[$k].reset_count = ((.[$k].reset_count // 0) + 1) | .[$k].last_reset_at = $ts | .[$k].tasks_since_reset = 0' \
+        "$reg_file" > "$tmp" && mv "$tmp" "$reg_file"
+
+    ok "Permanent worker '$name' reset (reset #$(jq -r --arg k "$name" '.[$k].reset_count' "$reg_file"))"
+}
+
+cmd_assign() {
+    local task_id="${1:-}"
+    local worker="${2:-}"
+    [[ -z "$task_id" || -z "$worker" ]] && die "usage: workers assign <task-id> <worker-name>"
+
+    local tasks_tool="${CMUX_PROJECT_ROOT}/tools/tasks"
+    [[ -x "$tasks_tool" ]] || die "tools/tasks not found"
+
+    "$tasks_tool" assign "$task_id" "$worker"
+    "$tasks_tool" update "$task_id" in-progress
+    ./tools/mailbox send "$worker" "[TASK] $task_id: $("$tasks_tool" show "$task_id" 2>/dev/null | head -1)"
+    ok "Task $task_id assigned to $worker"
+}
+
 cmd_help() {
     cat << 'EOF'
 workers - Manage worker agents
@@ -483,7 +675,9 @@ USAGE:
 
 COMMANDS:
     spawn <name> <task> [options]   Create a new worker and assign a task
-    kill <name>                     Terminate a worker (not supervisors)
+    kill <name> [--force]           Terminate a worker (not supervisors)
+    reset <name>                    Reset a permanent worker's context (preserves identity)
+    assign <task-id> <worker>       Assign a task to a worker and notify them
     list                            List all workers in the session
     send <name> <message>           Send a message to a worker
     status <name> [lines]           Show recent terminal output (default: 30 lines)
@@ -499,15 +693,26 @@ SPAWN OPTIONS:
                        Creates ~/.cmux/worktrees/<project>/<name> on branch feat/<name>.
                        When combined with --dir, uses --dir as the source repo.
                        Worktrees are preserved on kill.
+    --permanent <path> Mark as permanent worker with a role context file.
+                       Permanent workers persist across tasks and receive [TASK] messages.
+                       Use 'workers reset' to clear context without losing identity.
+                       Use 'workers kill --force' to permanently remove.
+
+KILL OPTIONS:
+    --force            Force-kill a permanent worker (normally protected from kill)
 
 EXAMPLES:
     workers spawn auth-worker "Implement JWT authentication in src/auth/"
     workers spawn api-worker "Fix the auth bug" --dir /path/to/my-api --project my-api
     workers spawn feature-x "Add feature X" --worktree
     workers spawn bug-fixer "Fix login crash" --task t_a3f8k2m9
+    workers spawn perm-frontend "Frontend specialist" --permanent .cmux/worker-contexts/perm-frontend-role.md
+    workers reset perm-frontend
+    workers assign t_a3f8k2m9 perm-frontend
     workers send auth-worker "Also add refresh token support"
     workers status auth-worker 50
     workers kill auth-worker
+    workers kill perm-frontend --force
     workers list
 
 ENVIRONMENT:
@@ -531,6 +736,8 @@ main() {
     case "$cmd" in
         spawn)  cmd_spawn "$@" ;;
         kill)   cmd_kill "$@" ;;
+        reset)  cmd_reset "$@" ;;
+        assign) cmd_assign "$@" ;;
         list)   cmd_list "$@" ;;
         send)   cmd_send "$@" ;;
         status) cmd_status "$@" ;;

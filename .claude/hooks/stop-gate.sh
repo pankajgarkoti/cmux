@@ -32,6 +32,17 @@ if [[ "${CMUX_AGENT_NAME}" == "supervisor" ]]; then
     exit 0
 fi
 
+# Skip for permanent workers during reset — their state is captured by the reset procedure
+if [[ "${CMUX_AGENT_NAME}" == perm-* ]]; then
+    local_reg_file="${CMUX_HOME:-.}/.cmux/agent_registry.json"
+    if [[ -f "$local_reg_file" ]]; then
+        local_is_perm=$(jq -r --arg k "${CMUX_AGENT_NAME}" '.[$k].permanent // false' "$local_reg_file" 2>/dev/null)
+        if [[ "$local_is_perm" == "true" ]]; then
+            exit 0  # Allow stop — reset procedure handles state preservation
+        fi
+    fi
+fi
+
 # Get transcript path
 transcript_path=$(echo "$input" | jq -r '.transcript_path // empty')
 
