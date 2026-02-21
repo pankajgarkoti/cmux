@@ -694,3 +694,12 @@ Built bidirectional Telegram ↔ CMUX integration. Inbound: Telegram polling →
 
 ## 17:26 - Session summary — Kai perm-backend
 Completed 6 tasks this session: (1) Fixed lost messages when PreToolUse hooks block tool calls — block-interactive.sh now rescues assistant text from transcript. (2) Added GET /api/messages/inbox/{agent_id} endpoint with pinned task and ASC-ordered messages. (3) Added clone_of and clone_index fields to Agent model. (4) Built token usage tracking with budget aggregation endpoints (GET /api/budget). (5) Fixed heartbeat GET to fall back to DB after server restart. (6) Integrated Laminar observability. (7) Built Telegram bot integration for bidirectional user ↔ CMUX messaging. All tasks committed, all tests passing (59/59).
+
+## 18:04 - Telegram reload endpoint
+Added POST /api/telegram/reload — reloads TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID from .env at runtime via load_dotenv(override=True). Starts polling if newly configured. Also fixed pydantic Settings model_config to use extra=ignore so non-CMUX_ env vars in .env don't cause validation errors.
+
+## 18:04 - Session resume — Task 8 completed
+Resumed from context compaction and completed Task 8: POST /api/telegram/reload endpoint. The endpoint reloads Telegram credentials from .env at runtime using load_dotenv(override=True), updates the singleton bot config, and starts polling if newly configured. Also fixed a pydantic Settings validation error where non-CMUX_ prefixed env vars (TELEGRAM_BOT_TOKEN, NODE_ENV, etc.) caused extra_forbidden errors — added extra=ignore to model_config. All 60 tests pass, committed as bb10c7a.
+
+## 18:04 - Telegram bot fully operational
+Telegram bridge is live end-to-end. Kai added POST /api/telegram/reload (bb10c7a) for hot-reconfiguring the bot without server restart. Used it to activate polling after .env was created mid-session. Inbound messages from @cmux_sh_bot flow through mailbox to supervisor. Outbound replies via /api/telegram/send. User confirmed working from their side.
