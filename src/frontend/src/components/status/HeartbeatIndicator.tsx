@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Heart, Clock, Inbox, Users, ListTodo, Monitor, Shield, Bell, GitBranch, Activity, Settings, Check, AlertTriangle } from 'lucide-react';
+import { Heart, HeartCrack, Clock, Inbox, Users, ListTodo, Monitor, Shield, Bell, GitBranch, Activity, Settings, Check, AlertTriangle } from 'lucide-react';
 import { useHeartbeatStore } from '../../stores/heartbeatStore';
 import { cn } from '../../lib/utils';
 import { API_BASE } from '../../lib/constants';
@@ -91,12 +91,8 @@ export function HeartbeatIndicator() {
 
   const status = getStatus();
 
-  // Heart pulses always — green = healthy, amber = active issues, red = alert
-  const heartColor = status === 'alert'
-    ? 'text-red-500 fill-red-500'
-    : status === 'active'
-      ? 'text-amber-500 fill-amber-500'
-      : 'text-emerald-500 fill-emerald-500';
+  // Heart is always red — it's a heart. Alert states use HeartCrack icon instead.
+  const HeartIcon = status === 'alert' ? HeartCrack : Heart;
 
   const formatAgo = (s: number | null) => {
     if (s === null) return 'No data';
@@ -130,11 +126,10 @@ export function HeartbeatIndicator() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="h-8 w-8 relative" title="System heartbeat">
-          <Heart
+          <HeartIcon
             className={cn(
-              'h-4 w-4 transition-colors',
-              heartColor,
-              'animate-heartbeat',
+              'h-4 w-4 text-red-500 fill-red-500 transition-colors',
+              status === 'alert' ? 'animate-pulse' : 'animate-heartbeat',
             )}
           />
           {status === 'active' && (
@@ -151,7 +146,7 @@ export function HeartbeatIndicator() {
       <DropdownMenuContent align="end" className="w-80">
         <DropdownMenuLabel className="flex items-center justify-between">
           <span className="flex items-center gap-1.5">
-            <Heart className={cn('h-3.5 w-3.5', heartColor)} />
+            <HeartIcon className="h-3.5 w-3.5 text-red-500 fill-red-500" />
             Heartbeat
           </span>
           <span className="text-[11px] font-normal text-muted-foreground flex items-center gap-1">
@@ -169,8 +164,8 @@ export function HeartbeatIndicator() {
 
         {latest?.all_clear && sectionEntries.length === 0 && (
           <div className="px-3 py-4 flex items-center justify-center gap-2 text-xs text-emerald-500 dark:text-emerald-400">
-            <Heart className="h-4 w-4 fill-emerald-500 text-emerald-500 animate-heartbeat" />
-            All clear — system healthy
+            <Heart className="h-4 w-4 fill-red-500 text-red-500 animate-heartbeat" />
+            <span className="text-emerald-500 dark:text-emerald-400">All clear — system healthy</span>
           </div>
         )}
 
