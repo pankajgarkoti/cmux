@@ -194,6 +194,25 @@ cd src/frontend && npm run typecheck
 - Log errors and how you fixed them
 - Future agents (including you after compaction) benefit
 
+### 7. Verify Integration, Not Just Existence
+
+Creating a new component is not enough — you MUST verify it's actually wired into the system. Dead code that exists but never runs is worse than no code at all, because it creates a false sense of safety.
+
+> **Lesson learned (2026-02-21):** `health.sh` contained full multi-stage recovery logic (restart → rollback → progressive rollback) but was never started by `cmux.sh` or any other startup script. When the system crashed, the recovery logic didn't fire because nothing ever invoked it. The daemon was dead code for the entire life of the system.
+
+**After creating any new component, verify:**
+
+| Component type | Verification |
+|---------------|-------------|
+| Shell script/daemon | Is it started by `cmux.sh` or `monitor.sh`? Check the startup flow. |
+| API route | Is it mounted in `main.py`? Can you `curl` it? |
+| Frontend component | Is it imported and rendered somewhere? Does `npm run build` include it? |
+| Service/module | Is it imported by a route or startup code? |
+| Config value | Is it read by the code that needs it? |
+| Cron/scheduled task | Is the scheduler running? Is the task registered? |
+
+**The test:** If you deleted the new file, would anything break? If the answer is "no", it's not integrated.
+
 ## Recovery from Bad State
 
 ### Recovering Stashed Changes

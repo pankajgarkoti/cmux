@@ -187,6 +187,39 @@ Workers don't need to act on `alertness`, `autonomy`, or `proactiveness` — tho
 
 ---
 
+## Reserved Resources (DO NOT TOUCH)
+
+Certain system resources are reserved for CMUX infrastructure. Using them will break the orchestration system and may require manual recovery.
+
+### Port 8000 — CMUX API Server
+
+**NEVER start any server, process, or service on port 8000.** This port is exclusively reserved for the CMUX API server. Starting a project server on port 8000 will replace the CMUX API, breaking:
+
+- All inter-agent communication (mailbox, messaging)
+- The dashboard and WebSocket connections
+- Health monitoring and auto-recovery
+- Agent lifecycle management
+
+> **Lesson learned (2026-02-21):** A worker started a todo-backend API on port 8000 without specifying a different port. This replaced the CMUX server, killing all orchestration. The health daemon didn't catch it because it only checked if *something* responded on port 8000, not *what* responded.
+
+**If your task requires running a server**, use any other port:
+
+| Good ports | Use case |
+|-----------|----------|
+| 3000, 3001 | Frontend dev servers |
+| 5000, 5173 | Vite, Flask defaults |
+| 8001, 8080, 9000 | Backend API servers |
+
+### .cmux/ Directory
+
+Do not delete, move, or restructure files in `.cmux/`. This is CMUX runtime state — mailbox, journal, agent registry, task database. You may **read** files here and **append** to the journal, but do not modify structure.
+
+### tmux Session 'cmux'
+
+Do not kill, rename, or reconfigure the `cmux` tmux session or its system windows (`monitor`, `supervisor`). Your own worker window is managed by the supervisor.
+
+---
+
 ## CRITICAL: You Run Unattended
 
 You are running in a tmux window with no human operator watching. **Never use interactive tools that block waiting for user input.** Specifically:
@@ -456,11 +489,32 @@ When your task is complete:
 
 1. **Verify**: Ensure all requirements are met
 2. **Test**: Run relevant tests
-3. **Report**: Output `[DONE]` with summary
-4. **Wait**: Supervisor will review and either:
+3. **Reflect**: Before reporting, briefly note what worked and what didn't (see below)
+4. **Report**: Output `[DONE]` with summary
+5. **Wait**: Supervisor will review and either:
    - Assign next task
    - Ask for modifications
    - Close your window
+
+### Reflection After Task (Brief, Not Bureaucratic)
+
+Before sending your `[DONE]` message, spend 30 seconds reflecting and journal a quick note:
+
+```bash
+./tools/journal log "Reflection: <task-name> — what worked: <1-2 sentences>. What I'd do differently: <1-2 sentences or 'nothing'>."
+```
+
+**Examples:**
+
+```bash
+./tools/journal log "Reflection: auth-fix — what worked: reproduced bug first, fix was straightforward. What I'd do differently: nothing, clean task."
+
+./tools/journal log "Reflection: dashboard-charts — what worked: component structure was solid. What I'd do differently: should have tested with empty data sooner, spent 20 min debugging a null case I could have caught early."
+```
+
+This is NOT a formal post-mortem. It's a 1-2 sentence note that helps future agents (and future you) learn from your experience. The journal persists across sessions — your reflection becomes part of the system's collective memory.
+
+**Skip reflection if the task was trivial** (typo fix, config change, simple rename).
 
 ## Error Handling
 

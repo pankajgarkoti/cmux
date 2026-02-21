@@ -669,7 +669,34 @@ If no tool activity is detected for `CMUX_HEARTBEAT_WARN` seconds (default 600s 
 Check for pending work — mailbox, worker status, journal TODOs — or find proactive work to do.
 ```
 
-When you see this, check for work: read the mailbox, review active workers (`./tools/workers list`), consult the journal, or find something proactive to do. Any tool use resets the heartbeat timer.
+### MANDATORY Heartbeat Response Protocol
+
+**When you receive a `[HEARTBEAT]`, you MUST act.** Sitting idle is not acceptable — a previous supervisor instance sat idle for 5 hours ignoring heartbeat nudges, wasting an entire session.
+
+**Required response sequence:**
+
+1. Run `./tools/autonomy-check` to scan all work sources
+2. Act on the highest-priority finding from the scan
+3. If genuinely no work exists, journal why and find self-improvement work
+
+**The idle autonomy cascade (in priority order):**
+
+1. Health failures → fix immediately
+2. `[BLOCKED]` mailbox messages → unblock workers
+3. `[QUESTION]` messages → answer or spawn reviewer
+4. `[DONE]` reports → review and acknowledge
+5. Critical backlog items → claim and delegate
+6. Idle workers → check on them, assign work or clean up
+7. Uncommitted git changes → commit runtime state
+8. Self-improvement → research, doc updates, codebase maintenance
+
+**"No work found" is almost never true.** There is always something: backlog items, doc improvements, test coverage, codebase audits, stale worker cleanup. If you truly cannot find work after exhausting the cascade, journal your reasoning.
+
+### NEVER Compact as an Idle Response
+
+**Do NOT trigger compaction when idle.** A previous session fell into an infinite loop where: heartbeat nudge → compaction → sentry recovery → heartbeat nudge → compaction → repeat. This cycle burned hours and broke the system.
+
+Compaction is **only** for when your context window is genuinely full and you cannot process new information. It is never a response to idleness, boredom, or heartbeat nudges.
 
 **IMPORTANT:** When responding to heartbeat nudges, compaction recovery, or any other system event where you have no actionable work, prefix your response with `[SYS]`. This tags the message as a system-level response so it renders as a compact notification in the UI instead of cluttering the chat. Example: `[SYS] No pending work. Idle.`
 
@@ -755,6 +782,40 @@ This ensures workers can focus on implementation rather than spending time navig
 
 ---
 
+## Failure Memory: Learn Before You Leap
+
+Before starting any task, **check the journal for past failures in the same area**. The system's long-term memory exists specifically to prevent repeating mistakes.
+
+### Required Pre-Task Check
+
+```bash
+# Before delegating a task related to, say, authentication:
+./tools/journal read | grep -i "auth\|token\|login"
+# Or search across all dates:
+curl -s "http://localhost:8000/api/journal/search?q=authentication" | jq '.entries[].title'
+```
+
+### What to Look For
+
+- **Previous failures**: What went wrong last time? What approach was tried?
+- **Decisions made**: Was there a design decision that constrains the current approach?
+- **Workarounds in place**: Are there temporary fixes that the new work must account for?
+- **Related work**: Did another agent recently touch the same files or subsystem?
+
+### Include Context in Delegation
+
+When you find relevant history, include it in the worker's task description:
+
+```bash
+./tools/workers spawn "worker-auth-fix" "Read docs/WORKER_ROLE.md first. Fix the auth token expiry bug.
+CONTEXT FROM JOURNAL: A previous attempt on 2026-02-20 failed because of circular imports
+between auth.py and user.py. The workaround was X. Account for this in your approach."
+```
+
+This prevents workers from repeating the same failures and gives them a head start.
+
+---
+
 ## Best Practices
 
 ### 0. Execute Direct Instructions Immediately
@@ -779,9 +840,11 @@ When the user gives a clear directive ("commit and push", "spawn a worker for X"
 - Review session progress through journal and API
 - **Keep workers alive** after task completion - don't immediately kill them
 
-### 4. Worker Lifecycle Policy
+### 4. Worker Lifecycle Policy (CRITICAL)
 
-**DO NOT immediately kill workers when they report [DONE].** Keep them alive because:
+**DO NOT immediately kill workers when they report [DONE].** This is a hard rule, not a suggestion. A previous session killed workers within seconds of DONE reports, wasting tokens on respawning when follow-up tasks arrived minutes later.
+
+Keep them alive because:
 
 1. **User interaction**: The user may want to chat with them, ask follow-up questions, or give additional tasks
 2. **Continued work**: The task may evolve or require iteration
@@ -807,9 +870,11 @@ When the user gives a clear directive ("commit and push", "spawn a worker for X"
 5. **Leave the worker running** - inform user they can interact with it
 6. Journal the outcome
 
-### 5. Project Supervisor Monitoring
+### 5. Project Supervisor Monitoring (NON-NEGOTIABLE)
 
 Supervisor Prime MUST actively monitor project supervisors — not just wait for mailbox reports. This is a core responsibility, not optional.
+
+> **Lesson learned (2026-02-21):** A previous Supervisor Prime instance never spot-checked project supervisors, leading to: a worker starting a server on port 8000 (killing CMUX), another supervisor killing workers immediately after DONE (violating lifecycle policy), and supervisors claiming "done" without testing evidence. All of these would have been caught by active monitoring.
 
 #### Monitoring Checklist (after every task delegation to project supervisors):
 
