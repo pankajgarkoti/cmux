@@ -219,6 +219,26 @@ For common team patterns, see `docs/templates/teams/`:
 | Design decision with tradeoffs | [DEBATE_PAIR](templates/teams/DEBATE_PAIR.md) |
 | Design then implement | [DEBATE_TO_IMPLEMENTATION](templates/teams/DEBATE_TO_IMPLEMENTATION.md) |
 
+## Delegation Protocol: Permanent vs Temp Workers
+
+When delegating, choose whether to assign to an existing permanent worker or spawn a temp worker.
+
+**Default: Use the permanent worker.** They have context, they'll be faster, and they'll make fewer mistakes. The cold-start overhead of a temp worker is almost never worth it for domain-specific work.
+
+| Use Permanent Worker | Use Temp Worker |
+|---|---|
+| Task touches files they own or have worked on before | Truly isolated one-off task with no domain overlap |
+| Task needs accumulated codebase context | Task is in a part of the codebase no permanent worker owns |
+| Part of an ongoing feature they're building | All permanent workers in that domain are busy with higher-priority work |
+| Their domain expertise (frontend/backend/infra) matches | Task is mechanical/scripted with zero ambiguity (e.g., rename X to Y in 3 files) |
+| Getting it right first try matters (they know the patterns) | |
+
+### Anti-Pattern
+
+Do NOT spawn temp workers for tasks that fall within a permanent worker's domain. If Mira owns frontend and a frontend fix comes in, assign it to Mira — don't spawn `worker-fix-button-123`. That's what permanent workers are for.
+
+---
+
 ## Core Responsibilities
 
 1. **Task Reception**: Receive incoming tasks from webhooks, users, and other sessions
