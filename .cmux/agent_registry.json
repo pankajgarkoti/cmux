@@ -259,7 +259,7 @@
     "created_by": "tools/workers",
     "created_at": "2026-02-21T11:03:24Z",
     "agent_id": "ag_59k104m4",
-    "display_name": "Archivist",
+    "display_name": "Iris",
     "role": "permanent-worker",
     "project_id": "hero",
     "permanent": true
@@ -270,7 +270,7 @@
     "created_by": "tools/workers",
     "created_at": "2026-02-21T11:03:36Z",
     "agent_id": "ag_1rdlxtbe",
-    "display_name": "Scout",
+    "display_name": "Wren",
     "role": "permanent-worker",
     "project_id": "heroweb",
     "permanent": true
