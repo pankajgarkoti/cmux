@@ -62,9 +62,8 @@
 > Updated at end of each session with context for the next supervisor.
 
 ### Current Session (2026-02-21)
-- 8 permanent workers deployed: Mira (frontend), Kai (backend), Sol (infra), Nova (research), Sage (UI review), Flint (API review), Bolt (DevOps), Echo (QA)
-- Clone system fully implemented (3 commits) — workers can self-clone for parallel work
-- Budget tracking deployed — token usage visible in sidebar
-- Hero project role files pre-generated, ready for `teams setup-permanent SQUAD_MODEL --project hero`
-- Nova is currently conducting a deep research survey on autonomous LLM systems — check for artifact in `.cmux/journal/2026-02-21/artifacts/self-improvement-research-v1.md`
+- 18 workers online: 8 CMUX permanent + 5 hero squad (Ash, Rune, Piper, Cleo, Iris) + 5 heroweb squad (Zara, Finn, Luna, Juno, Wren)
+- Telegram bot integrated (@cmux_sh_bot) — .env configured with token + chat_id, pending server reload to activate polling
+- Clone system, budget statusline, Laminar observability all shipped
 - All backlog items cleared. User wants idle time used for self-reflection, not academic research.
+- Research artifacts available: hero-codebase-research-report.md, heroweb-codebase-research-report.md, cmux-system-report.md, self-improvement-research-v1.md
