@@ -7,6 +7,9 @@
 #   workers kill <name> [--force]  - Terminate a worker (--force for permanent workers)
 #   workers reset <name>           - Reset a permanent worker's context
 #   workers assign <task-id> <name> - Assign a task and notify worker
+#   workers clone <parent> <task>  - Clone a permanent worker for parallel work
+#   workers merge-clone <clone>    - Merge clone's worktree branch and clean up
+#   workers list-clones <parent>   - List active clones of a permanent worker
 #   workers team [project-id]      - List permanent workers (optionally by project)
 #   workers list                   - List all workers
 #   workers send <name> <message>  - Send message to a worker
@@ -739,6 +742,200 @@ cmd_assign() {
     ok "Task $task_id assigned to $worker"
 }
 
+cmd_clone() {
+    local parent_name="${1:-}"
+    local task="${2:-}"
+
+    [[ -z "$parent_name" ]] && die "usage: workers clone <parent-name> '<task>'"
+    [[ -z "$task" ]] && die "usage: workers clone <parent-name> '<task>'"
+
+    local reg_file="${CMUX_PROJECT_ROOT}/.cmux/agent_registry.json"
+    [[ -f "$reg_file" ]] || die "No agent registry found"
+
+    # 1. Verify parent is a permanent worker
+    local is_perm
+    is_perm=$(jq -r --arg k "$parent_name" '.[$k].permanent // false' "$reg_file" 2>/dev/null)
+    [[ "$is_perm" != "true" ]] && die "'$parent_name' is not a permanent worker"
+
+    # 2. Look up parent info
+    local parent_display parent_role_ctx parent_project
+    parent_display=$(jq -r --arg k "$parent_name" '.[$k].display_name // $k' "$reg_file")
+    parent_role_ctx=$(jq -r --arg k "$parent_name" '.[$k].role_context // empty' "$reg_file")
+    parent_project=$(jq -r --arg k "$parent_name" '.[$k].project_id // "cmux"' "$reg_file")
+    [[ -z "$parent_role_ctx" ]] && die "No role_context found for '$parent_name'"
+
+    # 3. Generate clone index (count existing clones + 1, skip collisions)
+    local clone_index
+    clone_index=$(jq -r --arg parent "$parent_name" \
+        '[to_entries[] | select(.value.clone_of == $parent)] | length' "$reg_file" 2>/dev/null || echo "0")
+    clone_index=$((clone_index + 1))
+
+    local clone_name="${parent_name}-clone-${clone_index}"
+
+    # Handle name collisions (killed clones may still be in registry)
+    while jq -e --arg k "$clone_name" '.[$k]' "$reg_file" >/dev/null 2>&1; do
+        ((clone_index++))
+        clone_name="${parent_name}-clone-${clone_index}"
+    done
+
+    info "Cloning '$parent_name' as '$clone_name' (clone #${clone_index})"
+
+    # 4. Write clone-specific role context file
+    local context_dir="${CMUX_PROJECT_ROOT}/.cmux/worker-contexts"
+    mkdir -p "$context_dir"
+    local clone_role_ctx="${context_dir}/${clone_name}-clone-role.md"
+
+    # Short task summary for display name (first 30 chars)
+    local task_summary="${task:0:30}"
+    [[ ${#task} -gt 30 ]] && task_summary="${task_summary}..."
+
+    cat > "$clone_role_ctx" << CLONECTX
+# Clone Identity: ${clone_name}
+
+You are a **clone** of ${parent_display} (${parent_name}). You share their role and expertise.
+
+## Parent Role
+Read ${parent_role_ctx} for your full specialization and standards.
+
+## Clone Coordination
+- You are an **ephemeral** clone — you exist to complete one task, then your work gets merged.
+- You are working in a **git worktree** on your own branch.
+- Commit your work to your branch. Do NOT merge into main.
+- When done, report [DONE] to your **parent** (${parent_name}) via mailbox, NOT the supervisor:
+  \`./tools/mailbox send ${parent_name} "[DONE] ${clone_name}: <summary>" "<details>"\`
+- Your parent will merge your branch and clean up your worktree.
+
+## Your Task
+${task}
+CLONECTX
+
+    # 5. Spawn clone as ephemeral worker with worktree
+    local clone_task="Read ${clone_role_ctx} for your clone identity and task. You are a clone of ${parent_display} (${parent_name})."
+    cmd_spawn "$clone_name" "$clone_task" --worktree --project "$parent_project"
+
+    # 6. Add clone fields to registry (after spawn registered the base entry)
+    local tmp
+    tmp=$(mktemp)
+    local display="${parent_display} | ${task_summary}"
+    jq --arg k "$clone_name" --arg parent "$parent_name" --argjson idx "$clone_index" --arg disp "$display" \
+        '.[$k].clone_of = $parent | .[$k].clone_index = $idx | .[$k].display_name = $disp' \
+        "$reg_file" > "$tmp" && mv "$tmp" "$reg_file"
+
+    # 7. Notify parent via mailbox
+    ./tools/mailbox send "$parent_name" "[STATUS] Clone spawned" "Clone ${clone_name} spawned for: ${task}" 2>/dev/null || true
+
+    echo ""
+    ok "Clone '$clone_name' of '$parent_name' ready"
+    echo "Clone index: $clone_index"
+    echo "Display: $display"
+}
+
+cmd_merge_clone() {
+    local clone_name="${1:-}"
+    [[ -z "$clone_name" ]] && die "usage: workers merge-clone <clone-name>"
+
+    local reg_file="${CMUX_PROJECT_ROOT}/.cmux/agent_registry.json"
+    [[ -f "$reg_file" ]] || die "No agent registry found"
+
+    # Look up clone info
+    local parent worktree_branch worktree_path
+    parent=$(jq -r --arg k "$clone_name" '.[$k].clone_of // empty' "$reg_file")
+    [[ -z "$parent" ]] && die "'$clone_name' is not a clone (no clone_of field)"
+
+    worktree_branch=$(jq -r --arg k "$clone_name" '.[$k].worktree_branch // empty' "$reg_file")
+    worktree_path=$(jq -r --arg k "$clone_name" '.[$k].worktree_path // empty' "$reg_file")
+    [[ -z "$worktree_branch" ]] && die "No worktree_branch found for '$clone_name'"
+
+    info "Merging clone '$clone_name' (branch: $worktree_branch)"
+
+    # Merge the worktree branch into current branch
+    local merge_msg="merge: ${clone_name}"
+    if ! git merge --no-ff "$worktree_branch" -m "$merge_msg" 2>&1; then
+        die "Merge failed — resolve conflicts manually, then run 'workers merge-clone $clone_name' again"
+    fi
+    ok "Branch '$worktree_branch' merged"
+
+    # Kill the clone worker (if still alive)
+    if window_exists "$clone_name"; then
+        info "Killing clone worker..."
+        # Archive conversation first
+        curl -sX POST "http://localhost:${CMUX_PORT:-8000}/api/agents/${clone_name}/archive" > /dev/null 2>&1 || true
+        tmux send-keys -t "${CMUX_SESSION}:${clone_name}" C-c
+        sleep 1
+        tmux kill-window -t "${CMUX_SESSION}:${clone_name}" 2>/dev/null || true
+        ok "Clone worker terminated"
+    fi
+
+    # Clean up worktree
+    if [[ -n "$worktree_path" ]] && [[ -d "$worktree_path" ]]; then
+        info "Removing worktree..."
+        git worktree remove "$worktree_path" --force 2>/dev/null || warn "Could not remove worktree at $worktree_path"
+    fi
+
+    # Delete the branch (already merged)
+    git branch -d "$worktree_branch" 2>/dev/null || warn "Could not delete branch $worktree_branch"
+
+    # Clean up registry entry
+    local tmp
+    tmp=$(mktemp)
+    jq --arg k "$clone_name" 'del(.[$k])' "$reg_file" > "$tmp" && mv "$tmp" "$reg_file"
+
+    # Clean up context files
+    rm -f "${CMUX_PROJECT_ROOT}/.cmux/worker-contexts/${clone_name}-context.md"
+    rm -f "${CMUX_PROJECT_ROOT}/.cmux/worker-contexts/${clone_name}-clone-role.md"
+
+    # Notify parent
+    ./tools/mailbox send "$parent" "[STATUS] Clone merged" "Clone ${clone_name} merged and cleaned up" 2>/dev/null || true
+
+    ok "Clone '$clone_name' merged and cleaned up"
+}
+
+cmd_list_clones() {
+    local parent_name="${1:-}"
+    [[ -z "$parent_name" ]] && die "usage: workers list-clones <parent-name>"
+
+    local reg_file="${CMUX_PROJECT_ROOT}/.cmux/agent_registry.json"
+    [[ -f "$reg_file" ]] || die "No agent registry found"
+
+    echo -e "${BOLD}Clones of '${parent_name}':${NC}"
+    echo ""
+    printf "  ${DIM}%-28s %-8s %-28s %s${NC}\n" "NAME" "INDEX" "BRANCH" "STATUS"
+    printf "  ${DIM}%-28s %-8s %-28s %s${NC}\n" "────────────────────────" "──────" "────────────────────────" "──────"
+
+    local count=0
+    local clones
+    clones=$(jq -r --arg parent "$parent_name" \
+        'to_entries[] | select(.value.clone_of == $parent) | .key' "$reg_file" 2>/dev/null)
+
+    if [[ -z "$clones" ]]; then
+        echo -e "  ${DIM}(no active clones)${NC}"
+        echo ""
+        echo "Total clones: 0"
+        return 0
+    fi
+
+    while IFS= read -r name; do
+        [[ -z "$name" ]] && continue
+
+        local idx branch
+        idx=$(jq -r --arg k "$name" '.[$k].clone_index // "?"' "$reg_file")
+        branch=$(jq -r --arg k "$name" '.[$k].worktree_branch // "n/a"' "$reg_file")
+
+        local status_color="${GREEN}"
+        local status_label="online"
+        if ! window_exists "$name"; then
+            status_color="${RED}"
+            status_label="offline"
+        fi
+
+        printf "  %-28s %-8s %-28s ${status_color}%s${NC}\n" "$name" "$idx" "$branch" "$status_label"
+        ((count++))
+    done <<< "$clones"
+
+    echo ""
+    echo "Total clones: $count"
+}
+
 cmd_help() {
     cat << 'EOF'
 workers - Manage worker agents
@@ -751,6 +948,9 @@ COMMANDS:
     kill <name> [--force]           Terminate a worker (not supervisors)
     reset <name>                    Reset a permanent worker's context (preserves identity)
     assign <task-id> <worker>       Assign a task to a worker and notify them
+    clone <parent> <task>           Clone a permanent worker for parallel work (worktree)
+    merge-clone <clone-name>        Merge a clone's worktree branch and clean up
+    list-clones <parent>            List active clones of a permanent worker
     team [project-id]               List permanent workers (optionally filtered by project)
     list                            List all workers in the session
     send <name> <message>           Send a message to a worker
@@ -783,6 +983,9 @@ EXAMPLES:
     workers spawn perm-frontend "Frontend specialist" --permanent .cmux/worker-contexts/perm-frontend-role.md
     workers reset perm-frontend
     workers assign t_a3f8k2m9 perm-frontend
+    workers clone perm-frontend "Fix button hover styles in src/frontend/src/components/"
+    workers list-clones perm-frontend
+    workers merge-clone perm-frontend-clone-1
     workers send auth-worker "Also add refresh token support"
     workers status auth-worker 50
     workers kill auth-worker
@@ -808,14 +1011,17 @@ main() {
     shift || true
 
     case "$cmd" in
-        spawn)  cmd_spawn "$@" ;;
-        kill)   cmd_kill "$@" ;;
-        reset)  cmd_reset "$@" ;;
-        assign) cmd_assign "$@" ;;
-        team)   cmd_team "$@" ;;
-        list)   cmd_list "$@" ;;
-        send)   cmd_send "$@" ;;
-        status) cmd_status "$@" ;;
+        spawn)       cmd_spawn "$@" ;;
+        kill)        cmd_kill "$@" ;;
+        reset)       cmd_reset "$@" ;;
+        assign)      cmd_assign "$@" ;;
+        clone)       cmd_clone "$@" ;;
+        merge-clone) cmd_merge_clone "$@" ;;
+        list-clones) cmd_list_clones "$@" ;;
+        team)        cmd_team "$@" ;;
+        list)        cmd_list "$@" ;;
+        send)        cmd_send "$@" ;;
+        status)      cmd_status "$@" ;;
         help|--help|-h) cmd_help ;;
         *)      die "unknown command: $cmd (try 'workers help')" ;;
     esac
