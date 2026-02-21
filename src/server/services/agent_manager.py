@@ -37,6 +37,8 @@ class AgentManager:
             agent.project_id = meta.get("project_id", "cmux")
             agent.permanent = meta.get('permanent', False)
             agent.role_context = meta.get('role_context')
+            agent.clone_of = meta.get('clone_of')
+            agent.clone_index = meta.get('clone_index')
             agent.reset_count = meta.get('reset_count', 0)
             agent.tasks_since_reset = meta.get('tasks_since_reset', 0)
         else:

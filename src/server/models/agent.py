@@ -36,6 +36,8 @@ class Agent(BaseModel):
     project_id: str = "cmux"
     permanent: bool = False
     role_context: Optional[str] = None
+    clone_of: Optional[str] = None
+    clone_index: Optional[int] = None
     reset_count: int = 0
     tasks_since_reset: int = 0
     tmux_window: str
