@@ -192,3 +192,13 @@ Updated src/server/routes/tasks.py to expose all SQLite schema fields (priority,
 ## 05:50 - Test suite results: 45/45 pytest tests pass, TypeScript typecheck clean. No fixes needed.
 
 ## 05:50 - Reflection: test-suite-run — what worked: straightforward task, all tests and typecheck already passing. What I'd do differently: nothing, clean run.
+
+## 06:11 - Starting: @mention routing implementation — parse mentions in user messages, route to mentioned agents, add frontend autocomplete
+
+## 06:13 - Mention routing backend
+Expanded @mention routing in agents.py to work from any agent context (removed supervisor-only guard). Now stores mention-routed messages in conversation store with metadata tracking, broadcasts via WebSocket so they appear in chat history for mentioned agents.
+
+## 06:16 - Mention routing complete
+Implemented full @mention routing: (1) Backend expanded to route mentions from any agent context, not just supervisor. Stores mention-routed messages in conversation store with metadata tracking. (2) Frontend mentions are now clickable buttons that navigate to the mentioned agent. (3) Autocomplete dropdown was already implemented. All 45 pytest tests pass, TypeScript typecheck clean, frontend builds. Verified end-to-end in browser: sent test message with @sup-hero mention, confirmed routing, confirmed clickable navigation. Commit 8a897ea.
+
+## 06:16 - Reflection: mention-routing — what worked: codebase already had partial implementation (regex, autocomplete, CSS highlighting), so the task was mostly about expanding routing to work universally and making mentions interactive. What I'd do differently: nothing, clean task.

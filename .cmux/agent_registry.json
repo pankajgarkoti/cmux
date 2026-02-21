@@ -49,13 +49,13 @@
     "role": "project-supervisor",
     "project_id": "todo-frontend"
   },
-  "worker-test-suite": {
-    "registered_at": "2026-02-21T00:20:05Z",
+  "worker-mention-routing": {
+    "registered_at": "2026-02-21T00:40:58Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T00:20:05Z",
-    "agent_id": "ag_t52q0ow4",
-    "display_name": "worker-test-suite",
+    "created_at": "2026-02-21T00:40:58Z",
+    "agent_id": "ag_pe7u3ktr",
+    "display_name": "worker-mention-routing",
     "role": "worker",
     "project_id": "cmux"
   }
