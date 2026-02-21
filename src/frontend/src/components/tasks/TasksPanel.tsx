@@ -36,6 +36,7 @@ import type { Task, TaskStatus, TaskPriority } from '@/types/task';
 // -- Constants --
 
 const STATUS_CONFIGS: Record<string, { label: string; color: string; dot: string }> = {
+  backlog: { label: 'Backlog', color: 'bg-violet-500/15 text-violet-500 border-violet-500/30', dot: 'bg-violet-400' },
   pending: { label: 'Pending', color: 'bg-zinc-500/15 text-zinc-500 border-zinc-500/30', dot: 'bg-zinc-400' },
   assigned: { label: 'Assigned', color: 'bg-blue-500/15 text-blue-500 border-blue-500/30', dot: 'bg-blue-400' },
   'in-progress': { label: 'In Progress', color: 'bg-amber-500/15 text-amber-600 border-amber-500/30', dot: 'bg-amber-400' },
@@ -52,7 +53,7 @@ const PRIORITY_CONFIGS: Record<string, { label: string; color: string }> = {
 
 const PRIORITY_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
-const ALL_STATUSES: TaskStatus[] = ['pending', 'assigned', 'in-progress', 'done', 'blocked'];
+const ALL_STATUSES: TaskStatus[] = ['backlog', 'pending', 'assigned', 'in-progress', 'done', 'blocked'];
 const ALL_PRIORITIES: TaskPriority[] = ['critical', 'high', 'medium', 'low'];
 
 type SortOption = 'priority-desc' | 'priority-asc' | 'time-desc' | 'time-asc' | 'priority-time';

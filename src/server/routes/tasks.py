@@ -17,7 +17,7 @@ router = APIRouter()
 
 DB_PATH = settings.cmux_dir / "tasks.db"
 
-VALID_STATUSES = {"pending", "assigned", "in-progress", "review", "done", "blocked", "failed"}
+VALID_STATUSES = {"backlog", "pending", "assigned", "in-progress", "review", "done", "blocked", "failed"}
 VALID_PRIORITIES = {"critical", "high", "medium", "low"}
 VALID_SOURCES = {"user", "backlog", "self-generated", "worker-escalation", "system"}
 

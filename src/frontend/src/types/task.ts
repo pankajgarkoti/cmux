@@ -34,6 +34,6 @@ export interface TaskStatsResponse {
   needs_attention: Task[];
 }
 
-export type TaskStatus = 'pending' | 'assigned' | 'in-progress' | 'review' | 'done' | 'blocked' | 'failed';
+export type TaskStatus = 'backlog' | 'pending' | 'assigned' | 'in-progress' | 'review' | 'done' | 'blocked' | 'failed';
 export type TaskPriority = 'critical' | 'high' | 'medium' | 'low';
 export type TaskSource = 'user' | 'backlog' | 'self-generated' | 'worker-escalation' | 'system';
