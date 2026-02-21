@@ -130,11 +130,15 @@ export function ChatHeader({
   const workerCount = agents.filter((a) => a.type === 'worker').length;
   const totalMessages = totalMessagesCount;
 
-  const displayName = agentId || 'supervisor';
+  const displayName = agent?.display_name || agentId || 'supervisor';
   const title = agentId ? displayName : 'Command Center';
   const isPermanent = agent?.permanent === true;
+  // Show technical name in subtitle when display_name differs
+  const agentLabel = agent?.display_name && agent.display_name !== agent.name
+    ? agent.name
+    : null;
   const subtitle = agentId
-    ? `${isPermanent ? 'Permanent Worker' : isWorker ? 'Worker' : 'Supervisor'} agent`
+    ? `${agentLabel ? `${agentLabel} · ` : ''}${isPermanent ? 'Permanent Worker' : isWorker ? 'Worker' : 'Supervisor'} agent`
     : 'Multi-agent orchestration dashboard';
 
   return (

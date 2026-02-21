@@ -214,10 +214,12 @@ export function ChatInput({ onSend, isPending, placeholder, inputRef, agents = [
                     <Bot className="h-3 w-3 text-secondary-foreground" />
                   </div>
                   <div className="min-w-0">
-                    <span className="font-medium">@{agent.id}</span>
+                    <span className="font-medium">
+                      {agent.display_name || agent.id}
+                    </span>
                     {agent.display_name && agent.display_name !== agent.id && (
                       <span className="text-muted-foreground ml-1.5 text-xs">
-                        {agent.display_name}
+                        {agent.id}
                       </span>
                     )}
                   </div>

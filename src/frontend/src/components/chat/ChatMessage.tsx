@@ -225,7 +225,9 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
   const messageDate = new Date(message.timestamp);
   const relativeTime = formatDistanceToNow(messageDate, { addSuffix: true });
   const preciseTime = format(messageDate, 'MMM d, yyyy h:mm:ss a');
-  const displayName = isUser ? 'You' : message.from_agent;
+  // Show display_name (given name) if available, fall back to from_agent
+  const agentData = !isUser ? agents.find(a => a.name === message.from_agent || a.id === message.from_agent) : null;
+  const displayName = isUser ? 'You' : (agentData?.display_name || message.from_agent);
 
   const previewContent = getPreviewContent(message.content);
   const actuallyTruncated = previewContent.length < message.content.length;
@@ -271,16 +273,24 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
             isUser ? 'flex-row-reverse' : ''
           )}
         >
-          <span className="text-xs font-medium">{displayName}</span>
+          {!isUser && agentData?.display_name && agentData.display_name !== agentData.name ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-xs font-medium cursor-default">{displayName}</span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {agentData.name}
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <span className="text-xs font-medium">{displayName}</span>
+          )}
           {!isUser && (
             <Badge
               variant="outline"
               className="text-[10px] h-4 px-1 border-current/20"
             >
-              {(() => {
-                const agentData = agents.find(a => a.name === message.from_agent || a.id === message.from_agent);
-                return agentData?.type === 'supervisor' || agentData?.role === 'project-supervisor' ? 'SUP' : 'WRK';
-              })()}
+              {agentData?.type === 'supervisor' || agentData?.role === 'project-supervisor' ? 'SUP' : 'WRK'}
             </Badge>
           )}
           <Tooltip>

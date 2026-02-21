@@ -1,6 +1,11 @@
 import { cn } from '@/lib/utils';
 import { Bot, Crown, Loader2, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useAgentEventStore } from '@/stores/agentEventStore';
 import type { Agent, AgentStatus } from '@/types/agent';
 
@@ -45,7 +50,14 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
     ? (isProjectSupervisor ? 'P-SUP' : 'SUP')
     : isPermanent ? 'PERM' : 'WRK';
 
-  return (
+  // Tooltip content: technical name + role type
+  const tooltipText = isPermanent
+    ? `${agent.name} · Permanent Worker`
+    : isSupervisor
+      ? `${agent.name} · Supervisor`
+      : agent.name;
+
+  const button = (
     <button
       onClick={onClick}
       className={cn(
@@ -100,4 +112,20 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
       </Badge>
     </button>
   );
+
+  // Show display_name differs from agent.name — tooltip reveals technical identity
+  if (agent.display_name && agent.display_name !== agent.name) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {button}
+        </TooltipTrigger>
+        <TooltipContent side="right" className="text-xs">
+          {tooltipText}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return button;
 }
