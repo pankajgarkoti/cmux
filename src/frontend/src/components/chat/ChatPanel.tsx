@@ -11,6 +11,7 @@ import { useChatKeyboard } from '@/hooks/useChatKeyboard';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { ChatHeader } from './ChatHeader';
+import { InboxView } from './InboxView';
 import { AgentActivityIndicator } from './AgentActivityIndicator';
 import { WorkerConfirmModal } from './WorkerConfirmModal';
 import { ArchivedAgentView } from './ArchivedAgentView';
@@ -166,17 +167,27 @@ export function ChatPanel() {
         isWorker={isWorker}
         onClearChat={handleClearChat}
         showAllMessages={showAllMessages}
-        onToggleFilter={() => setShowAllMessages(prev => !prev)}
+        onToggleFilter={isWorker ? undefined : () => setShowAllMessages(prev => !prev)}
       />
 
-      {/* Chat Content */}
-      <ChatMessages
-        messages={messages}
-        onSuggestionClick={handleSuggestionClick}
-        onLoadMore={fetchNextPage}
-        hasMore={hasNextPage ?? false}
-        isLoadingMore={isFetchingNextPage}
-      />
+      {/* Chat Content — Inbox view for workers, DM view for everything else */}
+      {isWorker && selectedAgentId ? (
+        <InboxView
+          messages={messages}
+          agentId={selectedAgentId}
+          onLoadMore={fetchNextPage}
+          hasMore={hasNextPage ?? false}
+          isLoadingMore={isFetchingNextPage}
+        />
+      ) : (
+        <ChatMessages
+          messages={messages}
+          onSuggestionClick={handleSuggestionClick}
+          onLoadMore={fetchNextPage}
+          hasMore={hasNextPage ?? false}
+          isLoadingMore={isFetchingNextPage}
+        />
+      )}
 
       {/* Activity Indicator - shows when agent is working */}
       <AgentActivityIndicator agentId={targetAgent} />

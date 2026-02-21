@@ -76,6 +76,8 @@ interface ChatMessageProps {
   toolCalls?: Activity[];
   thoughts?: Thought[];
   collapseCount?: number;
+  /** When set, flips alignment: messages FROM this agent align left, others right. */
+  inboxAgentId?: string;
 }
 
 const PREVIEW_LENGTH = 1200;
@@ -211,7 +213,7 @@ function SystemNotification({ message, info, collapseCount }: { message: Message
   );
 }
 
-export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: ChatMessageProps) {
+export function ChatMessage({ message, toolCalls, thoughts, collapseCount, inboxAgentId }: ChatMessageProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const agents = useAgentStore((s) => s.agents);
 
@@ -222,6 +224,10 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
   }
 
   const isUser = message.type === 'user' || message.from_agent === 'user';
+  // In inbox mode, alignment is worker-centric: worker's own messages left, everything else right.
+  const alignRight = inboxAgentId
+    ? message.from_agent !== inboxAgentId
+    : isUser;
   const messageDate = new Date(message.timestamp);
   const relativeTime = formatDistanceToNow(messageDate, { addSuffix: true });
   const preciseTime = format(messageDate, 'MMM d, yyyy h:mm:ss a');
@@ -244,7 +250,7 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
     <div
       className={cn(
         'group flex gap-3 max-w-[85%]',
-        isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'
+        alignRight ? 'ml-auto flex-row-reverse' : 'mr-auto'
       )}
     >
       {/* Avatar */}
@@ -252,7 +258,7 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
         <AvatarFallback
           className={cn(
             'text-xs',
-            isUser
+            alignRight
               ? 'bg-primary text-primary-foreground'
               : 'bg-secondary text-secondary-foreground'
           )}
@@ -265,7 +271,7 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
       <div
         className={cn(
           'rounded-2xl px-4 py-2.5 min-w-0 relative',
-          isUser
+          alignRight
             ? 'bg-primary text-primary-foreground rounded-tr-sm'
             : 'bg-muted rounded-tl-sm'
         )}
@@ -274,7 +280,7 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
         <div
           className={cn(
             'flex items-center gap-2 mb-1',
-            isUser ? 'flex-row-reverse' : ''
+            alignRight ? 'flex-row-reverse' : ''
           )}
         >
           {!isUser && agentData?.display_name && agentData.display_name !== agentData.name ? (
@@ -313,7 +319,7 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
               <span
                 className={cn(
                   'text-[10px] cursor-default',
-                  isUser
+                  alignRight
                     ? 'text-primary-foreground/70'
                     : 'text-muted-foreground'
                 )}
@@ -329,10 +335,10 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
           {/* Message Actions - appear on hover */}
           <MessageActions
             content={message.content}
-            isUser={isUser}
+            isUser={alignRight}
             className={cn(
               'ml-auto',
-              isUser ? 'mr-auto ml-0' : ''
+              alignRight ? 'mr-auto ml-0' : ''
             )}
           />
         </div>
