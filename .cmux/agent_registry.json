@@ -28,25 +28,5 @@
     "display_name": "sup-heroweb",
     "role": "project-supervisor",
     "project_id": "heroweb"
-  },
-  "worker-heartbeat-ui": {
-    "registered_at": "2026-02-21T02:23:23Z",
-    "type": "worker",
-    "created_by": "tools/workers",
-    "created_at": "2026-02-21T02:23:23Z",
-    "agent_id": "ag_iwydy6pu",
-    "display_name": "worker-heartbeat-ui",
-    "role": "worker",
-    "project_id": "cmux"
-  },
-  "worker-tasks-polish": {
-    "registered_at": "2026-02-21T02:27:18Z",
-    "type": "worker",
-    "created_by": "tools/workers",
-    "created_at": "2026-02-21T02:27:18Z",
-    "agent_id": "ag_za43l3i7",
-    "display_name": "worker-tasks-polish",
-    "role": "worker",
-    "project_id": "cmux"
   }
 }
