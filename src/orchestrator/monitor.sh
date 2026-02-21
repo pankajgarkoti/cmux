@@ -412,10 +412,29 @@ check_supervisor_heartbeat() {
         printf "  Heartbeat:  ${GREEN}●${NC} ${staleness}s ago\n"
         reset_heartbeat_state
 
-        # POST healthy heartbeat to API so the dashboard has fresh data
+        # POST healthy heartbeat with rich system stats
+        local hb_supervisor="active (${staleness}s idle)"
+        local hb_workers hb_mailbox hb_backlog hb_health hb_git
+        hb_workers=$(tmux list-windows -t "$CMUX_SESSION" -F '#{window_name}' 2>/dev/null | grep -v -e '^supervisor$' -e '^monitor$' -e '^sup-' -e '^sentry$' | wc -l | xargs)
+        hb_mailbox=$(grep -c '"status":"submitted"' "$CMUX_MAILBOX" 2>/dev/null || echo "0")
+        hb_backlog=$(sqlite3 "${CMUX_PROJECT_ROOT}/.cmux/tasks.db" "SELECT COUNT(*) FROM tasks WHERE status='backlog';" 2>/dev/null || echo "0")
+        hb_health=$(curl -sf --max-time 1 "http://localhost:${CMUX_PORT}/api/webhooks/health" 2>/dev/null | grep -q '"api":"healthy"' && echo "healthy" || echo "degraded")
+        hb_git=$(git -C "$CMUX_PROJECT_ROOT" diff --stat HEAD 2>/dev/null | tail -1 | sed 's/^ *//')
+        [[ -z "$hb_git" ]] && hb_git="clean"
+
+        local hb_sections
+        hb_sections=$(jq -n \
+            --arg sup "$hb_supervisor" \
+            --arg wrk "${hb_workers} active" \
+            --arg mbx "${hb_mailbox} pending" \
+            --arg blg "${hb_backlog} items" \
+            --arg hlt "$hb_health" \
+            --arg gt "$hb_git" \
+            '{supervisor: $sup, workers: $wrk, mailbox: $mbx, backlog: $blg, health: $hlt, git: $gt}')
+
         curl -sf --max-time 2 -X POST "http://localhost:${CMUX_PORT}/api/heartbeat" \
             -H "Content-Type: application/json" \
-            -d "{\"timestamp\": ${now}, \"sections\": {\"supervisor\": \"active\", \"staleness\": \"${staleness}s\"}, \"highest_priority\": null, \"all_clear\": true}" \
+            -d "{\"timestamp\": ${now}, \"sections\": ${hb_sections}, \"highest_priority\": null, \"all_clear\": true}" \
             >/dev/null 2>&1 || true
         return
     fi
