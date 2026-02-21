@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Heart, Clock, Inbox, Users, ListTodo, Monitor, Shield, Bell, GitBranch, Activity, Settings, Check } from 'lucide-react';
+import { Heart, Clock, Inbox, Users, ListTodo, Monitor, Shield, Bell, GitBranch, Activity, Settings, Check, AlertTriangle } from 'lucide-react';
 import { useHeartbeatStore } from '../../stores/heartbeatStore';
 import { cn } from '../../lib/utils';
 import { API_BASE } from '../../lib/constants';
@@ -90,12 +90,8 @@ export function HeartbeatIndicator() {
 
   const status = getStatus();
 
-  const heartColor = {
-    idle: 'text-emerald-500 fill-emerald-500',
-    clear: 'text-emerald-500 fill-emerald-500',
-    active: 'text-red-500 fill-red-500',
-    alert: 'text-red-600 fill-red-600',
-  }[status];
+  // Heart is ALWAYS red and pulsing — red = alive, pumping, healthy
+  const heartColor = 'text-red-500 fill-red-500';
 
   const formatAgo = (s: number | null) => {
     if (s === null) return 'No data';
@@ -136,6 +132,14 @@ export function HeartbeatIndicator() {
               'animate-heartbeat',
             )}
           />
+          {status === 'active' && (
+            <span className="absolute top-0.5 right-0.5 flex h-2.5 w-2.5 items-center justify-center rounded-full bg-amber-400 border border-background" />
+          )}
+          {status === 'alert' && (
+            <span className="absolute top-0 right-0 flex h-3 w-3 items-center justify-center rounded-full bg-red-600 border border-background">
+              <AlertTriangle className="h-2 w-2 text-white" strokeWidth={3} />
+            </span>
+          )}
           <span className="sr-only">System heartbeat</span>
         </Button>
       </DropdownMenuTrigger>
@@ -159,8 +163,8 @@ export function HeartbeatIndicator() {
         )}
 
         {latest?.all_clear && sectionEntries.length === 0 && (
-          <div className="px-3 py-4 flex items-center justify-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-            <Heart className="h-4 w-4 fill-emerald-500 text-emerald-500" />
+          <div className="px-3 py-4 flex items-center justify-center gap-2 text-xs text-red-500 dark:text-red-400">
+            <Heart className="h-4 w-4 fill-red-500 text-red-500 animate-heartbeat" />
             All clear — system healthy
           </div>
         )}
