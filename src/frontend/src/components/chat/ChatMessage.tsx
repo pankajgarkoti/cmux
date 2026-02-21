@@ -78,8 +78,8 @@ interface ChatMessageProps {
   collapseCount?: number;
 }
 
-const COLLAPSE_THRESHOLD = 500;
 const PREVIEW_LENGTH = 1200;
+const COLLAPSE_THRESHOLD = PREVIEW_LENGTH + 200;
 
 // Regex to match @mentions (agent names are alphanumeric with hyphens)
 const MENTION_REGEX = /@([\w-]+)/g;
@@ -227,12 +227,12 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
   const preciseTime = format(messageDate, 'MMM d, yyyy h:mm:ss a');
   const displayName = isUser ? 'You' : message.from_agent;
 
+  const previewContent = getPreviewContent(message.content);
+  const actuallyTruncated = previewContent.length < message.content.length;
   const shouldCollapse =
-    message.content.length > COLLAPSE_THRESHOLD && !isUser;
+    message.content.length > COLLAPSE_THRESHOLD && actuallyTruncated && !isUser;
   const isCollapsed = shouldCollapse && !isExpanded;
-  const displayContent = isCollapsed
-    ? getPreviewContent(message.content)
-    : message.content;
+  const displayContent = isCollapsed ? previewContent : message.content;
 
   return (
     <div
