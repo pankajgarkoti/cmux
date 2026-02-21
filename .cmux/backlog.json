@@ -158,5 +158,15 @@
     "status": "pending",
     "created_at": "2026-02-21T01:44:23Z",
     "completed_at": null
+  },
+  {
+    "id": 17,
+    "title": "Add content-based dedup for consecutive identical messages in chat UI",
+    "description": "Frontend shows duplicate messages when the same agent sends identical content in rapid succession. Add a dedup filter in ChatMessages that collapses consecutive messages from the same agent with identical content.",
+    "priority": 3,
+    "source": "self",
+    "status": "pending",
+    "created_at": "2026-02-21T02:34:43Z",
+    "completed_at": null
   }
 ]
