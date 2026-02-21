@@ -5,6 +5,8 @@ export interface Task {
   project: string;
   assigned_to: string;
   status: string;
+  priority?: TaskPriority;
+  source?: string;
   parent_id: string;
   resources: string[];
   created_at: string;
@@ -24,3 +26,4 @@ export interface TaskTreeResponse {
 }
 
 export type TaskStatus = 'pending' | 'assigned' | 'in-progress' | 'done' | 'blocked';
+export type TaskPriority = 'critical' | 'high' | 'medium' | 'low';
