@@ -411,6 +411,12 @@ check_supervisor_heartbeat() {
         # Healthy — active within threshold
         printf "  Heartbeat:  ${GREEN}●${NC} ${staleness}s ago\n"
         reset_heartbeat_state
+
+        # POST healthy heartbeat to API so the dashboard has fresh data
+        curl -sf --max-time 2 -X POST "http://localhost:${CMUX_PORT}/api/heartbeat" \
+            -H "Content-Type: application/json" \
+            -d "{\"timestamp\": ${now}, \"sections\": {\"supervisor\": \"active\", \"staleness\": \"${staleness}s\"}, \"highest_priority\": null, \"all_clear\": true}" \
+            >/dev/null 2>&1 || true
         return
     fi
 
