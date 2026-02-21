@@ -508,3 +508,6 @@ Completed the agent budget tracking feature (backlog 7966ee6a) across three para
 
 ## 12:48 - All backlog items cleared
 Session complete — backlog fully cleared. 13 feature commits this session covering clone system, message dedup, budget tracking, heartbeat fix, teams setup-permanent, workers-init-role, permanent worker guide, hero role templates, and UI polish. All 55 tests passing, system healthy, 8 permanent workers online and idle. No pending work remaining.
+
+## 13:11 - ESLint config added — all lint warnings resolved
+Proactive maintenance: added missing .eslintrc.cjs for the frontend (ESLint 8 + TypeScript + React hooks + react-refresh). Fixed real issues: memoized agents/projects arrays in Explorer.tsx to satisfy exhaustive-deps, added textareaRef to dependency arrays in ChatInput.tsx. Suppressed expected shadcn UI react-refresh warnings via overrides. npm run lint now passes cleanly with --max-warnings 0. Commit 391f87f.
