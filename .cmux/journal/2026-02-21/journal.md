@@ -674,3 +674,23 @@ Integrated @lmnr-ai/lmnr into heroweb. Changes: (1) next.config.ts — added @lm
 
 ## 17:01 - CMUX system report complete
 Wrote comprehensive 961-line technical report covering all 10 sections: architecture, orchestration (cmux.sh/monitor.sh/daemons), agent lifecycle (spawn/kill/reset/clone), communication (mailbox/router/WebSocket), memory (6 tiers), self-improvement (health/heartbeat/sentry/compact/autonomy), hook system (9 hooks), team templates (6 templates + permanent teams), frontend dashboard (13 stores, 60+ components), and safety model (5-level recovery hierarchy). Verified every claim against source code. Committed as 8c0a8cb.
+
+## 17:02 - Big batch complete — Laminar, budget dashboard, system report
+Completed 4 parallel tasks: (1) Mira built per-agent token/cost dashboard in Budget tab (2e4b356). (2) Kai integrated Laminar into CMUX backend (bd8b1d8). (3) Finn integrated Laminar into heroweb Next.js (e47b88e). (4) Nova wrote 961-line comprehensive CMUX system report (8c0a8cb). Also added researcher role to SQUAD_MODEL template (f4497ce), spawned Iris and Wren for hero/heroweb squads, named all squad members.
+
+## 17:11 - Fix token usage extraction
+Fixed notify-complete.sh to sum usage tokens across ALL assistant messages instead of only the last one. Previous approach used tail -100 and extracted .[-1].message.usage, giving single-turn numbers. New approach reads the full transcript with jq, maps .usage from every assistant message, and sums input_tokens, output_tokens, cache_creation, and cache_read. Added timeout 5 to guard against large transcripts.
+
+## 17:11 - Budget statusline replaces table tab
+Replaced the per-agent budget table (4th tab in activity panel) with a compact always-visible BudgetStatusline in the header. Shows total cost + total tokens (e.g. $20.17 · 19.5k tok) with hover tooltip for input/output/cache breakdown. User feedback: the table was 'too heavy and not user-friendly'. Commit 2c90428.
+
+## 17:12 - Session continuation — statusline commit
+Continued from previous session that ran out of context. The budget table-to-statusline replacement (task 4) had been coded and verified but not committed. Verified the diff, committed as 2c90428, journaled, and reported done to supervisor. All frontend changes clean: BudgetPanel rewritten as compact BudgetStatusline, Budget tab removed from activity panel, statusline added to header bar.
+
+## 17:21 - Telegram integration in progress: integration module, route, polling, outbound forwarding. Wiring up message forwarding now.
+
+## 17:23 - Telegram bot integration
+Built bidirectional Telegram ↔ CMUX integration. Inbound: Telegram polling → mailbox → supervisor. Outbound: agent messages to user forwarded to Telegram (from both send_to_user endpoint and Stop event handler, skipping system messages). Used httpx with raw Telegram Bot API instead of python-telegram-bot — simpler, no new deps. TelegramBot singleton is a noop when TELEGRAM_BOT_TOKEN is unset. Security: only accepts messages from configured TELEGRAM_CHAT_ID (auto-detects from first message if unset). Polling starts/stops in FastAPI lifespan. 4 new tests, all 59 passing. Commit f7c212f.
+
+## 17:26 - Session summary — Kai perm-backend
+Completed 6 tasks this session: (1) Fixed lost messages when PreToolUse hooks block tool calls — block-interactive.sh now rescues assistant text from transcript. (2) Added GET /api/messages/inbox/{agent_id} endpoint with pinned task and ASC-ordered messages. (3) Added clone_of and clone_index fields to Agent model. (4) Built token usage tracking with budget aggregation endpoints (GET /api/budget). (5) Fixed heartbeat GET to fall back to DB after server restart. (6) Integrated Laminar observability. (7) Built Telegram bot integration for bidirectional user ↔ CMUX messaging. All tasks committed, all tests passing (59/59).

@@ -31,6 +31,7 @@
 - **Used temp workers for domain-owned work** — spawned two temp workers to fix HeartbeatIndicator.tsx (frontend) instead of sending to Mira. First temp worker got the colors wrong, needed a second. Mira would have had the context to get it right first try. Rule: if a permanent worker owns the domain, use them. Temp workers are for truly ownerless one-offs.
 - **Asked user for permission on obvious decisions** — "Want me to add this to SUPERVISOR_ROLE.md?" User rightly said "trust yourself." If I identified a problem and know the fix, just do it.
 - **Worker claimed [DONE] without committing** — delegation-protocol worker reported done but changes were unstaged. Supervisor had to commit manually. Need to verify commits exist after every [DONE] report, not just trust the message.
+- **Built a heavy data table when a statusline would do** — Budget view was a full per-agent table with 7 columns. User said "not user-friendly, make a statusline." Default to minimal glanceable UI, not data dumps. Ask: what does the user need to see at a glance? Build that, not a spreadsheet.
 
 ### 2026-02-20
 - **compact.sh was missing** — a critical daemon referenced in docs but the file didn't exist. Nobody noticed until compaction failures cascaded.
