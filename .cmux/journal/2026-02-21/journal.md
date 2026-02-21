@@ -183,3 +183,6 @@ Rewrote TasksPanel.tsx with card-based layout, status/priority badges, filter ba
 
 ## 05:38 - Tasks API debugging
 Both tasks workers done. UI commit 73a5563, API commit 645b8e8. Server hasnt picked up new routes — stats/POST/DELETE missing from OpenAPI. Need server restart.
+
+## 05:39 - Tasks API expansion complete
+Updated src/server/routes/tasks.py to expose all SQLite schema fields (priority, source, linked_workers) in task responses. Added POST /api/tasks for task creation, DELETE /api/tasks/{id} with recursive child deletion, and GET /api/tasks/stats for dashboard aggregations. Expanded PATCH to accept priority and source updates, and added review/failed to valid status set to match the CLI. Updated frontend types and API client. All verified with ASGI transport tests and existing pytest suite. Commit 645b8e8.
