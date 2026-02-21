@@ -70,6 +70,9 @@ tmux_send_keys() {
     fi
 
     tmux send-keys -t "${session}:${window}" Enter
+
+    # Auto-detect stuck paste buffers and press Enter again if needed
+    tmux_unstick_paste "$session" "$window" 2>/dev/null || true
 }
 
 # Send interrupt (Ctrl+C) to a tmux window
@@ -98,6 +101,53 @@ tmux_kill_window() {
 tmux_list_windows() {
     local session="$1"
     tmux list-windows -t "$session" -F "#{window_name}" 2>/dev/null || true
+}
+
+# Detect and submit stuck paste buffers in a tmux pane.
+# After tmux send-keys delivers multiline text, Claude Code may show
+# "[Pasted text #N +M lines]" without submitting. This checks for that
+# pattern and presses Enter to unstick it.
+#
+# Usage: tmux_unstick_paste session window
+# Returns: 0 if unstick was needed and performed, 1 if no stuck paste found
+tmux_unstick_paste() {
+    local session="$1"
+    local window="$2"
+
+    sleep 0.3
+    local tail_output
+    tail_output=$(tmux capture-pane -t "${session}:${window}" -p -S -5 2>/dev/null) || return 1
+
+    if echo "$tail_output" | grep -qE '\[Pasted text'; then
+        tmux send-keys -t "${session}:${window}" Enter
+        sleep 0.2
+        return 0
+    fi
+    return 1
+}
+
+# Sweep ALL windows in a session for stuck paste buffers and submit them.
+# Designed to be called periodically from monitor.sh or the heartbeat cycle.
+#
+# Usage: tmux_sweep_stuck_pastes session
+tmux_sweep_stuck_pastes() {
+    local session="$1"
+    local windows
+    windows=$(tmux list-windows -t "$session" -F '#{window_name}' 2>/dev/null) || return 0
+
+    while IFS= read -r window; do
+        [[ -z "$window" ]] && continue
+        # Skip monitor window (it's the dashboard, not an agent)
+        [[ "$window" == "monitor" ]] && continue
+
+        local tail_output
+        tail_output=$(tmux capture-pane -t "${session}:${window}" -p -S -5 2>/dev/null) || continue
+
+        if echo "$tail_output" | grep -qE '\[Pasted text'; then
+            tmux send-keys -t "${session}:${window}" Enter
+            echo "[tmux_sweep] Unstuck paste buffer in ${session}:${window}" >&2
+        fi
+    done <<< "$windows"
 }
 
 # Clear any text stuck in tmux input buffer

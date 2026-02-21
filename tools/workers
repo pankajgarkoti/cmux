@@ -514,6 +514,16 @@ cmd_send() {
     sleep 0.1
     tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
 
+    # Auto-detect stuck paste buffers — Claude Code sometimes shows
+    # "[Pasted text #N +M lines]" without submitting. Press Enter again if so.
+    sleep 0.3
+    local pane_tail
+    pane_tail=$(tmux capture-pane -t "${CMUX_SESSION}:${name}" -p -S -5 2>/dev/null) || true
+    if echo "$pane_tail" | grep -qE '\[Pasted text'; then
+        tmux send-keys -t "${CMUX_SESSION}:${name}" Enter
+        sleep 0.2
+    fi
+
     ok "Message sent to '$name'"
 }
 
@@ -662,7 +672,11 @@ cmd_assign() {
 
     "$tasks_tool" assign "$task_id" "$worker"
     "$tasks_tool" update "$task_id" in-progress
-    ./tools/mailbox send "$worker" "[TASK] $task_id: $("$tasks_tool" show "$task_id" 2>/dev/null | head -1)"
+
+    # Notify worker via mailbox (requires 3 args: to, subject, body)
+    local task_title
+    task_title=$("$tasks_tool" show "$task_id" 2>/dev/null | head -1)
+    ./tools/mailbox send "$worker" "[TASK] $task_id" "Assigned: ${task_title:-$task_id}. Read details: sqlite3 .cmux/tasks.db \"SELECT description FROM tasks WHERE id LIKE '${task_id}%'\""
     ok "Task $task_id assigned to $worker"
 }
 

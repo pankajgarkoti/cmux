@@ -1043,6 +1043,9 @@ run_dashboard() {
         printf "${DIM}Dashboard: http://localhost:${CMUX_PORT}${NC}\n"
         printf "${DIM}Ctrl+b n/p: switch windows | Ctrl+b d: detach${NC}\n"
 
+        # Sweep all panes for stuck paste buffers (cheap — just capture + grep)
+        tmux_sweep_stuck_pastes "$CMUX_SESSION" 2>/dev/null || true
+
         # Periodic auto-maintenance (every MAINTENANCE_INTERVAL iterations)
         ((MAINTENANCE_COUNTER++)) || true
         if ((MAINTENANCE_COUNTER >= MAINTENANCE_INTERVAL)); then
