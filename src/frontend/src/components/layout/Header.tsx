@@ -61,28 +61,30 @@ export function Header() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs text-muted-foreground font-mono hidden sm:inline mr-1.5">
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground font-mono hidden sm:inline">
           multi-agent orchestrator
         </span>
 
-        {/* Heartbeat indicator — heart icon with system scan status */}
-        <HeartbeatIndicator />
+        <div className="h-4 w-px bg-border" />
 
-        {/* Dark mode toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleTheme}
-          className="h-8 w-8"
-        >
+        {/* Heartbeat + dark mode grouped tight */}
+        <div className="flex items-center">
+          <HeartbeatIndicator />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="h-8 w-8"
+          >
           {theme === 'dark' ? (
             <Sun className="h-4 w-4 text-yellow-500" />
           ) : (
             <Moon className="h-4 w-4 text-slate-600" />
           )}
           <span className="sr-only">Toggle theme</span>
-        </Button>
+          </Button>
+        </div>
       </div>
       <RegisterProjectDialog open={registerOpen} onOpenChange={setRegisterOpen} />
     </header>
