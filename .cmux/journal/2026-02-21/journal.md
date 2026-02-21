@@ -502,3 +502,9 @@ Added full token usage tracking pipeline for agent budget monitoring. AgentEvent
 
 ## 12:45 - Budget token display in sidebar
 Added frontend budget/token usage display to agent sidebar. New getBudget() API call in api.ts with BudgetResponse type. Explorer.tsx fetches budget data via React Query (staleTime 30s), builds tokensByAgent map, passes through ProjectAgentGroup to AgentTreeItem. AgentTreeItem shows compact token count in text-muted-foreground/60. Only renders when totalTokens > 0. Backend endpoint not yet live (Kai building), so UI gracefully shows nothing until data is available.
+
+## 12:47 - Budget tracking feature complete — backlog cleared
+Completed the agent budget tracking feature (backlog 7966ee6a) across three parallel worker tracks. Sol updated the Stop hook to extract usage data from transcripts (input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens) — commit 9ffe9cb. Kai built the backend: usage field on AgentEvent model, storage migration, budget aggregation endpoint GET /api/budget returning per-agent totals, plus 5 new tests (55 total passing) — commit 7601dbf. Mira added the frontend: getBudget() API call, React Query fetch in Explorer, compact token count display in AgentTreeItem (formatTokenCount: 12.4k/1.2M format) — commit 034ea1d. Budget API confirmed live with real data. Backlog is now empty.
+
+## 12:48 - All backlog items cleared
+Session complete — backlog fully cleared. 13 feature commits this session covering clone system, message dedup, budget tracking, heartbeat fix, teams setup-permanent, workers-init-role, permanent worker guide, hero role templates, and UI polish. All 55 tests passing, system healthy, 8 permanent workers online and idle. No pending work remaining.
