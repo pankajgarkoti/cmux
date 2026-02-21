@@ -214,3 +214,6 @@ Created tools/watchdog — a CLI tool that scans all agent tmux windows for stuc
 
 ## 07:01 - Post-compaction maintenance sprint
 Completed 5 commits after session compaction. (1) Cleaned up stale sup-hello-world context file. (2) Ran full codebase audit — zero TODO/FIXME/HACK markers found, only operational WARN log calls. (3) Memory consolidation: distilled 2 days of journal entries into lessons-learned.md with 12 categories of reusable patterns, updated MEMORY.md with Technical Patterns section. (4) Built tools/watchdog — stuck-agent detection via tmux pane heuristics (permission prompts, plan mode, error loops, process exit, resource exhaustion). Integrated into autonomy-check for heartbeat scans. (5) Archived 180 processed mailbox messages. System healthy, 45/45 tests pass, typecheck clean.
+
+## 07:14 - Self-scheduling + backlog refresh
+Built tools/schedule — self-scheduling check-ins for supervisor. Supports add (seconds), add-at (HH:MM), list, fire (called by autonomy-check), clear. Integrated into autonomy-check as Reminders section. Also cleaned up 4 stale in-progress backlog items and seeded 3 new forward-looking items from research report: lock-based parallel worker coordination, Reflexion pattern for task improvement, agent budget tracking. All 13 original backlog items now completed.

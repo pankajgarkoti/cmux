@@ -5,9 +5,9 @@
     "description": "Execute uv run pytest across the entire codebase. Investigate and fix any test failures found. Ensure all tests pass cleanly before marking complete.",
     "priority": 3,
     "source": "system",
-    "status": "in_progress",
+    "status": "completed",
     "created_at": "2026-02-20T05:46:17Z",
-    "completed_at": null
+    "completed_at": "2026-02-21T01:44:13Z"
   },
   {
     "id": 2,
@@ -15,9 +15,9 @@
     "description": "Run npm run typecheck in src/frontend/ and fix any TypeScript errors found. Ensure clean typecheck pass.",
     "priority": 3,
     "source": "system",
-    "status": "in_progress",
+    "status": "completed",
     "created_at": "2026-02-20T05:46:18Z",
-    "completed_at": null
+    "completed_at": "2026-02-21T01:44:13Z"
   },
   {
     "id": 3,
@@ -25,9 +25,9 @@
     "description": "Search the codebase for TODO, FIXME, and HACK comments. Categorize them by urgency and area. Create backlog items for any that represent real work to be done.",
     "priority": 4,
     "source": "system",
-    "status": "in_progress",
+    "status": "completed",
     "created_at": "2026-02-20T05:46:20Z",
-    "completed_at": null
+    "completed_at": "2026-02-21T01:44:13Z"
   },
   {
     "id": 4,
@@ -35,9 +35,9 @@
     "description": "Check .cmux/worker-contexts/ for context files belonging to workers that no longer exist. Remove stale ones to keep the directory clean.",
     "priority": 5,
     "source": "system",
-    "status": "in_progress",
+    "status": "completed",
     "created_at": "2026-02-20T05:46:21Z",
-    "completed_at": null
+    "completed_at": "2026-02-21T01:44:13Z"
   },
   {
     "id": 5,
@@ -128,5 +128,35 @@
     "status": "completed",
     "created_at": "2026-02-21T01:23:10Z",
     "completed_at": "2026-02-21T01:43:57Z"
+  },
+  {
+    "id": 14,
+    "title": "Add lock-based coordination for parallel workers",
+    "description": "Prevent two workers from editing the same file simultaneously. Use flock or a coordination DB to serialize writes to shared resources. From research: parallel workers need explicit coordination mechanisms.",
+    "priority": 3,
+    "source": "self",
+    "status": "pending",
+    "created_at": "2026-02-21T01:44:20Z",
+    "completed_at": null
+  },
+  {
+    "id": 15,
+    "title": "Implement Reflexion pattern for task improvement",
+    "description": "After each task completion, auto-generate a reflection (what worked, what failed, what to do differently). Store reflections in journal artifacts. Feed into future task prompts for similar work. Based on NeurIPS Reflexion paper.",
+    "priority": 3,
+    "source": "self",
+    "status": "pending",
+    "created_at": "2026-02-21T01:44:22Z",
+    "completed_at": null
+  },
+  {
+    "id": 16,
+    "title": "Add agent budget tracking",
+    "description": "Track token/cost usage per agent. Set budget limits per worker. Alert when approaching limits. Useful for preventing runaway agents from consuming excessive resources.",
+    "priority": 4,
+    "source": "self",
+    "status": "pending",
+    "created_at": "2026-02-21T01:44:23Z",
+    "completed_at": null
   }
 ]
