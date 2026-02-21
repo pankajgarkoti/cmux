@@ -516,3 +516,20 @@ Proactive maintenance: added missing .eslintrc.cjs for the frontend (ESLint 8 + 
 
 ## 14:12 - Self-improvement research loop activated
 User requested that idle heartbeat time be used for self-improvement research instead of sitting idle. Updated monitor.sh heartbeat all-clear message to direct supervisor toward research on autonomous LLM systems, memory architectures, RAG, agent coordination, and cognitive scaffolding. Updated MEMORY.md with the new idle behavior policy. Delegated first deep research survey to Nova (perm-research) covering 5 areas: memory systems, retrieval-augmented cognition, multi-agent coordination, self-improvement/meta-learning, and cognitive architecture. Output will be saved as an artifact for concrete CMUX improvement recommendations.
+
+## 14:14 - Fixing heartbeat display — no data showing
+User reported heartbeat icon shows no stats when clicked. Root cause: GET /api/heartbeat only checks in-memory _latest_heartbeat which is None after server restart — doesn't fall back to SQLite heartbeat_history table. Additionally, the monitor's healthy heartbeat POST may be failing silently. Assigned Kai to fix the GET endpoint to fall back to DB. Investigating monitor POST separately.
+
+## 14:14 - Fixed heartbeat GET endpoint: now falls back to latest heartbeat_history DB record when _latest_heartbeat is None (e.g. after server restart). Cached in-memory after first read. Commit 65e78f3.
+
+## 14:16 - Starting task: Enrich healthy heartbeat POST in monitor.sh with system stats
+
+## 14:17 - Enriched healthy heartbeat with 6 stats: supervisor, workers, mailbox, backlog, health, git. All fast one-liners with fallbacks.
+
+## 14:18 - Research Survey Complete
+Completed comprehensive survey on autonomous LLM agent systems (559 lines). Covered: Letta/MemGPT tiered memory, A-MEM Zettelkasten-inspired linking, episodic memory frameworks, context compression (masking vs summarization), RAG for agent self-knowledge, multi-agent coordination (CrewAI/AutoGen/MetaGPT/LangGraph), Reflexion/LATS self-improvement, OPRO prompt optimization, Voyager/LATM tool creation, CoALA cognitive architecture. Produced 9 ranked recommendations (R1-R9). Top 3 most actionable: structured journal notes with auto-linking, observation masking for compaction, automated reflexion after tasks. Artifact: .cmux/journal/2026-02-21/artifacts/self-improvement-research-v1.md
+
+## 14:18 - Reflection: research-survey — what worked: parallel web searches across all 5 areas gathered broad coverage quickly, then targeted deep dives on most actionable sources. What I'd do differently: could have spent more time on the Mem0g graph implementation details and LangGraph checkpointing patterns — those are the closest to production-ready for our use case.
+
+## 14:21 - Session continuation — wiring reflection.md
+Continuing from compacted session. Picked up where we left off: committing reflection.md, wiring it into the heartbeat nudge, updating MEMORY.md. User also asked how reflection differs from journal and wants it per-day + committed to git.
