@@ -26,6 +26,7 @@ export interface Agent {
   role_context?: string;
   reset_count?: number;
   tasks_since_reset?: number;
+  clone_of?: string;
 }
 
 export interface AgentListResponse {

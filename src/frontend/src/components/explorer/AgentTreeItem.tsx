@@ -41,18 +41,28 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
     return matchesAgent && isAgentActive(sessionId);
   });
 
+  // Clone detection
+  const isClone = !!agent.clone_of;
+
   // Use display_name if available, fall back to name
   const displayName = agent.display_name || agent.name;
+
+  // For clones, parse "ParentName | task summary" from display_name
+  const cloneParts = isClone && displayName.includes('|')
+    ? { parent: displayName.split('|')[0].trim(), task: displayName.split('|').slice(1).join('|').trim() }
+    : null;
 
   const isPermanent = agent.permanent === true;
   const badgeLabel = getAgentBadgeLabel(agent);
 
   // Tooltip content: technical name + role type
-  const tooltipText = isPermanent
-    ? `${agent.name} · Permanent Worker`
-    : isSupervisor
-      ? `${agent.name} · Supervisor`
-      : agent.name;
+  const tooltipText = isClone
+    ? `${agent.name} · Clone of ${agent.clone_of}`
+    : isPermanent
+      ? `${agent.name} · Permanent Worker`
+      : isSupervisor
+        ? `${agent.name} · Supervisor`
+        : agent.name;
 
   const button = (
     <button
@@ -60,7 +70,8 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
       className={cn(
         'w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md transition-colors text-left',
         'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-        isSelected && 'bg-sidebar-accent text-sidebar-accent-foreground'
+        isSelected && 'bg-sidebar-accent text-sidebar-accent-foreground',
+        isClone && 'pl-6'
       )}
     >
       {/* Status indicator with working animation */}
@@ -68,7 +79,8 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
         className={cn(
           'w-2 h-2 rounded-full flex-shrink-0',
           statusColors[agent.status],
-          isWorking && 'animate-pulse ring-2 ring-green-400/50'
+          isWorking && 'animate-pulse ring-2 ring-green-400/50',
+          isClone && 'opacity-50'
         )}
         title={isWorking ? 'Working...' : agent.status}
       />
@@ -82,11 +94,18 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
       ) : isPermanent ? (
         <ShieldCheck className="h-4 w-4 text-teal-500 flex-shrink-0" />
       ) : (
-        <Bot className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        <Bot className={cn('h-4 w-4 flex-shrink-0', isClone ? 'text-muted-foreground/60' : 'text-muted-foreground')} />
       )}
 
-      {/* Name */}
-      <span className="truncate flex-1">{displayName}</span>
+      {/* Name — clones show "ParentName | task summary" with split styling */}
+      {cloneParts ? (
+        <span className="truncate flex-1">
+          <span className="font-medium">{cloneParts.parent}</span>
+          <span className="text-muted-foreground font-normal"> | {cloneParts.task}</span>
+        </span>
+      ) : (
+        <span className="truncate flex-1">{displayName}</span>
+      )}
 
       {/* Working indicator - animated spinner */}
       {isWorking && (

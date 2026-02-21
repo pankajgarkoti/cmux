@@ -96,8 +96,10 @@ export function Explorer() {
       groups.get(projectId)!.push(agent);
     }
 
-    // Sort agents within each group: supervisors first, then by display name
+    // Sort agents within each group: supervisors first, then by display name,
+    // with clones placed immediately after their parent.
     for (const [, groupAgents] of groups) {
+      // First pass: sort without clone awareness
       groupAgents.sort((a, b) => {
         const aIsSup = a.type === 'supervisor' || a.role === 'project-supervisor';
         const bIsSup = b.type === 'supervisor' || b.role === 'project-supervisor';
@@ -107,6 +109,31 @@ export function Explorer() {
         const bName = b.display_name || b.name;
         return aName.localeCompare(bName);
       });
+
+      // Second pass: move clones right after their parent
+      const clones = groupAgents.filter(a => a.clone_of);
+      if (clones.length > 0) {
+        // Remove clones from the list
+        for (const clone of clones) {
+          const idx = groupAgents.indexOf(clone);
+          if (idx !== -1) groupAgents.splice(idx, 1);
+        }
+        // Re-insert each clone after its parent
+        for (const clone of clones) {
+          const parentIdx = groupAgents.findIndex(a => a.id === clone.clone_of || a.name === clone.clone_of);
+          if (parentIdx !== -1) {
+            // Find the last consecutive clone already inserted after this parent
+            let insertIdx = parentIdx + 1;
+            while (insertIdx < groupAgents.length && groupAgents[insertIdx].clone_of === clone.clone_of) {
+              insertIdx++;
+            }
+            groupAgents.splice(insertIdx, 0, clone);
+          } else {
+            // Parent not found in this group, append at end
+            groupAgents.push(clone);
+          }
+        }
+      }
     }
 
     const result: ProjectGroup[] = [];
