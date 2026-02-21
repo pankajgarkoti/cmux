@@ -448,3 +448,33 @@ Assigned two parallel tasks: Nova writes docs/PERMANENT_WORKER_GUIDE.md — a co
 
 ## 11:59 - Built workers-init-role tool
 Created tools/workers-init-role — a shell script that scans a project directory and generates a starter role file for permanent workers. Detects package.json, pyproject.toml, go.mod for tech stack and dependencies. Finds key source files, config conventions, and recent git activity. Supports 7 role types (frontend, backend, fullstack, qa, devops, research, reviewer) each with tailored specialization and standards templates. Output lands in .cmux/worker-contexts/<name>-role.md. Tested against cmux (Python+JS mixed) and hero (React Native/Expo) projects. Had to work around macOS bash 3.2 limitations — no ${var,,} lowercase, and backticks inside unquoted heredocs get interpreted as command substitution. Rewrote output generation to use section-by-section echo/cat instead of a single heredoc.
+
+## 12:12 - Integrating team templates into permanent worker setup
+User pointed out that the scanning/init tool should leverage the team hierarchy templates (SQUAD_MODEL, FEATURE_TEAM, PLATFORM_TEAM, etc.) when setting up project permanent teams. Explored all 7 team templates and 10 role templates. The idea: instead of creating individual workers in isolation, the init tool should let project supervisors pick a team template and generate a coordinated set of role files + spawn the full team structure. This connects the existing team templates with the permanent worker system.
+
+## 12:15 - Building setup-permanent for tools/teams. Extracted scan logic to tools/lib/scan-project.sh, refactored workers-init-role to use it. Now adding the main cmd_setup_permanent function.
+
+## 12:18 - Starting task: Implement clone system for permanent workers (clone, merge-clone, list-clones commands)
+
+## 12:18 - Built teams setup-permanent
+Extended tools/teams with setup-permanent command. Extracted shared scan logic into tools/lib/scan-project.sh and refactored workers-init-role to use it. The new command scans a project directory, generates role files with auto-generated personalities for all team members, includes team coordination sections (teammates, lead assignment), and spawns permanent workers in one shot. Supports 4 templates: SOLO_WORKER (1), SQUAD_MODEL (4), FEATURE_TEAM (3), PLATFORM_TEAM (3). Rejects ephemeral templates. Added --dry-run flag. Tested all templates against hero, heroweb, and cmux projects. All error cases validated.
+
+## 12:18 - Added clone_of (Optional[str]) and clone_index (Optional[int]) to Agent model, populated from registry in _enrich_from_registry(). Commit 3fc8393.
+
+## 12:20 - Idle after completing teams setup-permanent task. Both tasks done: workers-init-role (6472b48) and teams setup-permanent (a91dba2).
+
+## 12:21 - Implemented clone system: workers clone/merge-clone/list-clones. 214 lines added. Clones are ephemeral, worktree-isolated copies of permanent workers that report to their parent.
+
+## 12:21 - Reflection: clone-system — what worked: clean decomposition into 3 commands, reused cmd_spawn for heavy lifting, tested all error paths. What I'd do differently: nothing, well-scoped task.
+
+## 12:21 - Clone system for permanent workers
+Implemented workers clone/merge-clone/list-clones commands. Clone spawns an ephemeral worktree-isolated copy of a permanent worker that shares the parent's role context and project_id. Key decisions: reused cmd_spawn internally for the heavy lifting rather than duplicating spawn logic; clones report [DONE] to their parent not the supervisor; merge-clone does full cleanup (merge branch, kill worker, remove worktree, clean registry+context files). Clone index auto-increments and handles registry collisions from previously killed clones.
+
+## 12:21 - Clone system implementation complete
+All three parallel tracks of the clone system are done. Sol (perm-infra) built the clone/merge-clone/list-clones CLI commands in tools/workers (+214 lines, commit f539d6f). Kai (perm-backend) added clone_of and clone_index fields to the Agent model (commit 3fc8393). Mira (perm-frontend) is finishing the sidebar UI — clones show indented under parent with 'ParentName | task' split styling, dimmed icons, and tooltip showing clone lineage. Build and typecheck pass. Waiting for Mira's commit before final verification.
+
+## 12:21 - Clone sidebar display
+Added frontend support for worker clones in sidebar. Agent type gets clone_of field. Explorer.tsx sorts clones under their parent agent. AgentTreeItem.tsx renders clone names with split styling (ParentName in font-medium, | task summary in text-muted-foreground), pl-6 indent, lighter status dot (opacity-50), dimmer bot icon. Tooltip shows 'agent-name · Clone of parent-name'. Commit a443668.
+
+## 12:22 - Session continuity - clone sidebar task
+Continued from previous session that ran out of context. Completed the clone sidebar display task (commit a443668). Three files changed: added clone_of field to Agent type, implemented clone grouping in Explorer.tsx sidebar sorting, and updated AgentTreeItem.tsx with split-styled clone names (ParentName | task summary), indentation, lighter status indicators, and clone-aware tooltips. All three implementation steps from the supervisor's task spec were completed. Typecheck and build clean.
