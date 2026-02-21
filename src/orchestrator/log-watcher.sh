@@ -147,7 +147,7 @@ $errors
 \`\`\`
 EOF
             mailbox_lock
-            echo "[$timestamp] system:log-watcher -> cmux:supervisor: $summary (body: $alert_file)" >> "$CMUX_MAILBOX"
+            jq -cn --arg id "$(uuidgen | tr '[:upper:]' '[:lower:]')" --arg ts "$timestamp" --arg from "system:log-watcher" --arg to "cmux:supervisor" --arg subject "$summary" --arg body "$alert_file" --arg status "submitted" '{id:$id,ts:$ts,from:$from,to:$to,subject:$subject,body:$body,status:$status}' >> "$CMUX_MAILBOX"
             mailbox_unlock
             log_info "Reported $error_count errors from $(basename "$log_file")"
         fi
@@ -180,7 +180,7 @@ check_agent_discrepancies() {
             local timestamp
             timestamp=$(date -Iseconds)
             mailbox_lock
-            echo "[$timestamp] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent '$agent' missing from tmux" >> "$CMUX_MAILBOX"
+            jq -cn --arg id "$(uuidgen | tr '[:upper:]' '[:lower:]')" --arg ts "$timestamp" --arg from "system:log-watcher" --arg to "cmux:supervisor" --arg subject "[ALERT] Registered agent '$agent' missing from tmux" --arg body "" --arg status "submitted" '{id:$id,ts:$ts,from:$from,to:$to,subject:$subject,body:$body,status:$status}' >> "$CMUX_MAILBOX"
             mailbox_unlock
         fi
     done <<< "$registered_agents"
