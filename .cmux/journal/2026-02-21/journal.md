@@ -349,3 +349,9 @@ Implementing permanent worker infrastructure in tools/workers. Completed: --perm
 Implemented all 7 changes from the debate rebuttal plan: --permanent flag on spawn, cmd_reset with graceful Claude restart, --force on kill with audit log, pre-compact.sh hook for state capture, stop-gate.sh permanent worker bypass, auto-maintenance protection, cmd_assign shorthand, updated help text. All scripts pass bash -n syntax check. Commit cb2afff.
 
 ## 09:33 - Reflection: perm-worker-infra — what worked: having the full spec from the debate rebuttal made implementation straightforward. All insertion points were clearly identified. What I'd do differently: nothing, clean task with well-defined requirements.
+
+## 09:34 - Mira (perm-frontend) online. Read role context and worker guidelines. Awaiting tasks.
+
+## 09:34 - Kai (perm-backend) online. Permanent backend worker initialized and ready for tasks.
+
+## 09:35 - Sol (perm-infra) online. Permanent infrastructure engineer initialized. Awaiting tasks.

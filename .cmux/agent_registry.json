@@ -38,5 +38,47 @@
     "display_name": "impl-perm-infra",
     "role": "worker",
     "project_id": "cmux"
+  },
+  "perm-frontend": {
+    "registered_at": "2026-02-21T04:04:16Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-21T04:04:16Z",
+    "agent_id": "ag_2vveyf19",
+    "display_name": "perm-frontend",
+    "role": "permanent-worker",
+    "project_id": "cmux",
+    "permanent": true,
+    "role_context": "/Users/pankajgarkoti/Desktop/code/oss/cmux/.cmux/worker-contexts/perm-frontend-role.md",
+    "tasks_since_reset": 0,
+    "reset_count": 0
+  },
+  "perm-backend": {
+    "registered_at": "2026-02-21T04:04:28Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-21T04:04:28Z",
+    "agent_id": "ag_geljf2nl",
+    "display_name": "perm-backend",
+    "role": "permanent-worker",
+    "project_id": "cmux",
+    "permanent": true,
+    "role_context": "/Users/pankajgarkoti/Desktop/code/oss/cmux/.cmux/worker-contexts/perm-backend-role.md",
+    "tasks_since_reset": 0,
+    "reset_count": 0
+  },
+  "perm-infra": {
+    "registered_at": "2026-02-21T04:04:39Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-21T04:04:39Z",
+    "agent_id": "ag_p6119gsx",
+    "display_name": "perm-infra",
+    "role": "permanent-worker",
+    "project_id": "cmux",
+    "permanent": true,
+    "role_context": "/Users/pankajgarkoti/Desktop/code/oss/cmux/.cmux/worker-contexts/perm-infra-role.md",
+    "tasks_since_reset": 0,
+    "reset_count": 0
   }
 }
