@@ -205,14 +205,10 @@ route_message() {
     # Store in DB + broadcast to frontend (with task_status if present)
     store_message_via_api "$from" "$to" "$content" "mailbox" "$status"
 
-    # Route to user via API (handles both "user" and "cmux:user" / "session:user")
+    # For user-targeted messages, /messages/internal already stored + broadcast.
+    # No second call needed — the old /messages/user call caused duplicate display.
     local to_agent_name="${to##*:}"
     if [[ "$to" == "user" ]] || [[ "$to_agent_name" == "user" ]]; then
-        local from_agent="${from##*:}"
-        curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/user" \
-            -H "Content-Type: application/json" \
-            -d "{\"content\": $(echo "$content" | jq -Rs .), \"from_agent\": \"$from_agent\"}" \
-            >/dev/null 2>&1 || true
         log_route "DELIVERED" "$from" "user" "via API"
         return 0
     fi

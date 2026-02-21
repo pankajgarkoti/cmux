@@ -162,7 +162,7 @@ EOF
         body_value="$filepath"
     fi
 
-    # Special case: user messages go to API
+    # Special case: user messages go to API (use /messages/internal to store + broadcast)
     if [[ "$to_addr" == "user" ]]; then
         local msg_content
         if (( ${#body} < INLINE_THRESHOLD )); then
@@ -170,9 +170,9 @@ EOF
         else
             msg_content=$(printf '%s\n\n(see: %s)' "$subject" "$body_value" | jq -Rs .)
         fi
-        if curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/user" \
+        if curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/internal" \
             -H "Content-Type: application/json" \
-            -d "{\"content\": $msg_content, \"from_agent\": \"$CMUX_AGENT_NAME\"}" \
+            -d "{\"from_agent\": \"$CMUX_AGENT_NAME\", \"to_agent\": \"user\", \"content\": $msg_content, \"type\": \"user\"}" \
             >/dev/null 2>&1; then
             ok "Sent to user: $subject"
         else
@@ -202,11 +202,11 @@ cmd_quick() {
     local from=$(get_from_address)
     local to_addr=$(normalize_to "$to")
 
-    # Special case: user messages go to API
+    # Special case: user messages go to API (use /messages/internal to store + broadcast)
     if [[ "$to_addr" == "user" ]]; then
-        if curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/user" \
+        if curl -sf -X POST "http://localhost:${CMUX_PORT}/api/messages/internal" \
             -H "Content-Type: application/json" \
-            -d "{\"content\": $(printf '%s' "$subject" | jq -Rs .), \"from_agent\": \"$CMUX_AGENT_NAME\"}" \
+            -d "{\"from_agent\": \"$CMUX_AGENT_NAME\", \"to_agent\": \"user\", \"content\": $(printf '%s' "$subject" | jq -Rs .), \"type\": \"user\"}" \
             >/dev/null 2>&1; then
             ok "Sent to user: $subject"
         else
