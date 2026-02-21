@@ -91,8 +91,12 @@ export function HeartbeatIndicator() {
 
   const status = getStatus();
 
-  // Heart is ALWAYS red and pulsing — red = alive, pumping, healthy
-  const heartColor = 'text-red-500 fill-red-500';
+  // Heart pulses always — green = healthy, amber = active issues, red = alert
+  const heartColor = status === 'alert'
+    ? 'text-red-500 fill-red-500'
+    : status === 'active'
+      ? 'text-amber-500 fill-amber-500'
+      : 'text-emerald-500 fill-emerald-500';
 
   const formatAgo = (s: number | null) => {
     if (s === null) return 'No data';
@@ -159,13 +163,13 @@ export function HeartbeatIndicator() {
 
         {!latest && (
           <div className="px-3 py-4 text-xs text-muted-foreground text-center">
-            Waiting for first heartbeat scan...
+            Waiting for first heartbeat...
           </div>
         )}
 
         {latest?.all_clear && sectionEntries.length === 0 && (
-          <div className="px-3 py-4 flex items-center justify-center gap-2 text-xs text-red-500 dark:text-red-400">
-            <Heart className="h-4 w-4 fill-red-500 text-red-500 animate-heartbeat" />
+          <div className="px-3 py-4 flex items-center justify-center gap-2 text-xs text-emerald-500 dark:text-emerald-400">
+            <Heart className="h-4 w-4 fill-emerald-500 text-emerald-500 animate-heartbeat" />
             All clear — system healthy
           </div>
         )}
