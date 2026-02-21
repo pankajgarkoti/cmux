@@ -88,11 +88,11 @@ export function ActivityTimeline() {
           </TabsList>
         </div>
 
-        <TabsContent value="thoughts" className="flex-1 overflow-hidden mt-0">
+        <TabsContent value="thoughts" className="flex-1 overflow-hidden mt-2">
           <ThoughtStream />
         </TabsContent>
 
-        <TabsContent value="activity" className="flex-1 overflow-hidden mt-0">
+        <TabsContent value="activity" className="flex-1 overflow-hidden mt-2">
           <ScrollArea className="flex-1 h-full">
             <div className="p-3 pt-0 space-y-2">
               {displayedActivities.length === 0 ? (
@@ -120,7 +120,7 @@ export function ActivityTimeline() {
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="tasks" className="flex-1 overflow-hidden mt-0">
+        <TabsContent value="tasks" className="flex-1 overflow-hidden mt-2">
           <TasksPanel />
         </TabsContent>
       </Tabs>
