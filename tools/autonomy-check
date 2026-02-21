@@ -277,6 +277,26 @@ if [[ -f "$registry" ]]; then
 fi
 
 #───────────────────────────────────────────────────────────────────────────────
+# 4b. Watchdog — stuck agent detection
+#───────────────────────────────────────────────────────────────────────────────
+
+watchdog_summary=""
+watchdog_tool="${CMUX_PROJECT_ROOT}/tools/watchdog"
+if [[ -x "$watchdog_tool" ]]; then
+    watchdog_output=$("$watchdog_tool" scan 2>/dev/null || true)
+    # Extract stuck agents (lines with red dot indicator)
+    stuck_lines=$(echo "$watchdog_output" | grep -E '●.*critical|●.*warning' | grep -v 'healthy' || true)
+    if [[ -n "$stuck_lines" ]]; then
+        # Count stuck agents
+        stuck_count=$(echo "$stuck_lines" | wc -l | tr -d ' ')
+        # Extract agent names and issues
+        stuck_details=$(echo "$stuck_lines" | sed 's/.*●[[:space:]]*//' | sed 's/[[:space:]]*healthy.*//' | tr '\n' '; ' | sed 's/; $//')
+        watchdog_summary="${stuck_count} stuck agent(s): ${stuck_details}"
+        [[ -z "$highest_priority" ]] && highest_priority="Watchdog: ${stuck_count} agent(s) stuck — run ./tools/watchdog scan for details"
+    fi
+fi
+
+#───────────────────────────────────────────────────────────────────────────────
 # 5. Git — uncommitted tracked changes
 #───────────────────────────────────────────────────────────────────────────────
 
@@ -321,6 +341,7 @@ has_findings=false
 [[ -n "$worker_summary" ]] && has_findings=true
 [[ -n "$backlog_summary" ]] && has_findings=true
 [[ -n "$supervisor_summary" ]] && has_findings=true
+[[ -n "$watchdog_summary" ]] && has_findings=true
 [[ -n "$git_summary" ]] && has_findings=true
 [[ -n "$health_summary" ]] && has_findings=true
 
@@ -342,6 +363,7 @@ if [[ "$OUTPUT_MODE" == "summary" ]]; then
     [[ -n "$worker_summary" ]]     && echo "Workers: ${worker_summary}"
     [[ -n "$backlog_summary" ]]    && echo "Backlog: ${backlog_summary}"
     [[ -n "$supervisor_summary" ]] && echo "Supervisors: ${supervisor_summary}"
+    [[ -n "$watchdog_summary" ]]   && echo "Watchdog: ${watchdog_summary}"
     [[ -n "$git_summary" ]]        && echo "Git: ${git_summary}"
     [[ -n "$health_summary" ]]     && echo "Health: ${health_summary}"
 
