@@ -80,18 +80,40 @@ if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
     tail -50 "$transcript_path" | jq -c 'select(.type == "assistant") | [.message.content[]? | select(.type == "text") | .text[0:40]]' 2>/dev/null | tail -5 >> "$DEBUG_LOG"
 fi
 
+# Extract usage/token data from the last assistant message
+usage_json="null"
+if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
+    usage_json=$(tail -100 "$transcript_path" | \
+        jq -rs '
+            [.[] | select(.type == "assistant")] |
+            if length > 0 then
+                .[-1].message.usage // null |
+                if . then {
+                    input_tokens: (.input_tokens // 0),
+                    output_tokens: (.output_tokens // 0),
+                    cache_creation_input_tokens: (.cache_creation_input_tokens // 0),
+                    cache_read_input_tokens: (.cache_read_input_tokens // 0)
+                } else null end
+            else null end
+        ' 2>/dev/null || echo "null")
+
+    echo "usage=$usage_json" >> "$DEBUG_LOG"
+fi
+
 # Build event payload - use CMUX_AGENT_NAME for agent_id
 payload=$(jq -n \
     --arg event_type "Stop" \
     --arg agent_name "$AGENT_NAME" \
     --arg response_content "$response_content" \
     --argjson hook_data "$input" \
+    --argjson usage "$usage_json" \
     '{
         event_type: $event_type,
         session_id: $hook_data.session_id,
         agent_id: $agent_name,
         transcript_path: $hook_data.transcript_path,
-        response_content: (if $response_content == "" then null else $response_content end)
+        response_content: (if $response_content == "" then null else $response_content end),
+        usage: $usage
     }')
 
 # POST to FastAPI (non-blocking, ignore errors)
