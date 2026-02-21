@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     model_config = {
         "env_prefix": "CMUX_",
         "env_file": ".env",
+        "extra": "ignore",
     }
 
 

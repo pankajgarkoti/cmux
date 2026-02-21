@@ -155,6 +155,20 @@ class TelegramBot:
         if self.on_message:
             await self.on_message(text, chat_id)
 
+    def reload_config(self, token: Optional[str] = None, chat_id: Optional[str] = None):
+        """Re-read credentials from environment and update internal state.
+
+        Call this after dotenv.load_dotenv() to pick up newly-created .env files
+        without restarting the server.
+        """
+        self.token = token or os.getenv("TELEGRAM_BOT_TOKEN")
+        self.chat_id = chat_id or os.getenv("TELEGRAM_CHAT_ID")
+        self._base_url = f"{TELEGRAM_API}/bot{self.token}" if self.token else None
+        # Close stale HTTP client so next call creates a fresh one
+        if self._client and not self._client.is_closed:
+            # Can't await here (sync method) — mark for recreation
+            self._client = None
+
     async def stop(self):
         """Stop polling and close the HTTP client."""
         self._running = False

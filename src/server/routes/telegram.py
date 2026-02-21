@@ -55,6 +55,30 @@ async def telegram_send(req: TelegramSendRequest):
     return {"success": sent}
 
 
+@router.post("/reload")
+async def telegram_reload():
+    """Reload Telegram bot credentials from .env and restart if newly configured.
+
+    Call this after updating .env with TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID
+    so the bot picks up the new values without a server restart.
+    """
+    from dotenv import load_dotenv
+
+    load_dotenv(override=True)
+    was_running = telegram_bot.is_running
+    telegram_bot.reload_config()
+
+    # Start polling if newly configured and not already running
+    if telegram_bot.is_configured and not was_running:
+        await telegram_bot.start_polling()
+
+    return {
+        "configured": telegram_bot.is_configured,
+        "running": telegram_bot.is_running,
+        "chat_id": telegram_bot.chat_id,
+    }
+
+
 @router.post("/webhook")
 async def telegram_webhook(update: TelegramWebhookUpdate):
     """Receive a Telegram webhook update (for future webhook mode).

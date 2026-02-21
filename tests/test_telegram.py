@@ -51,3 +51,13 @@ def test_telegram_webhook_with_message(client):
     })
     assert response.status_code == 200
     assert response.json()["ok"] is True
+
+
+def test_telegram_reload(client):
+    """Test reload endpoint returns status fields."""
+    response = client.post("/api/telegram/reload")
+    assert response.status_code == 200
+    data = response.json()
+    assert "configured" in data
+    assert "running" in data
+    assert "chat_id" in data
