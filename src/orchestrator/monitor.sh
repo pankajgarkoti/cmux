@@ -561,7 +561,7 @@ check_supervisor_heartbeat() {
                     -d "$hb_json" >/dev/null 2>&1 || true
             fi
         else
-            tmux_safe_send "$CMUX_SESSION" "supervisor" "[HEARTBEAT] Autonomy scan (idle ${staleness}s): All clear — no pending mailbox, backlog, or worker issues found. Look for proactive work: code improvements, test coverage, documentation, or check ./tools/backlog list." --retry 2
+            tmux_safe_send "$CMUX_SESSION" "supervisor" "[HEARTBEAT] You have been idle for ${staleness}s with no tool activity. Check for pending work — mailbox, worker status, journal TODOs — or find proactive work to do. If no tasks are pending, conduct self-improvement research: autonomous LLM systems, memory architectures, retrieval-augmented generation, agent coordination patterns, or cognitive scaffolding. Delegate to Nova (perm-research) for deep dives. Save findings to .cmux/journal/artifacts/ and identify concrete improvements to implement in CMUX." --retry 2
 
             # POST all-clear heartbeat to API (best-effort, 2s timeout)
             curl -sf --max-time 2 -X POST "http://localhost:${CMUX_PORT}/api/heartbeat" \
