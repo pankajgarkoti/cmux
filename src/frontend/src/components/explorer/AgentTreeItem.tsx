@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Bot, Crown, Loader2 } from 'lucide-react';
+import { Bot, Crown, Loader2, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useAgentEventStore } from '@/stores/agentEventStore';
 import type { Agent, AgentStatus } from '@/types/agent';
@@ -40,9 +40,10 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
   const displayName = agent.display_name || agent.name;
 
   // Badge label
+  const isPermanent = agent.permanent === true;
   const badgeLabel = isSupervisor
     ? (isProjectSupervisor ? 'P-SUP' : 'SUP')
-    : 'WRK';
+    : isPermanent ? 'PERM' : 'WRK';
 
   return (
     <button
@@ -69,6 +70,8 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
           'h-4 w-4 flex-shrink-0',
           isProjectSupervisor ? 'text-purple-500' : 'text-amber-500'
         )} />
+      ) : isPermanent ? (
+        <ShieldCheck className="h-4 w-4 text-teal-500 flex-shrink-0" />
       ) : (
         <Bot className="h-4 w-4 text-muted-foreground flex-shrink-0" />
       )}
@@ -89,7 +92,8 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
         className={cn(
           'text-[10px] h-4 px-1',
           isProjectSupervisor ? 'border-purple-500/50 text-purple-600' :
-          isSupervisor ? 'border-amber-500/50 text-amber-600' : 'border-muted'
+          isSupervisor ? 'border-amber-500/50 text-amber-600' :
+          isPermanent ? 'border-teal-500/50 text-teal-600' : 'border-muted'
         )}
       >
         {badgeLabel}

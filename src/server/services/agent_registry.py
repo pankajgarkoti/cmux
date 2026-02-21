@@ -210,10 +210,16 @@ class AgentRegistry:
         return dict(self._agents)
 
     def cleanup_stale(self, existing_windows: Set[str]):
-        """Remove registry entries for windows that no longer exist."""
+        """Remove registry entries for windows that no longer exist.
+
+        Permanent workers are never cleaned up — they persist across sessions.
+        """
         stale = set(self._agents.keys()) - existing_windows
         if stale:
-            for key in stale:
+            for key in list(stale):
+                if self._agents.get(key, {}).get('permanent', False):
+                    stale.discard(key)
+                    continue
                 del self._agents[key]
             self._save()
         return stale

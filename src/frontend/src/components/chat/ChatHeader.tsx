@@ -132,8 +132,9 @@ export function ChatHeader({
 
   const displayName = agentId || 'supervisor';
   const title = agentId ? displayName : 'Command Center';
+  const isPermanent = agent?.permanent === true;
   const subtitle = agentId
-    ? `${isWorker ? 'Worker' : 'Supervisor'} agent`
+    ? `${isPermanent ? 'Permanent Worker' : isWorker ? 'Worker' : 'Supervisor'} agent`
     : 'Multi-agent orchestration dashboard';
 
   return (
@@ -163,16 +164,36 @@ export function ChatHeader({
               </Badge>
             </>
           ) : (
-            <Badge
-              variant="outline"
-              className={cn('text-[10px] h-5 px-1.5', statusDisplay.className)}
-            >
-              {statusDisplay.label}
-            </Badge>
+            <>
+              <Badge
+                variant="outline"
+                className={cn('text-[10px] h-5 px-1.5', statusDisplay.className)}
+              >
+                {statusDisplay.label}
+              </Badge>
+              {isPermanent && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] h-5 px-1.5 bg-teal-500/20 text-teal-600 border-teal-500/30"
+                >
+                  Permanent
+                </Badge>
+              )}
+            </>
           )}
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{subtitle}</span>
+          {isPermanent && (agent?.reset_count || agent?.tasks_since_reset) ? (
+            <>
+              <span className="text-muted-foreground/50">|</span>
+              <span>
+                {agent.reset_count ? `${agent.reset_count} resets` : ''}
+                {agent.reset_count && agent.tasks_since_reset ? ', ' : ''}
+                {agent.tasks_since_reset ? `${agent.tasks_since_reset} tasks` : ''}
+              </span>
+            </>
+          ) : null}
           {lastActivityDate && (
             <>
               <span className="text-muted-foreground/50">|</span>

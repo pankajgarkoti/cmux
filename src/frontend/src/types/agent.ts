@@ -22,6 +22,10 @@ export interface Agent {
   display_name?: string;
   role?: string;
   project_id?: string;
+  permanent?: boolean;
+  role_context?: string;
+  reset_count?: number;
+  tasks_since_reset?: number;
 }
 
 export interface AgentListResponse {

@@ -34,6 +34,10 @@ class Agent(BaseModel):
     role: AgentRole = AgentRole.WORKER
     status: AgentStatus = AgentStatus.IDLE
     project_id: str = "cmux"
+    permanent: bool = False
+    role_context: Optional[str] = None
+    reset_count: int = 0
+    tasks_since_reset: int = 0
     tmux_window: str
     session: str = "cmux"  # tmux session this agent belongs to
     created_at: datetime = Field(default_factory=datetime.utcnow)

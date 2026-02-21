@@ -35,6 +35,10 @@ class AgentManager:
             if agent.role in (AgentRole.SUPERVISOR, AgentRole.PROJECT_SUPERVISOR):
                 agent.type = AgentType.SUPERVISOR
             agent.project_id = meta.get("project_id", "cmux")
+            agent.permanent = meta.get('permanent', False)
+            agent.role_context = meta.get('role_context')
+            agent.reset_count = meta.get('reset_count', 0)
+            agent.tasks_since_reset = meta.get('tasks_since_reset', 0)
         else:
             agent.display_name = agent.name
         return agent
