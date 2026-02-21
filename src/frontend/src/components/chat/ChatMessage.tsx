@@ -108,7 +108,7 @@ function renderWithMentions(text: string, className?: string) {
     parts.push(
       <button
         key={`${mentionName}-${matchIndex}`}
-        className="inline-flex items-center bg-primary-foreground/20 text-primary-foreground font-medium rounded px-1 py-0.5 text-[0.9em] hover:bg-primary-foreground/30 transition-colors cursor-pointer"
+        className="inline-flex items-center bg-white/20 text-white font-medium rounded px-1 py-0.5 text-[0.9em] hover:bg-white/30 transition-colors cursor-pointer"
         onClick={(e) => {
           e.stopPropagation();
           useAgentStore.getState().selectAgent(mentionName);
@@ -259,7 +259,7 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount, inbox
           className={cn(
             'text-xs',
             alignRight
-              ? 'bg-primary text-primary-foreground'
+              ? 'bg-primary text-white'
               : 'bg-secondary text-secondary-foreground'
           )}
         >
@@ -272,7 +272,7 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount, inbox
         className={cn(
           'rounded-2xl px-4 py-2.5 min-w-0 relative',
           alignRight
-            ? 'bg-primary text-primary-foreground rounded-tr-sm'
+            ? 'bg-primary text-white rounded-tr-sm'
             : 'bg-muted rounded-tl-sm'
         )}
       >
@@ -320,7 +320,7 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount, inbox
                 className={cn(
                   'text-[10px] cursor-default',
                   alignRight
-                    ? 'text-primary-foreground/70'
+                    ? 'text-white/70'
                     : 'text-muted-foreground'
                 )}
               >
