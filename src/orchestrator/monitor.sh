@@ -699,6 +699,31 @@ spawn_sentry() {
         mailbox_context=$(tail -10 "$CMUX_MAILBOX" 2>/dev/null || echo "(empty)")
     fi
 
+    # Gather context: backlog items
+    local backlog_context=""
+    backlog_context=$(sqlite3 "${CMUX_PROJECT_ROOT}/.cmux/tasks.db" \
+        "SELECT title FROM tasks WHERE status='backlog' ORDER BY priority LIMIT 3;" 2>/dev/null || echo "(no backlog)")
+    [[ -z "$backlog_context" ]] && backlog_context="(no backlog items)"
+
+    # Gather context: recent mailbox subjects
+    local mailbox_subjects=""
+    if [[ -f "$CMUX_MAILBOX" ]]; then
+        mailbox_subjects=$(tail -5 "$CMUX_MAILBOX" 2>/dev/null | grep -o '"subject":"[^"]*"' | sed 's/"subject":"//;s/"$//' || echo "(empty)")
+    fi
+    [[ -z "$mailbox_subjects" ]] && mailbox_subjects="(no recent messages)"
+
+    # Gather context: today's journal tail
+    local today today_journal today_journal_tail today_reflection
+    today=$(date +%Y-%m-%d)
+    today_journal=".cmux/journal/${today}/journal.md"
+    today_reflection=".cmux/journal/${today}/reflection.md"
+    today_journal_tail=""
+    if [[ -f "$today_journal" ]]; then
+        today_journal_tail=$(tail -20 "$today_journal" 2>/dev/null || echo "(empty)")
+    else
+        today_journal_tail="(no journal entries today)"
+    fi
+
     # Timestamps for the report
     local now last_beat staleness
     now=$(date +%s)
@@ -801,10 +826,39 @@ done
 
 ### Step 5: Brief the new supervisor
 
-Send a message explaining what happened:
+Write an enriched briefing file and send the supervisor to read it:
 
 \`\`\`bash
-tmux send-keys -t "${CMUX_SESSION}:supervisor" -l "SENTRY BRIEFING: The previous supervisor became unresponsive (heartbeat stale for ${staleness}s at ${timestamp}). Recovery was performed. Check the journal for details. Resume normal operations."
+cat > .cmux/worker-contexts/sentry-briefing.md << 'BRIEF_EOF'
+# Sentry Recovery Briefing
+
+The previous supervisor became unresponsive (heartbeat stale for ${staleness}s at ${timestamp}). A sentry agent performed recovery.
+
+## Pending Backlog (top 3)
+
+${backlog_context}
+
+## Recent Mailbox Messages
+
+${mailbox_subjects}
+
+## Recent Journal (tail of today)
+
+${today_journal_tail}
+
+## Where to Look
+
+- Today's reflection: \`${today_reflection}\`
+- Today's journal: \`${today_journal}\`
+- Full backlog: run \`./tools/backlog list\`
+
+## Recommended Next Steps
+
+1. Read \`${today_reflection}\` for today's full context
+2. Run \`./tools/autonomy-check\` to find highest-priority next action
+3. Resume normal operations — check backlog, respond to any pending mailbox messages
+BRIEF_EOF
+tmux send-keys -t "${CMUX_SESSION}:supervisor" -l "SENTRY RECOVERY: You were relaunched after becoming unresponsive. Read .cmux/worker-contexts/sentry-briefing.md for full context on what was pending, then resume operations."
 sleep 0.2
 tmux send-keys -t "${CMUX_SESSION}:supervisor" Enter
 \`\`\`
