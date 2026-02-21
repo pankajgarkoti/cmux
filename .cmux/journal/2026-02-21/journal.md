@@ -410,3 +410,15 @@ Created docs/TEAM.md as a living reference for the permanent worker team. Docume
 
 ## 11:35 - Starting inbox redesign
 Claimed backlog item c866351b — redesign worker chat as inbox view. Analyzed current architecture: backend already supports agent_id filtering via conversation_store.get_messages(). Frontend does client-side filtering in ChatPanel. Plan: Kai adds a pinned-task endpoint and inbox-style query, Mira rebuilds the chat panel layout with pinned task header and grouped messages. Reading all relevant files now.
+
+## 11:38 - Inbox endpoint implemented
+Added GET /api/messages/inbox/{agent_id} endpoint for the inbox redesign. Returns pinned_task (first [TASK] message sent TO the agent), messages (all involving the agent, ASC order), and total count. Changes: InboxResponse model in message.py, get_inbox() + _row_to_message helper in conversation_store.py, route in messages.py. 5 new tests, all 50 passing. Commit 6d402a8.
+
+## 11:42 - Inbox redesign in progress
+Kai completed backend endpoint (commit 6d402a8) — GET /api/messages/inbox/{agent_id} with pinned_task, messages, total. 50/50 tests passing. Mira working on frontend InboxView component with browser testing via Chrome MCP. Found CSS alignment issue and fixing it.
+
+## 11:42 - Inbox redesign in progress
+Building InboxView component for worker chat panel. Pinned task card at top, inbox feed below. Added inboxAgentId prop to ChatMessage for worker-centric alignment (worker messages left, incoming right). InboxView replaces ChatMessages for workers; supervisor and command center views unchanged. Filter toggle hidden for workers. Typecheck and build passing, visual testing via Chrome MCP.
+
+## 11:44 - Inbox redesign complete
+Completed worker inbox redesign (commit b8e4c9d). New InboxView component with: (1) Pinned task card at top showing first [TASK] message with clipboard icon and indigo styling; (2) Worker-centric alignment via inboxAgentId prop on ChatMessage — worker's own messages left, incoming messages (supervisor, user) right-aligned with primary colors; (3) Filter toggle hidden for workers (always shows all messages); (4) System notifications as collapsed dividers. ChatPanel gates on isWorker to choose InboxView vs ChatMessages. Supervisor/command center views unchanged. Verified in browser: Kai's inbox shows pinned task, two left-aligned DONE messages, one right-aligned TASK from supervisor.
