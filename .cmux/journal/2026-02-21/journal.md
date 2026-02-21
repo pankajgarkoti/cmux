@@ -533,3 +533,13 @@ Completed comprehensive survey on autonomous LLM agent systems (559 lines). Cove
 
 ## 14:21 - Session continuation — wiring reflection.md
 Continuing from compacted session. Picked up where we left off: committing reflection.md, wiring it into the heartbeat nudge, updating MEMORY.md. User also asked how reflection differs from journal and wants it per-day + committed to git.
+
+## 14:24 - Heartbeat recipient design decision
+Discussed with user who should receive heartbeat nudges. Decision: supervisor-only for now. Workers should never get heartbeats (task-driven, not idle-loop-driven). Project supervisors could opt-in later when persistent project supervisors become a real thing, but not worth building yet. One-line change in monitor.sh when needed. Added reflection file system — per-day at .cmux/journal/YYYY-MM-DD/reflection.md, wired into heartbeat nudge (commit 67bc5c4).
+
+## 14:50 - Trust yourself — stop asking permission for obvious fixes
+User called out that I asked 'want me to add this?' when I had already identified the problem and solution. If I know what's wrong and know the fix, just do it. Also logged the temp-worker-vs-permanent-worker mistake: spawned two disposable workers for HeartbeatIndicator.tsx instead of sending to Mira who owns frontend. She would have gotten it right first try. Added both to reflection.md and dispatched a worker to formalize the delegation protocol in SUPERVISOR_ROLE.md.
+
+## 14:50 - Added 'Delegation Protocol: Permanent vs Temp Workers' section to docs/SUPERVISOR_ROLE.md after team templates section. Table format with clear criteria for when to use each type, plus anti-pattern callout.
+
+## 14:50 - Reflection: delegation-protocol — what worked: clean task, read both files first, inserted at the right spot between Team Templates and Core Responsibilities. What I'd do differently: nothing, straightforward doc edit.
