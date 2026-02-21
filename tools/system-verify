@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+#═══════════════════════════════════════════════════════════════════════════════
+# system-verify - Validate all CMUX infrastructure exists and works
+#
+# Usage: system-verify
+#
+# Checks hooks, daemons, health endpoint, critical files, and tmux session.
+# Exits 0 if all pass, 1 if any fail.
+#═══════════════════════════════════════════════════════════════════════════════
+
+set -uo pipefail
+
+CMUX_HOME="${CMUX_HOME:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+CMUX_SESSION="${CMUX_SESSION:-cmux}"
+CMUX_PORT="${CMUX_PORT:-8000}"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+passed=0
+failed=0
+
+pass() { echo -e "  ${GREEN}✓${NC} $1"; ((passed++)); }
+fail() { echo -e "  ${RED}✗${NC} $1"; ((failed++)); }
+section() { echo -e "\n${BOLD}$1${NC}"; }
+
+#───────────────────────────────────────────────────────────────────────────────
+# 1. HOOKS — verify all hook scripts from settings.json exist and are executable
+#───────────────────────────────────────────────────────────────────────────────
+section "Hooks"
+
+settings_file="${CMUX_HOME}/.claude/settings.json"
+if [[ ! -f "$settings_file" ]]; then
+    fail "settings.json not found: $settings_file"
+else
+    pass "settings.json exists"
+
+    # Extract all command fields from hooks, filter to file paths only
+    # (skip inline shell commands that don't start with $( or /)
+    git_root="$CMUX_HOME"
+    hook_commands=$(jq -r '
+        .hooks | to_entries[] | .value[] | .hooks[]? | .command // empty
+    ' "$settings_file" 2>/dev/null)
+
+    while IFS= read -r cmd; do
+        [[ -z "$cmd" ]] && continue
+
+        # Skip inline shell commands (contain { or ||, no .sh extension)
+        if [[ "$cmd" == *"{"* || "$cmd" == *"||"* ]] && [[ "$cmd" != *".sh"* ]]; then
+            continue
+        fi
+
+        # Resolve $(git rev-parse --show-toplevel) to actual path
+        resolved="${cmd//\$(git rev-parse --show-toplevel)/$git_root}"
+
+        # Extract just the script path (strip trailing args if any)
+        script_path="$resolved"
+
+        # Get basename for display
+        display_name=$(basename "$script_path")
+
+        if [[ ! -f "$script_path" ]]; then
+            fail "hook missing: $display_name ($script_path)"
+        elif [[ ! -x "$script_path" ]]; then
+            fail "hook not executable: $display_name"
+        else
+            pass "hook: $display_name"
+        fi
+    done <<< "$hook_commands"
+fi
+
+#───────────────────────────────────────────────────────────────────────────────
+# 2. DAEMONS — check background processes are running
+#───────────────────────────────────────────────────────────────────────────────
+section "Daemons"
+
+# Check for monitor window in tmux (runs router, compact, journal-nudge)
+if tmux list-windows -t "$CMUX_SESSION" -F '#{window_name}' 2>/dev/null | grep -qx "monitor"; then
+    pass "monitor window exists"
+else
+    fail "monitor window missing from tmux session"
+fi
+
+# Check daemon processes by looking for running scripts
+for daemon in router.sh journal-nudge.sh compact.sh; do
+    if pgrep -f "$daemon" > /dev/null 2>&1; then
+        pass "daemon running: $daemon"
+    else
+        fail "daemon not running: $daemon"
+    fi
+done
+
+#───────────────────────────────────────────────────────────────────────────────
+# 3. HEALTH — verify API server responds correctly
+#───────────────────────────────────────────────────────────────────────────────
+section "Health"
+
+health_url="http://localhost:${CMUX_PORT}/api/webhooks/health"
+health_response=$(curl -sf --max-time 3 "$health_url" 2>/dev/null) || health_response=""
+
+if [[ -z "$health_response" ]]; then
+    fail "health endpoint unreachable: $health_url"
+else
+    pass "health endpoint responds"
+
+    # Check for api:healthy in response
+    api_status=$(echo "$health_response" | jq -r '.api // empty' 2>/dev/null)
+    if [[ "$api_status" == "healthy" ]]; then
+        pass "API status: healthy"
+    else
+        fail "API status: ${api_status:-unknown} (expected 'healthy')"
+    fi
+
+    # Check overall status field
+    overall=$(echo "$health_response" | jq -r '.status // empty' 2>/dev/null)
+    if [[ "$overall" == "healthy" ]]; then
+        pass "overall status: healthy"
+    else
+        fail "overall status: ${overall:-missing} (expected 'healthy')"
+    fi
+fi
+
+#───────────────────────────────────────────────────────────────────────────────
+# 4. FILES — verify critical files exist
+#───────────────────────────────────────────────────────────────────────────────
+section "Critical Files"
+
+for f in \
+    .cmux/mailbox \
+    .cmux/conversations.db \
+    .cmux/tasks.db \
+    .cmux/agent_registry.json \
+    .cmux/projects.json \
+    tools/workers \
+    tools/backlog \
+    tools/journal \
+    tools/mailbox \
+    tools/teams; do
+
+    full_path="${CMUX_HOME}/${f}"
+    if [[ -e "$full_path" ]]; then
+        pass "$f"
+    else
+        fail "$f missing"
+    fi
+done
+
+#───────────────────────────────────────────────────────────────────────────────
+# 5. TMUX — verify session and supervisor window
+#───────────────────────────────────────────────────────────────────────────────
+section "Tmux Session"
+
+if tmux has-session -t "$CMUX_SESSION" 2>/dev/null; then
+    pass "tmux session '$CMUX_SESSION' exists"
+else
+    fail "tmux session '$CMUX_SESSION' not found"
+fi
+
+if tmux list-windows -t "$CMUX_SESSION" -F '#{window_name}' 2>/dev/null | grep -qx "supervisor"; then
+    pass "supervisor window exists"
+else
+    fail "supervisor window missing"
+fi
+
+# Count total windows
+window_count=$(tmux list-windows -t "$CMUX_SESSION" 2>/dev/null | wc -l | tr -d ' ')
+if [[ -n "$window_count" ]]; then
+    pass "total tmux windows: $window_count"
+fi
+
+#───────────────────────────────────────────────────────────────────────────────
+# Summary
+#───────────────────────────────────────────────────────────────────────────────
+
+total=$((passed + failed))
+echo ""
+if [[ $failed -eq 0 ]]; then
+    echo -e "${GREEN}${BOLD}${passed}/${total} checks passed${NC}"
+    exit 0
+else
+    echo -e "${RED}${BOLD}${passed}/${total} checks passed${NC} (${failed} failed)"
+    exit 1
+fi
