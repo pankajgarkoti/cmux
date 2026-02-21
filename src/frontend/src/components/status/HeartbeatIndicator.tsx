@@ -32,11 +32,11 @@ interface HeartbeatPrefs {
   heartbeat_observe_timeout: number;
 }
 
-const PREF_LABELS: Record<keyof HeartbeatPrefs, { label: string; unit: string }> = {
-  heartbeat_warn_threshold: { label: 'Idle warn', unit: 's' },
-  heartbeat_nudge_interval: { label: 'Nudge cooldown', unit: 's' },
-  heartbeat_max_nudges: { label: 'Max nudges', unit: '' },
-  heartbeat_observe_timeout: { label: 'Observe timeout', unit: 's' },
+const PREF_LABELS: Record<keyof HeartbeatPrefs, { label: string; unit: string; tooltip: string }> = {
+  heartbeat_warn_threshold: { label: 'Idle warn', unit: 's', tooltip: 'Seconds of supervisor idle time before the first productivity nudge is sent' },
+  heartbeat_nudge_interval: { label: 'Nudge cooldown', unit: 's', tooltip: 'Minimum seconds between consecutive nudge messages' },
+  heartbeat_max_nudges: { label: 'Max nudges', unit: '', tooltip: 'Maximum nudge attempts before escalating to sentry recovery' },
+  heartbeat_observe_timeout: { label: 'Observe timeout', unit: 's', tooltip: 'Seconds of frozen terminal output before declaring supervisor stuck' },
 };
 
 export function HeartbeatIndicator() {
@@ -91,7 +91,7 @@ export function HeartbeatIndicator() {
   const status = getStatus();
 
   const heartColor = {
-    idle: 'text-muted-foreground',
+    idle: 'text-emerald-500 fill-emerald-500',
     clear: 'text-emerald-500 fill-emerald-500',
     active: 'text-red-500 fill-red-500',
     alert: 'text-red-600 fill-red-600',
@@ -133,7 +133,7 @@ export function HeartbeatIndicator() {
             className={cn(
               'h-4 w-4 transition-colors',
               heartColor,
-              status !== 'idle' && 'animate-heartbeat',
+              'animate-heartbeat',
             )}
           />
           <span className="sr-only">System heartbeat</span>
@@ -143,7 +143,7 @@ export function HeartbeatIndicator() {
         <DropdownMenuLabel className="flex items-center justify-between">
           <span className="flex items-center gap-1.5">
             <Heart className={cn('h-3.5 w-3.5', heartColor)} />
-            Autonomy Scan
+            Heartbeat
           </span>
           <span className="text-[11px] font-normal text-muted-foreground flex items-center gap-1">
             <Clock className="h-3 w-3" />
@@ -210,11 +210,11 @@ export function HeartbeatIndicator() {
         {showConfig && prefs && (
           <div className="px-3 pb-2 space-y-1.5">
             {(Object.keys(PREF_LABELS) as (keyof HeartbeatPrefs)[]).map((key) => {
-              const { label, unit } = PREF_LABELS[key];
+              const { label, unit, tooltip } = PREF_LABELS[key];
               const isEditing = editKey === key;
               return (
                 <div key={key} className="flex items-center justify-between text-[11px]">
-                  <span className="text-muted-foreground">{label}</span>
+                  <span className="text-muted-foreground cursor-help" title={tooltip}>{label}</span>
                   {isEditing ? (
                     <span className="flex items-center gap-1">
                       <input
