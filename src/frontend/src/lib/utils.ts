@@ -25,6 +25,13 @@ export function getAgentBadgeColor(label: 'SUP' | 'P-SUP' | 'PERM' | 'WRK'): str
   }
 }
 
+/** Format a token count as compact string: 842, 12.4k, 1.2M */
+export function formatTokenCount(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 1_000_000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+}
+
 /** Message prefix → badge config. Returns null if no known prefix found. */
 const MESSAGE_PREFIXES = [
   { tag: '[TASK]', label: 'TASK', className: 'bg-indigo-500/15 text-indigo-600 border-indigo-500/30' },

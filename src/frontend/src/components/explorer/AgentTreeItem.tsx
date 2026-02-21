@@ -1,4 +1,4 @@
-import { cn, getAgentBadgeLabel, getAgentBadgeColor } from '@/lib/utils';
+import { cn, getAgentBadgeLabel, getAgentBadgeColor, formatTokenCount } from '@/lib/utils';
 import { Bot, Crown, Loader2, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -25,12 +25,6 @@ const statusColors: Record<AgentStatus, string> = {
   FAILED: 'bg-red-600',
   IDLE: 'bg-gray-300',
 };
-
-function formatTokenCount(n: number): string {
-  if (n < 1000) return String(n);
-  if (n < 1_000_000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-  return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
-}
 
 export function AgentTreeItem({ agent, isSelected, onClick, totalTokens }: AgentTreeItemProps) {
   const isSupervisor = agent.type === 'supervisor' || agent.role === 'project-supervisor';

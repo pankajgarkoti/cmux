@@ -10,6 +10,7 @@ import { ActivityTimelineItem } from './ActivityTimelineItem';
 import { ActivityFilters } from './ActivityFilters';
 import { ThoughtStream } from './ThoughtStream';
 import { TasksPanel } from '@/components/tasks/TasksPanel';
+import { BudgetPanel } from '@/components/budget/BudgetPanel';
 import { PanelHeader } from '@/components/layout/PanelHeader';
 import { Activity as ActivityIcon, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import type { ActivityType } from '@/types/activity';
@@ -85,6 +86,7 @@ export function ActivityTimeline() {
             <TabsTrigger value="thoughts" className="text-xs h-5 flex-1">Thoughts</TabsTrigger>
             <TabsTrigger value="activity" className="text-xs h-5 flex-1">Events</TabsTrigger>
             <TabsTrigger value="tasks" className="text-xs h-5 flex-1">Tasks</TabsTrigger>
+            <TabsTrigger value="budget" className="text-xs h-5 flex-1">Budget</TabsTrigger>
           </TabsList>
         </div>
 
@@ -122,6 +124,10 @@ export function ActivityTimeline() {
 
         <TabsContent value="tasks" className="flex-1 overflow-hidden mt-2">
           <TasksPanel />
+        </TabsContent>
+
+        <TabsContent value="budget" className="flex-1 overflow-hidden mt-2">
+          <BudgetPanel />
         </TabsContent>
       </Tabs>
     </div>
