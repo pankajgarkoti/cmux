@@ -331,6 +331,18 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount, inbox
               {preciseTime}
             </TooltipContent>
           </Tooltip>
+          {collapseCount && collapseCount > 1 && (
+            <span
+              className={cn(
+                'text-[10px] font-medium px-1.5 py-0 rounded-full',
+                alignRight
+                  ? 'bg-white/20 text-white/80'
+                  : 'bg-muted-foreground/20 text-muted-foreground'
+              )}
+            >
+              ×{collapseCount}
+            </span>
+          )}
 
           {/* Message Actions - appear on hover */}
           <MessageActions

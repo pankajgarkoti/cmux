@@ -191,7 +191,7 @@ export function ChatMessages({ messages, onSuggestionClick, onLoadMore, hasMore,
     return map;
   }, [sortedMessages, allThoughts]);
 
-  // Collapse consecutive system notifications of the same type into a single entry with count
+  // Collapse consecutive identical messages: system notifications by label, regular messages by content+sender
   const collapsedMessages = useMemo(() => {
     const result: { message: Message; collapseCount?: number }[] = [];
 
@@ -199,26 +199,37 @@ export function ChatMessages({ messages, onSuggestionClick, onLoadMore, hasMore,
       const msg = sortedMessages[i];
       const info = getSystemNotificationInfo(msg);
 
-      if (!info) {
-        result.push({ message: msg });
+      if (info) {
+        // Count consecutive system notifications with the same label
+        let count = 1;
+        while (i + count < sortedMessages.length) {
+          const nextMsg = sortedMessages[i + count];
+          const nextInfo = getSystemNotificationInfo(nextMsg);
+          if (nextInfo && nextInfo.label === info.label) {
+            count++;
+          } else {
+            break;
+          }
+        }
+        // Show only the last message of the group, with a count badge
+        result.push({ message: sortedMessages[i + count - 1], collapseCount: count });
+        i += count - 1;
         continue;
       }
 
-      // Count consecutive system notifications with the same label
+      // Content-based dedup: collapse consecutive identical messages from the same sender
       let count = 1;
       while (i + count < sortedMessages.length) {
         const nextMsg = sortedMessages[i + count];
-        const nextInfo = getSystemNotificationInfo(nextMsg);
-        if (nextInfo && nextInfo.label === info.label) {
+        if (getSystemNotificationInfo(nextMsg)) break;
+        if (nextMsg.from_agent === msg.from_agent && nextMsg.content === msg.content) {
           count++;
         } else {
           break;
         }
       }
-
-      // Show only the last message of the group, with a count badge
-      result.push({ message: sortedMessages[i + count - 1], collapseCount: count });
-      i += count - 1; // skip past the grouped messages
+      result.push({ message: sortedMessages[i + count - 1], collapseCount: count > 1 ? count : undefined });
+      i += count - 1;
     }
 
     return result;

@@ -193,7 +193,7 @@ export function InboxView({ messages, agentId, onLoadMore, hasMore, isLoadingMor
     return map;
   }, [sortedMessages, allThoughts]);
 
-  // Collapse consecutive system notifications
+  // Collapse consecutive identical messages: system notifications by label, regular messages by content+sender
   const collapsedMessages = useMemo(() => {
     const result: { message: Message; collapseCount?: number }[] = [];
 
@@ -201,23 +201,34 @@ export function InboxView({ messages, agentId, onLoadMore, hasMore, isLoadingMor
       const msg = sortedMessages[i];
       const info = getSystemNotificationInfo(msg);
 
-      if (!info) {
-        result.push({ message: msg });
+      if (info) {
+        let count = 1;
+        while (i + count < sortedMessages.length) {
+          const nextMsg = sortedMessages[i + count];
+          const nextInfo = getSystemNotificationInfo(nextMsg);
+          if (nextInfo && nextInfo.label === info.label) {
+            count++;
+          } else {
+            break;
+          }
+        }
+        result.push({ message: sortedMessages[i + count - 1], collapseCount: count });
+        i += count - 1;
         continue;
       }
 
+      // Content-based dedup: collapse consecutive identical messages from the same sender
       let count = 1;
       while (i + count < sortedMessages.length) {
         const nextMsg = sortedMessages[i + count];
-        const nextInfo = getSystemNotificationInfo(nextMsg);
-        if (nextInfo && nextInfo.label === info.label) {
+        if (getSystemNotificationInfo(nextMsg)) break;
+        if (nextMsg.from_agent === msg.from_agent && nextMsg.content === msg.content) {
           count++;
         } else {
           break;
         }
       }
-
-      result.push({ message: sortedMessages[i + count - 1], collapseCount: count });
+      result.push({ message: sortedMessages[i + count - 1], collapseCount: count > 1 ? count : undefined });
       i += count - 1;
     }
 
