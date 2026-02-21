@@ -137,7 +137,7 @@ Webhooks/User → Mailbox (.cmux/mailbox) → Router daemon → Supervisor agent
 **Orchestration (src/orchestrator/):**
 
 - `cmux.sh` - Main entry point, tmux session management
-- `health.sh` - Health monitoring with git rollback recovery
+- `monitor.sh` - Master orchestrator with health monitoring, recovery, and daemon management
 - `router.sh` - Polls mailbox, routes messages to agents
 - `compact.sh` - Periodic context compaction scheduler
 
@@ -195,7 +195,7 @@ Key settings (in `src/server/config.py`):
 
 The system protects against breaking itself during self-modification:
 
-1. **Health daemon** (`health.sh`) polls `/api/webhooks/health` every 10 seconds
+1. **Monitor daemon** (`monitor.sh`) polls `/api/webhooks/health` every 10 seconds
 2. After 3 consecutive failures, attempts restart
 3. If restart fails, stashes local changes and rolls back to previous git commit
 4. Rebuilds dependencies and frontend, then restarts

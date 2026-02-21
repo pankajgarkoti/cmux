@@ -270,8 +270,7 @@ cmux/
 │   │
 │   └── orchestrator/           # Bash scripts
 │       ├── cmux.sh             # Main entry point
-│       ├── monitor.sh          # Master orchestrator
-│       ├── health.sh           # Health monitoring
+│       ├── monitor.sh          # Master orchestrator + health monitoring
 │       ├── router.sh           # Message routing
 │       ├── compact.sh          # Periodic compaction
 │       └── lib/                # Shell libraries
@@ -320,7 +319,7 @@ cmux/
 
 ## Health Monitoring
 
-The health daemon (`health.sh`) provides automatic recovery:
+The monitor daemon (`monitor.sh`) provides automatic recovery:
 
 1. Checks server health every 10 seconds
 2. After 3 consecutive failures, attempts restart

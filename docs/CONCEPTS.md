@@ -368,7 +368,7 @@ CAREFUL (medium risk):
 └── src/server/websocket/  # Real-time communication
 
 FORBIDDEN (high risk):
-├── src/orchestrator/health.sh   # Recovery system itself
+├── src/orchestrator/monitor.sh  # Recovery system + master orchestrator
 ├── src/orchestrator/cmux.sh     # System startup
 └── /api/webhooks/health endpoint # Health check
 ```

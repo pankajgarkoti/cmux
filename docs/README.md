@@ -33,7 +33,7 @@ Welcome to the CMUX documentation. Choose where to start based on your goal.
 │                                                                 │
 │   Orchestration (bash/tmux)                                     │
 │   ├── cmux.sh        Start/stop the system                      │
-│   ├── health.sh      Monitor and auto-recover                   │
+│   ├── monitor.sh     Master orchestrator + auto-recover           │
 │   └── router.sh      Route messages between agents              │
 │                                                                 │
 │   Server (Python/FastAPI)                                       │

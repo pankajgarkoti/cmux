@@ -6,7 +6,7 @@ This document provides guidelines for agents modifying the CMUX system itself. T
 
 CMUX protects against breaking itself during self-modification:
 
-1. **Health Monitoring**: The health daemon (`health.sh`) checks server health every 10 seconds
+1. **Health Monitoring**: The monitor daemon (`monitor.sh`) checks server health every 10 seconds
 2. **Automatic Recovery**: After 3 consecutive failures, attempts simple restart
 3. **Git Rollback**: If restart fails, rolls back to last known healthy commit
 4. **Session Preservation**: tmux sessions are kept alive during rollback (agents survive)
@@ -103,9 +103,9 @@ These components are more sensitive:
 
 These components are critical for recovery:
 
-### `src/orchestrator/health.sh`
+### `src/orchestrator/monitor.sh`
 
-The recovery system itself. Breaking this removes the safety net.
+The master orchestrator and recovery system. Breaking this removes the safety net.
 
 ### `src/orchestrator/cmux.sh`
 

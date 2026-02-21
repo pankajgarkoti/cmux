@@ -105,7 +105,7 @@ Relevant files: src/server/services/mailbox.py
 
 **Your response:**
 ```bash
-./tools/mailbox send worker-mailbox-fix "[REVIEW] Use file-based lock with fcntl.flock(). Rationale: The mailbox is accessed by multiple processes (router daemon, server, workers via CLI), so in-memory locks won't work. fcntl.flock() is already used in the codebase (see health.sh) and handles crash recovery automatically. Specific guidance: Use a .cmux/mailbox.lock file with fcntl.LOCK_EX for writes and fcntl.LOCK_SH for reads."
+./tools/mailbox send worker-mailbox-fix "[REVIEW] Use file-based lock with fcntl.flock(). Rationale: The mailbox is accessed by multiple processes (router daemon, server, workers via CLI), so in-memory locks won't work. fcntl.flock() is already used in the codebase (see lib/filelock.sh) and handles crash recovery automatically. Specific guidance: Use a .cmux/mailbox.lock file with fcntl.LOCK_EX for writes and fcntl.LOCK_SH for reads."
 ./tools/mailbox done "Reviewed mailbox locking for worker-mailbox-fix. Decision: file-based lock with fcntl.flock()"
 ./tools/journal decision "Mailbox locking approach" "File-based lock with fcntl.flock() — needed for cross-process safety, already patterned in codebase"
 ```

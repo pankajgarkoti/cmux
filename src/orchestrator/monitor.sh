@@ -1116,7 +1116,7 @@ run_dashboard() {
     done
 }
 
-# Healthy commit tracking (from health.sh)
+# Healthy commit tracking (absorbed from former health.sh)
 HEALTHY_COMMIT_FILE=".cmux/.last_healthy_commit"
 RECOVERY_WAIT=30
 
