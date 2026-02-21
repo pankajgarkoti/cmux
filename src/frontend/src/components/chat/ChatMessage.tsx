@@ -85,7 +85,8 @@ const PREVIEW_LENGTH = 200;
 const MENTION_REGEX = /@([\w-]+)/g;
 
 /**
- * Renders text with @mentions highlighted as colored badges.
+ * Renders text with @mentions highlighted as clickable colored badges.
+ * Clicking a mention navigates to that agent in the sidebar.
  */
 function renderWithMentions(text: string, className?: string) {
   const parts: (string | JSX.Element)[] = [];
@@ -101,14 +102,18 @@ function renderWithMentions(text: string, className?: string) {
       parts.push(text.slice(lastIndex, matchIndex));
     }
 
-    // Add highlighted mention
+    // Add highlighted, clickable mention
     parts.push(
-      <span
+      <button
         key={`${mentionName}-${matchIndex}`}
-        className="inline-flex items-center bg-primary-foreground/20 text-primary-foreground font-medium rounded px-1 py-0.5 text-[0.9em]"
+        className="inline-flex items-center bg-primary-foreground/20 text-primary-foreground font-medium rounded px-1 py-0.5 text-[0.9em] hover:bg-primary-foreground/30 transition-colors cursor-pointer"
+        onClick={(e) => {
+          e.stopPropagation();
+          useAgentStore.getState().selectAgent(mentionName);
+        }}
       >
         {mentionFull}
-      </span>
+      </button>
     );
 
     lastIndex = matchIndex + mentionFull.length;

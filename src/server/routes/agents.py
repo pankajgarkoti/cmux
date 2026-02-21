@@ -112,22 +112,36 @@ async def send_message_to_agent(agent_id: str, message: AgentMessage):
     # Also broadcast the full message for chat UI
     await ws_manager.broadcast("new_message", msg.model_dump(mode="json"))
 
-    # Silently route @mentions to mentioned agents (only in Command Center)
-    if agent_id == "supervisor":
-        mentioned_names = MENTION_PATTERN.findall(message.content)
-        for name in set(mentioned_names):
-            if name == agent_id:
-                continue
-            mentioned_agent = await agent_manager.get_agent(name)
-            if mentioned_agent:
-                mention_content = f"[cmux:user] @you: {message.content}"
-                await tmux_service.send_input(
-                    mentioned_agent.tmux_window, mention_content,
-                    session=mentioned_agent.session,
-                )
-                logger.info(f"@mention routed message to {name}")
+    # Route @mentions to mentioned agents (works from any agent context)
+    mentioned_names = MENTION_PATTERN.findall(message.content)
+    routed_to: list[str] = []
+    for name in set(mentioned_names):
+        if name == agent_id:
+            continue  # Already receiving this message as primary target
+        mentioned_agent = await agent_manager.get_agent(name)
+        if mentioned_agent:
+            # Send to the mentioned agent's tmux window
+            mention_content = f"[cmux:user] @you: {message.content}"
+            await tmux_service.send_input(
+                mentioned_agent.tmux_window, mention_content,
+                session=mentioned_agent.session,
+            )
+            # Store mention-routed message so it appears in chat history
+            mention_msg = Message(
+                id=str(uuid.uuid4()),
+                timestamp=datetime.now(timezone.utc),
+                from_agent="user",
+                to_agent=name,
+                type=MessageType.USER,
+                content=message.content,
+                metadata={"mention_routed": True, "original_target": agent_id},
+            )
+            mailbox_service.store_message(mention_msg)
+            await ws_manager.broadcast("new_message", mention_msg.model_dump(mode="json"))
+            routed_to.append(name)
+            logger.info(f"@mention routed message to {name}")
 
-    return {"success": True, "agent_id": agent_id, "message_id": msg.id}
+    return {"success": True, "agent_id": agent_id, "message_id": msg.id, "mention_routed_to": routed_to}
 
 
 @router.post("/{agent_id}/interrupt")

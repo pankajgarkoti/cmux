@@ -2,6 +2,7 @@ import { Fragment } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
+import { useAgentStore } from '@/stores/agentStore';
 
 interface MarkdownContentProps {
   content: string;
@@ -26,13 +27,18 @@ function renderMentionsInText(text: string): React.ReactNode {
       parts.push(<Fragment key={key++}>{text.slice(lastIndex, matchIndex)}</Fragment>);
     }
 
+    const mentionName = match[1];
     parts.push(
-      <span
+      <button
         key={key++}
-        className="inline-flex items-center bg-primary/20 text-primary font-medium rounded px-1 py-0.5 text-[0.9em]"
+        className="inline-flex items-center bg-primary/20 text-primary font-medium rounded px-1 py-0.5 text-[0.9em] hover:bg-primary/30 transition-colors cursor-pointer"
+        onClick={(e) => {
+          e.stopPropagation();
+          useAgentStore.getState().selectAgent(mentionName);
+        }}
       >
         {mentionFull}
-      </span>
+      </button>
     );
 
     lastIndex = matchIndex + mentionFull.length;
