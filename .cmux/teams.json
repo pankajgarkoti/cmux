@@ -1,1 +1,32 @@
-{"teams":[]}
+{
+  "teams": [
+    {
+      "prefix": "hero",
+      "template": "SQUAD_MODEL",
+      "task": "permanent team",
+      "members": [
+        "hero-squad-lead",
+        "hero-backend",
+        "hero-frontend",
+        "hero-tester"
+      ],
+      "project_id": "hero",
+      "permanent": true,
+      "created_at": "2026-02-21T10:24:03Z"
+    },
+    {
+      "prefix": "heroweb",
+      "template": "SQUAD_MODEL",
+      "task": "permanent team",
+      "members": [
+        "heroweb-squad-lead",
+        "heroweb-backend",
+        "heroweb-frontend",
+        "heroweb-tester"
+      ],
+      "project_id": "heroweb",
+      "permanent": true,
+      "created_at": "2026-02-21T10:26:18Z"
+    }
+  ]
+}
