@@ -192,18 +192,16 @@ if [[ -n "$windows" ]]; then
 fi
 
 #───────────────────────────────────────────────────────────────────────────────
-# 3. Backlog — pending items with priority breakdown
+# 3. Backlog — pending items with priority breakdown (from tasks.db)
 #───────────────────────────────────────────────────────────────────────────────
 
-backlog_file="${CMUX_PROJECT_ROOT}/.cmux/backlog.json"
-if [[ -f "$backlog_file" ]]; then
-    # Count pending items by priority
-    p1=$(jq '[.[] | select(.status == "pending" and .priority == 1)] | length' "$backlog_file" 2>/dev/null || echo 0)
-    p2=$(jq '[.[] | select(.status == "pending" and .priority == 2)] | length' "$backlog_file" 2>/dev/null || echo 0)
-    p3=$(jq '[.[] | select(.status == "pending" and .priority == 3)] | length' "$backlog_file" 2>/dev/null || echo 0)
-    p4=$(jq '[.[] | select(.status == "pending" and .priority == 4)] | length' "$backlog_file" 2>/dev/null || echo 0)
-    p5=$(jq '[.[] | select(.status == "pending" and .priority == 5)] | length' "$backlog_file" 2>/dev/null || echo 0)
-    backlog_total=$((p1 + p2 + p3 + p4 + p5))
+tasks_db="${CMUX_PROJECT_ROOT}/.cmux/tasks.db"
+if [[ -f "$tasks_db" ]]; then
+    p1=$(sqlite3 "$tasks_db" "SELECT COUNT(*) FROM tasks WHERE status='backlog' AND priority='critical';" 2>/dev/null || echo 0)
+    p2=$(sqlite3 "$tasks_db" "SELECT COUNT(*) FROM tasks WHERE status='backlog' AND priority='high';" 2>/dev/null || echo 0)
+    p3=$(sqlite3 "$tasks_db" "SELECT COUNT(*) FROM tasks WHERE status='backlog' AND priority='medium';" 2>/dev/null || echo 0)
+    p4=$(sqlite3 "$tasks_db" "SELECT COUNT(*) FROM tasks WHERE status='backlog' AND priority='low';" 2>/dev/null || echo 0)
+    backlog_total=$((p1 + p2 + p3 + p4))
 
     if ((backlog_total > 0)); then
         priority_parts=()
@@ -211,7 +209,6 @@ if [[ -f "$backlog_file" ]]; then
         ((p2 > 0)) && priority_parts+=("${p2} high")
         ((p3 > 0)) && priority_parts+=("${p3} medium")
         ((p4 > 0)) && priority_parts+=("${p4} low")
-        ((p5 > 0)) && priority_parts+=("${p5} backlog")
 
         backlog_summary="${backlog_total} items ($(IFS=', '; echo "${priority_parts[*]}"))"
 

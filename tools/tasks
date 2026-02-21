@@ -29,7 +29,6 @@ set -euo pipefail
 
 CMUX_HOME="${CMUX_HOME:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 DB="${CMUX_HOME}/.cmux/tasks.db"
-BACKLOG_FILE="${CMUX_HOME}/.cmux/backlog.json"
 
 # Colors
 RED='\033[0;31m'
@@ -125,6 +124,7 @@ status_color() {
         done)        echo -e "${GREEN}${padded}${NC}" ;;
         blocked)     echo -e "${RED}${padded}${NC}" ;;
         failed)      echo -e "${RED}${BOLD}${padded}${NC}" ;;
+        backlog)     echo -e "${CYAN}${padded}${NC}" ;;
         *)           echo "$padded" ;;
     esac
 }
@@ -154,8 +154,8 @@ priority_sort_key() {
 
 validate_status() {
     case "$1" in
-        pending|assigned|in-progress|review|done|blocked|failed) ;;
-        *) die "invalid status: $1 (valid: pending, assigned, in-progress, review, done, blocked, failed)" ;;
+        pending|assigned|in-progress|review|done|blocked|failed|backlog) ;;
+        *) die "invalid status: $1 (valid: pending, assigned, in-progress, review, done, blocked, failed, backlog)" ;;
     esac
 }
 
@@ -867,71 +867,8 @@ cmd_dashboard() {
 }
 
 cmd_import_backlog() {
-    local backlog_id="${1:-}"
-
-    ensure_db
-
-    if [[ ! -f "$BACKLOG_FILE" ]]; then
-        die "no backlog file found at $BACKLOG_FILE"
-    fi
-
-    local items
-    if [[ -n "$backlog_id" ]]; then
-        # Strip leading #
-        backlog_id="${backlog_id#\#}"
-        items=$(jq -c --argjson id "$backlog_id" '[.[] | select(.id == $id)]' "$BACKLOG_FILE")
-        local count
-        count=$(echo "$items" | jq 'length')
-        [[ "$count" == "0" ]] && die "backlog item #${backlog_id} not found"
-    else
-        # Import all pending items
-        items=$(jq -c '[.[] | select(.status == "pending" or .status == "in_progress")]' "$BACKLOG_FILE")
-        local count
-        count=$(echo "$items" | jq 'length')
-        if [[ "$count" == "0" ]]; then
-            echo -e "${DIM}No pending backlog items to import${NC}"
-            return
-        fi
-    fi
-
-    local imported=0
-    while IFS= read -r item; do
-        local bl_id bl_title bl_desc bl_priority bl_source
-
-        bl_id=$(echo "$item" | jq -r '.id')
-        bl_title=$(echo "$item" | jq -r '.title')
-        bl_desc=$(echo "$item" | jq -r '.description // ""')
-        bl_priority=$(echo "$item" | jq -r '.priority // 3')
-        bl_source=$(echo "$item" | jq -r '.source // "system"')
-
-        # Map backlog priority (1-5) to task priority (critical/high/medium/low)
-        local task_priority
-        case "$bl_priority" in
-            1) task_priority="critical" ;;
-            2) task_priority="high" ;;
-            3) task_priority="medium" ;;
-            4|5) task_priority="low" ;;
-            *) task_priority="medium" ;;
-        esac
-
-        # Map backlog source to task source
-        local task_source="backlog"
-
-        # Generate task ID
-        local task_id
-        task_id=$(gen_id)
-        local now
-        now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-
-        sqlite3 "$DB" "INSERT INTO tasks (id, title, description, project, assigned_to, status, priority, source, parent_id, resources, created_at, updated_at)
-            VALUES ('$task_id', '$(echo "$bl_title" | sed "s/'/''/g")', '$(echo "$bl_desc" | sed "s/'/''/g")', '', '', 'pending', '$task_priority', '$task_source', '', '[]', '$now', '$now');"
-
-        ok "Imported backlog #${bl_id} → ${task_id}: ${bl_title} ($(priority_color "$task_priority"))"
-        ((imported++))
-    done < <(echo "$items" | jq -c '.[]')
-
-    echo ""
-    echo -e "${DIM}${imported} backlog item(s) imported as tasks${NC}"
+    warn "import-backlog is deprecated — backlog is now a status field in tasks.db."
+    echo -e "${DIM}Use 'backlog add' to create backlog items, or 'tasks add --status backlog'.${NC}"
 }
 
 cmd_global() {

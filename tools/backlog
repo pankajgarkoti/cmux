@@ -1,24 +1,29 @@
 #!/usr/bin/env bash
 #===============================================================================
-# backlog - Manage a persistent task backlog for CMUX supervisor autonomy
+# backlog - Manage backlog items in the CMUX tasks database
+#
+# Backlog is a status field on tasks in .cmux/tasks.db.
+# This CLI provides a convenient interface for managing backlog items.
 #
 # Usage:
-#   backlog add "<title>" "<description>" [priority] [source]
-#   backlog list                          - Show pending items by priority
-#   backlog next                          - Get highest-priority pending item
-#   backlog complete <id>                 - Mark item completed
-#   backlog skip <id>                     - Mark item skipped
-#   backlog prioritize <id> <priority>    - Change priority (1=highest, 5=lowest)
-#   backlog show <id>                     - Show full details for one item
+#   backlog add "<title>" [priority 1-5]         - Add backlog item
+#   backlog add "<title>" "<desc>" [pri] [src]    - Add with description
+#   backlog list                                  - Show backlog items by priority
+#   backlog next                                  - Claim highest-priority backlog item
+#   backlog done <id> [remarks]                   - Mark item done with optional remarks
+#   backlog complete <id> [remarks]               - Alias for done
+#   backlog skip <id>                             - Mark item done (skipped)
+#   backlog prioritize <id> <priority>            - Change priority (1-5)
+#   backlog show <id>                             - Show full details
 #
-# Storage: .cmux/backlog.json
+# Storage: .cmux/tasks.db (SQLite — tasks with status='backlog')
 # Designed for supervisor agents to maintain autonomous work queues.
 #===============================================================================
 
 set -euo pipefail
 
 CMUX_HOME="${CMUX_HOME:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-BACKLOG_FILE="${CMUX_HOME}/.cmux/backlog.json"
+DB="${CMUX_HOME}/.cmux/tasks.db"
 
 # Colors
 RED='\033[0;31m'
@@ -29,6 +34,8 @@ DIM='\033[2m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+SEP="$(printf '\x1f')"  # Unit separator for field splitting
+
 die() { echo -e "${RED}error:${NC} $1" >&2; exit 1; }
 ok() { echo -e "${GREEN}✓${NC} $1"; }
 warn() { echo -e "${YELLOW}!${NC} $1"; }
@@ -37,38 +44,78 @@ warn() { echo -e "${YELLOW}!${NC} $1"; }
 # Helpers
 #-------------------------------------------------------------------------------
 
-ensure_backlog() {
-    mkdir -p "$(dirname "$BACKLOG_FILE")"
-    if [[ ! -f "$BACKLOG_FILE" ]]; then
-        echo '[]' > "$BACKLOG_FILE"
-    fi
+ensure_db() {
+    [[ -f "$DB" ]] || die "tasks database not found: $DB"
 }
 
-next_id() {
-    local max_id
-    max_id=$(jq 'map(.id) | max // 0' "$BACKLOG_FILE")
-    echo $((max_id + 1))
+gen_uuid() {
+    uuidgen | tr '[:upper:]' '[:lower:]'
+}
+
+# Map numeric priority (1-5) to text
+pri_num_to_text() {
+    case "$1" in
+        1) echo "critical" ;;
+        2) echo "high" ;;
+        3) echo "medium" ;;
+        4|5) echo "low" ;;
+        *) echo "medium" ;;
+    esac
+}
+
+# Map text priority to numeric for display
+pri_text_to_num() {
+    case "$1" in
+        critical) echo "1" ;;
+        high)     echo "2" ;;
+        medium)   echo "3" ;;
+        low)      echo "4" ;;
+        *)        echo "3" ;;
+    esac
 }
 
 priority_label() {
     case "$1" in
-        1) echo -e "${RED}P1-critical${NC}" ;;
-        2) echo -e "${YELLOW}P2-high${NC}" ;;
-        3) echo -e "${CYAN}P3-medium${NC}" ;;
-        4) echo -e "${DIM}P4-low${NC}" ;;
-        5) echo -e "${DIM}P5-backlog${NC}" ;;
-        *) echo "P$1" ;;
+        1|critical) echo -e "${RED}P1-critical${NC}" ;;
+        2|high)     echo -e "${YELLOW}P2-high${NC}" ;;
+        3|medium)   echo -e "${CYAN}P3-medium${NC}" ;;
+        4|5|low)    echo -e "${DIM}P4-low${NC}" ;;
+        *)          echo "P?" ;;
     esac
 }
 
 status_label() {
     case "$1" in
-        pending)     echo -e "${CYAN}pending${NC}" ;;
-        in_progress) echo -e "${YELLOW}in_progress${NC}" ;;
-        completed)   echo -e "${GREEN}completed${NC}" ;;
-        skipped)     echo -e "${DIM}skipped${NC}" ;;
+        backlog)     echo -e "${CYAN}backlog${NC}" ;;
+        pending)     echo -e "${YELLOW}pending${NC}" ;;
+        done)        echo -e "${GREEN}done${NC}" ;;
         *)           echo "$1" ;;
     esac
+}
+
+# Abbreviate UUID for display (first 8 chars)
+short_id() {
+    echo "${1:0:8}"
+}
+
+# Resolve partial ID prefix to full task ID
+resolve_id() {
+    local partial="$1"
+    local matches
+    matches=$(sqlite3 "$DB" "SELECT id FROM tasks WHERE id LIKE '$(echo "$partial" | sed "s/'/''/g")%';")
+
+    if [[ -z "$matches" ]]; then
+        die "item not found: ${partial}"
+    fi
+
+    local count
+    count=$(echo "$matches" | wc -l | tr -d ' ')
+
+    if [[ "$count" -eq 1 ]]; then
+        echo "$matches"
+    else
+        die "ambiguous ID '${partial}' — matches ${count} items. Use more characters."
+    fi
 }
 
 #-------------------------------------------------------------------------------
@@ -77,252 +124,266 @@ status_label() {
 
 cmd_add() {
     local title="${1:-}"
-    local description="${2:-}"
-    local priority="${3:-3}"
-    local source="${4:-system}"
+    [[ -z "$title" ]] && die "usage: backlog add \"<title>\" [priority 1-5]"
+    shift
 
-    [[ -z "$title" ]] && die "usage: backlog add \"<title>\" \"<description>\" [priority] [source]"
-    [[ -z "$description" ]] && die "usage: backlog add \"<title>\" \"<description>\" [priority] [source]"
+    local description="" priority_num="3" source="system"
 
-    # Validate priority
-    if ! [[ "$priority" =~ ^[1-5]$ ]]; then
-        die "priority must be 1-5 (1=highest, 5=lowest)"
+    # Parse remaining args: if next is a number 1-5, it's priority.
+    # Otherwise it's a description (legacy format: "<desc>" [pri] [src]).
+    if [[ $# -gt 0 ]]; then
+        if [[ "$1" =~ ^[1-5]$ ]]; then
+            priority_num="$1"
+            shift
+        else
+            description="$1"
+            shift
+            if [[ $# -gt 0 && "$1" =~ ^[1-5]$ ]]; then
+                priority_num="$1"
+                shift
+            fi
+            if [[ $# -gt 0 ]]; then
+                source="$1"
+                shift
+            fi
+        fi
     fi
 
-    # Validate source
-    case "$source" in
-        user|system|self) ;;
-        *) die "source must be: user, system, or self" ;;
-    esac
+    ensure_db
 
-    ensure_backlog
-
-    local id
-    id=$(next_id)
-    local now
+    local id priority_text now
+    id=$(gen_uuid)
+    priority_text=$(pri_num_to_text "$priority_num")
     now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-    local new_item
-    new_item=$(jq -n \
-        --argjson id "$id" \
-        --arg title "$title" \
-        --arg description "$description" \
-        --argjson priority "$priority" \
-        --arg source "$source" \
-        --arg created_at "$now" \
-        '{id: $id, title: $title, description: $description, priority: $priority, source: $source, status: "pending", created_at: $created_at, completed_at: null}')
+    sqlite3 "$DB" "INSERT INTO tasks (id, title, description, project, assigned_to, status, priority, source, parent_id, resources, linked_workers, remarks, created_at, updated_at, completed_at)
+        VALUES ('$id', '$(echo "$title" | sed "s/'/''/g")', '$(echo "$description" | sed "s/'/''/g")', '', '', 'backlog', '$priority_text', '$(echo "$source" | sed "s/'/''/g")', '', '[]', '', '', '$now', '$now', '');"
 
-    jq --argjson item "$new_item" '. + [$item]' "$BACKLOG_FILE" > "${BACKLOG_FILE}.tmp" \
-        && mv "${BACKLOG_FILE}.tmp" "$BACKLOG_FILE"
-
-    ok "Added #${id}: ${title} ($(priority_label "$priority"))"
+    ok "Added $(short_id "$id"): ${title} ($(priority_label "$priority_num"))"
 }
 
 cmd_list() {
-    ensure_backlog
+    ensure_db
 
-    local filter="${1:-pending}"
+    local rows
+    rows=$(sqlite3 -separator "$SEP" "$DB" "SELECT id, priority, source, title FROM tasks WHERE status='backlog' ORDER BY
+        CASE priority
+            WHEN 'critical' THEN 1
+            WHEN 'high' THEN 2
+            WHEN 'medium' THEN 3
+            WHEN 'low' THEN 4
+            ELSE 5
+        END, created_at;")
 
-    local items
-    if [[ "$filter" == "all" ]]; then
-        items=$(jq -r 'sort_by(.priority, .created_at) | .[] | "\(.id)\t\(.priority)\t\(.status)\t\(.source)\t\(.title)"' "$BACKLOG_FILE")
-    else
-        items=$(jq -r --arg status "$filter" '[.[] | select(.status == $status)] | sort_by(.priority, .created_at) | .[] | "\(.id)\t\(.priority)\t\(.status)\t\(.source)\t\(.title)"' "$BACKLOG_FILE")
-    fi
-
-    if [[ -z "$items" ]]; then
-        echo -e "${DIM}No ${filter} backlog items${NC}"
+    if [[ -z "$rows" ]]; then
+        echo -e "${DIM}No backlog items${NC}"
         return
     fi
 
-    echo -e "${BOLD}Backlog (${filter}):${NC}"
+    echo -e "${BOLD}Backlog:${NC}"
     echo ""
-    printf "${DIM}%-4s  %-12s  %-12s  %-8s  %s${NC}\n" "ID" "PRIORITY" "STATUS" "SOURCE" "TITLE"
-    echo -e "${DIM}────  ────────────  ────────────  ────────  ─────────────────────────${NC}"
+    printf "${DIM}%-10s  %-12s  %-12s  %-14s  %s${NC}\n" "ID" "PRIORITY" "STATUS" "SOURCE" "TITLE"
+    echo -e "${DIM}──────────  ────────────  ────────────  ──────────────  ─────────────────────────${NC}"
 
-    while IFS=$'\t' read -r id priority status source title; do
-        printf "%-4s  %-12b  %-12b  %-8s  %s\n" \
-            "#${id}" \
+    local count=0
+    while IFS="$SEP" read -r id priority source title; do
+        printf "%-10s  %-12b  %-12b  %-14s  %s\n" \
+            "$(short_id "$id")" \
             "$(priority_label "$priority")" \
-            "$(status_label "$status")" \
+            "$(status_label "backlog")" \
             "$source" \
             "$title"
-    done <<< "$items"
+        ((count++))
+    done <<< "$rows"
 
-    local total
-    total=$(echo "$items" | wc -l | tr -d ' ')
     echo ""
-    echo -e "${DIM}${total} item(s)${NC}"
+    echo -e "${DIM}${count} item(s)${NC}"
 }
 
 cmd_next() {
-    ensure_backlog
+    ensure_db
 
-    local item
-    item=$(jq '[.[] | select(.status == "pending")] | sort_by(.priority, .created_at) | first // empty' "$BACKLOG_FILE")
+    local row
+    row=$(sqlite3 -separator "$SEP" "$DB" "SELECT id, title, description, priority FROM tasks WHERE status='backlog' ORDER BY
+        CASE priority
+            WHEN 'critical' THEN 1
+            WHEN 'high' THEN 2
+            WHEN 'medium' THEN 3
+            WHEN 'low' THEN 4
+            ELSE 5
+        END, created_at LIMIT 1;")
 
-    if [[ -z "$item" ]]; then
-        echo -e "${DIM}No pending backlog items${NC}"
+    if [[ -z "$row" ]]; then
+        echo -e "${DIM}No backlog items${NC}"
         return 1
     fi
 
     local id title description priority
-    id=$(echo "$item" | jq -r '.id')
-    title=$(echo "$item" | jq -r '.title')
-    description=$(echo "$item" | jq -r '.description')
-    priority=$(echo "$item" | jq -r '.priority')
-
-    # Mark as in_progress
-    jq --argjson id "$id" '(.[] | select(.id == $id)).status = "in_progress"' "$BACKLOG_FILE" > "${BACKLOG_FILE}.tmp" \
-        && mv "${BACKLOG_FILE}.tmp" "$BACKLOG_FILE"
-
-    echo -e "${BOLD}Next item: #${id}${NC}"
-    echo -e "  Title:    ${title}"
-    echo -e "  Priority: $(priority_label "$priority")"
-    echo -e "  Description: ${description}"
-    echo ""
-    ok "Marked #${id} as in_progress"
-}
-
-cmd_complete() {
-    local id="${1:-}"
-    [[ -z "$id" ]] && die "usage: backlog complete <id>"
-
-    # Strip leading # if present
-    id="${id#\#}"
-
-    ensure_backlog
-
-    local exists
-    exists=$(jq --argjson id "$id" '[.[] | select(.id == $id)] | length' "$BACKLOG_FILE")
-    [[ "$exists" == "0" ]] && die "item #${id} not found"
+    IFS="$SEP" read -r id title description priority <<< "$row"
 
     local now
     now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-    jq --argjson id "$id" --arg now "$now" \
-        '(.[] | select(.id == $id)) |= (.status = "completed" | .completed_at = $now)' \
-        "$BACKLOG_FILE" > "${BACKLOG_FILE}.tmp" \
-        && mv "${BACKLOG_FILE}.tmp" "$BACKLOG_FILE"
+    sqlite3 "$DB" "UPDATE tasks SET status='pending', updated_at='$now' WHERE id='$id';"
+    sqlite3 "$DB" "INSERT INTO task_status_history (task_id, old_status, new_status, changed_at) VALUES ('$id', 'backlog', 'pending', '$now');"
+
+    echo -e "${BOLD}Next item: $(short_id "$id")${NC}"
+    echo -e "  Title:    ${title}"
+    echo -e "  Priority: $(priority_label "$priority")"
+    if [[ -n "$description" ]]; then
+        echo -e "  Description: ${description}"
+    fi
+    echo ""
+    ok "Marked $(short_id "$id") as pending"
+}
+
+cmd_done() {
+    local id_input="${1:-}"
+    [[ -z "$id_input" ]] && die "usage: backlog done <id> [remarks]"
+    shift
+
+    local remarks="${*}"
+
+    ensure_db
+    local id
+    id=$(resolve_id "$id_input")
+
+    local now
+    now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+    local old_status
+    old_status=$(sqlite3 "$DB" "SELECT status FROM tasks WHERE id='$id';")
+
+    sqlite3 "$DB" "UPDATE tasks SET status='done', remarks='$(echo "$remarks" | sed "s/'/''/g")', completed_at='$now', updated_at='$now' WHERE id='$id';"
+    sqlite3 "$DB" "INSERT INTO task_status_history (task_id, old_status, new_status, changed_at) VALUES ('$id', '$old_status', 'done', '$now');"
 
     local title
-    title=$(jq -r --argjson id "$id" '.[] | select(.id == $id) | .title' "$BACKLOG_FILE")
-    ok "Completed #${id}: ${title}"
+    title=$(sqlite3 "$DB" "SELECT title FROM tasks WHERE id='$id';")
+    ok "Completed $(short_id "$id"): ${title}"
 }
 
 cmd_skip() {
-    local id="${1:-}"
-    [[ -z "$id" ]] && die "usage: backlog skip <id>"
+    local id_input="${1:-}"
+    [[ -z "$id_input" ]] && die "usage: backlog skip <id>"
 
-    id="${id#\#}"
+    ensure_db
+    local id
+    id=$(resolve_id "$id_input")
 
-    ensure_backlog
+    local now
+    now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-    local exists
-    exists=$(jq --argjson id "$id" '[.[] | select(.id == $id)] | length' "$BACKLOG_FILE")
-    [[ "$exists" == "0" ]] && die "item #${id} not found"
+    local old_status
+    old_status=$(sqlite3 "$DB" "SELECT status FROM tasks WHERE id='$id';")
 
-    jq --argjson id "$id" '(.[] | select(.id == $id)).status = "skipped"' \
-        "$BACKLOG_FILE" > "${BACKLOG_FILE}.tmp" \
-        && mv "${BACKLOG_FILE}.tmp" "$BACKLOG_FILE"
+    sqlite3 "$DB" "UPDATE tasks SET status='done', remarks='skipped', completed_at='$now', updated_at='$now' WHERE id='$id';"
+    sqlite3 "$DB" "INSERT INTO task_status_history (task_id, old_status, new_status, changed_at) VALUES ('$id', '$old_status', 'done', '$now');"
 
     local title
-    title=$(jq -r --argjson id "$id" '.[] | select(.id == $id) | .title' "$BACKLOG_FILE")
-    ok "Skipped #${id}: ${title}"
+    title=$(sqlite3 "$DB" "SELECT title FROM tasks WHERE id='$id';")
+    ok "Skipped $(short_id "$id"): ${title}"
 }
 
 cmd_prioritize() {
-    local id="${1:-}"
-    local priority="${2:-}"
+    local id_input="${1:-}"
+    local priority_num="${2:-}"
 
-    [[ -z "$id" ]] && die "usage: backlog prioritize <id> <priority>"
-    [[ -z "$priority" ]] && die "usage: backlog prioritize <id> <priority>"
+    [[ -z "$id_input" ]] && die "usage: backlog prioritize <id> <priority>"
+    [[ -z "$priority_num" ]] && die "usage: backlog prioritize <id> <priority>"
 
-    id="${id#\#}"
-
-    if ! [[ "$priority" =~ ^[1-5]$ ]]; then
+    if ! [[ "$priority_num" =~ ^[1-5]$ ]]; then
         die "priority must be 1-5 (1=highest, 5=lowest)"
     fi
 
-    ensure_backlog
+    ensure_db
+    local id
+    id=$(resolve_id "$id_input")
 
-    local exists
-    exists=$(jq --argjson id "$id" '[.[] | select(.id == $id)] | length' "$BACKLOG_FILE")
-    [[ "$exists" == "0" ]] && die "item #${id} not found"
+    local priority_text now
+    priority_text=$(pri_num_to_text "$priority_num")
+    now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-    jq --argjson id "$id" --argjson pri "$priority" \
-        '(.[] | select(.id == $id)).priority = $pri' \
-        "$BACKLOG_FILE" > "${BACKLOG_FILE}.tmp" \
-        && mv "${BACKLOG_FILE}.tmp" "$BACKLOG_FILE"
+    sqlite3 "$DB" "UPDATE tasks SET priority='$priority_text', updated_at='$now' WHERE id='$id';"
 
     local title
-    title=$(jq -r --argjson id "$id" '.[] | select(.id == $id) | .title' "$BACKLOG_FILE")
-    ok "Reprioritized #${id}: ${title} → $(priority_label "$priority")"
+    title=$(sqlite3 "$DB" "SELECT title FROM tasks WHERE id='$id';")
+    ok "Reprioritized $(short_id "$id"): ${title} → $(priority_label "$priority_num")"
 }
 
 cmd_show() {
-    local id="${1:-}"
-    [[ -z "$id" ]] && die "usage: backlog show <id>"
+    local id_input="${1:-}"
+    [[ -z "$id_input" ]] && die "usage: backlog show <id>"
 
-    id="${id#\#}"
+    ensure_db
+    local id
+    id=$(resolve_id "$id_input")
 
-    ensure_backlog
+    _qf() { sqlite3 "$DB" "SELECT $1 FROM tasks WHERE id='$id';"; }
 
-    local item
-    item=$(jq --argjson id "$id" '.[] | select(.id == $id) // empty' "$BACKLOG_FILE")
-    [[ -z "$item" ]] && die "item #${id} not found"
+    local title description priority status source remarks created_at completed_at
+    title=$(_qf "title")
+    description=$(_qf "description")
+    priority=$(_qf "priority")
+    status=$(_qf "status")
+    source=$(_qf "source")
+    remarks=$(_qf "remarks")
+    created_at=$(_qf "created_at")
+    completed_at=$(_qf "completed_at")
 
-    local title description priority status source created_at completed_at
-    title=$(echo "$item" | jq -r '.title')
-    description=$(echo "$item" | jq -r '.description')
-    priority=$(echo "$item" | jq -r '.priority')
-    status=$(echo "$item" | jq -r '.status')
-    source=$(echo "$item" | jq -r '.source')
-    created_at=$(echo "$item" | jq -r '.created_at')
-    completed_at=$(echo "$item" | jq -r '.completed_at')
-
-    echo -e "${BOLD}Backlog Item #${id}${NC}"
+    echo -e "${BOLD}Backlog Item $(short_id "$id")${NC}"
+    echo -e "  ID:          ${id}"
     echo -e "  Title:       ${title}"
-    echo -e "  Description: ${description}"
+    if [[ -n "$description" ]]; then
+        echo -e "  Description: ${description}"
+    fi
     echo -e "  Priority:    $(priority_label "$priority")"
     echo -e "  Status:      $(status_label "$status")"
     echo -e "  Source:      ${source}"
     echo -e "  Created:     ${created_at}"
-    if [[ "$completed_at" != "null" ]]; then
+    if [[ -n "$completed_at" ]]; then
         echo -e "  Completed:   ${completed_at}"
+    fi
+    if [[ -n "$remarks" ]]; then
+        echo -e "  Remarks:     ${remarks}"
     fi
 }
 
 cmd_help() {
     cat << 'EOF'
-backlog - Manage a persistent task backlog for CMUX
+backlog - Manage backlog items in the CMUX tasks database
 
 USAGE:
     backlog <command> [arguments]
 
 COMMANDS:
-    add "<title>" "<desc>" [pri] [src]   Add item (priority 1-5, source: user|system|self)
-    list [status|all]                    List items (default: pending)
-    next                                 Get & claim highest-priority pending item
-    complete <id>                        Mark item completed
-    skip <id>                            Mark item skipped
+    add "<title>" [priority] [src]       Add item (priority 1-5, source: user|system|self)
+    add "<title>" "<desc>" [pri] [src]   Add with description
+    list                                 List backlog items, sorted by priority
+    next                                 Claim highest-priority item (→ pending)
+    done <id> [remarks]                  Mark item done with optional remarks
+    complete <id> [remarks]              Alias for done
+    skip <id>                            Mark item done (skipped)
     prioritize <id> <priority>           Change priority (1=highest, 5=lowest)
     show <id>                            Show full details for one item
     help                                 Show this help
 
+IDS:
+    Items use UUID identifiers. You can use a prefix (e.g. first 8 chars)
+    as long as it uniquely identifies the item.
+
 EXAMPLES:
-    backlog add "Fix auth bug" "Token expiry broken in production" 1 user
-    backlog add "Run test suite" "Full pytest run and fix failures" 3
-    backlog list                 # Pending items, sorted by priority
-    backlog list all             # All items regardless of status
-    backlog next                 # Claim the top item
-    backlog complete 3           # Mark item #3 done
-    backlog skip 5               # Skip item #5
-    backlog prioritize 2 1       # Bump item #2 to critical
+    backlog add "Fix auth bug" 1
+    backlog add "Run test suite" "Full pytest run" 3
+    backlog list
+    backlog next
+    backlog done 7966ee6a "Fixed in commit abc123"
+    backlog skip 368208bc
+    backlog prioritize 206c8978 1
+    backlog show 7966ee6a
 
 STORAGE:
-    .cmux/backlog.json — array of items with id, title, description,
-    priority (1-5), source (user|system|self), status, timestamps.
+    .cmux/tasks.db — tasks with status='backlog' in the unified tasks table.
+    Claimed items (via next) transition to status='pending'.
 
 ENVIRONMENT:
     CMUX_HOME    Project root (default: git rev-parse --show-toplevel)
@@ -341,7 +402,8 @@ main() {
         add)        cmd_add "$@" ;;
         list)       cmd_list "$@" ;;
         next)       cmd_next "$@" ;;
-        complete)   cmd_complete "$@" ;;
+        done)       cmd_done "$@" ;;
+        complete)   cmd_done "$@" ;;
         skip)       cmd_skip "$@" ;;
         prioritize) cmd_prioritize "$@" ;;
         show)       cmd_show "$@" ;;
