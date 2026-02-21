@@ -191,6 +191,8 @@ Key settings (in `src/server/config.py`):
 - `CMUX_SESSION` - tmux session name (default: cmux)
 - `CMUX_MAILBOX` - Message queue path (default: .cmux/mailbox)
 - `LMNR_PROJECT_API_KEY` - Laminar observability API key (optional, traces LLM calls and agent events)
+- `TELEGRAM_BOT_TOKEN` - Telegram bot token (optional, enables Telegram ↔ CMUX messaging)
+- `TELEGRAM_CHAT_ID` - Telegram chat ID to send/receive messages (auto-detected from first message if unset)
 
 ## Self-Improvement Safety Model
 

@@ -8,6 +8,7 @@ from ..models.agent_event import AgentEvent, AgentEventResponse, AgentEventType
 from ..models.message import Message, MessageType
 from ..services.conversation_store import conversation_store
 from ..services.mailbox import mailbox_service
+from ..integrations.telegram import telegram_bot
 from ..websocket.manager import ws_manager
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,10 @@ async def receive_agent_event(event: AgentEvent):
 
         # Broadcast to frontend so it appears in the chat
         await ws_manager.broadcast("new_message", msg.model_dump(mode="json"))
+
+        # Forward to Telegram if configured (skip system messages — too noisy)
+        if telegram_bot.is_configured and msg_type != MessageType.SYSTEM:
+            await telegram_bot.send_message(f"[{display_agent_id}] {response_content}")
 
     return AgentEventResponse(
         success=True,

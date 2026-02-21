@@ -35,7 +35,9 @@ from .routes import (
     heartbeat,
     prefs,
     budget,
+    telegram,
 )
+from .integrations.telegram import telegram_bot
 from .websocket.manager import ws_manager
 
 logging.basicConfig(level=getattr(logging, settings.log_level))
@@ -47,8 +49,12 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting cmux server...")
     ws_manager.start_ping_task()
+    if telegram_bot.is_configured:
+        await telegram_bot.start_polling()
     yield
     # Shutdown
+    if telegram_bot.is_running:
+        await telegram_bot.stop()
     await ws_manager.stop_ping_task()
     await ws_manager.disconnect_all()
     logger.info("Shutting down cmux server...")
@@ -85,6 +91,7 @@ app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
 app.include_router(heartbeat.router, prefix="/api/heartbeat", tags=["heartbeat"])
 app.include_router(prefs.router, prefix="/api/prefs", tags=["prefs"])
 app.include_router(budget.router, prefix="/api/budget", tags=["budget"])
+app.include_router(telegram.router, prefix="/api/telegram", tags=["telegram"])
 
 # Static files (frontend) - only mount if directory exists
 frontend_dir = Path("src/frontend/dist")

@@ -6,6 +6,7 @@ import uuid
 from ..models.message import Message, MessageList, UserMessage, InternalMessage, InboxResponse, MessageType, TaskStatus, StatusUpdateRequest
 from ..services.mailbox import mailbox_service
 from ..services.conversation_store import conversation_store
+from ..integrations.telegram import telegram_bot
 
 from ..websocket.manager import ws_manager
 
@@ -100,6 +101,12 @@ async def send_to_user(message: UserMessage):
     )
 
     await ws_manager.broadcast("user_message", msg.model_dump(mode="json"))
+
+    # Forward to Telegram if configured
+    if telegram_bot.is_configured:
+        prefix = f"[{message.from_agent}] " if message.from_agent != "supervisor" else ""
+        await telegram_bot.send_message(f"{prefix}{message.content}")
+
     return {"success": True, "message_id": msg.id}
 
 
