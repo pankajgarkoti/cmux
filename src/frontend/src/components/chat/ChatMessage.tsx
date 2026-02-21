@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, getAgentBadgeLabel, getAgentBadgeColor, parseMessagePrefix } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -229,12 +229,16 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
   const agentData = !isUser ? agents.find(a => a.name === message.from_agent || a.id === message.from_agent) : null;
   const displayName = isUser ? 'You' : (agentData?.display_name || message.from_agent);
 
-  const previewContent = getPreviewContent(message.content);
-  const actuallyTruncated = previewContent.length < message.content.length;
+  // Parse message prefix (e.g. [TASK], [DONE], [STATUS])
+  const prefixInfo = !isUser ? parseMessagePrefix(message.content) : null;
+  const messageContent = prefixInfo ? prefixInfo.rest : message.content;
+
+  const previewContent = getPreviewContent(messageContent);
+  const actuallyTruncated = previewContent.length < messageContent.length;
   const shouldCollapse =
-    message.content.length > COLLAPSE_THRESHOLD && actuallyTruncated && !isUser;
+    messageContent.length > COLLAPSE_THRESHOLD && actuallyTruncated && !isUser;
   const isCollapsed = shouldCollapse && !isExpanded;
-  const displayContent = isCollapsed ? previewContent : message.content;
+  const displayContent = isCollapsed ? previewContent : messageContent;
 
   return (
     <div
@@ -285,14 +289,17 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
           ) : (
             <span className="text-xs font-medium">{displayName}</span>
           )}
-          {!isUser && (
-            <Badge
-              variant="outline"
-              className="text-[10px] h-4 px-1 border-current/20"
-            >
-              {agentData?.type === 'supervisor' || agentData?.role === 'project-supervisor' ? 'SUP' : 'WRK'}
-            </Badge>
-          )}
+          {!isUser && agentData && (() => {
+            const label = getAgentBadgeLabel(agentData);
+            return (
+              <Badge
+                variant="outline"
+                className={cn('text-[10px] h-4 px-1', getAgentBadgeColor(label))}
+              >
+                {label}
+              </Badge>
+            );
+          })()}
           <Tooltip>
             <TooltipTrigger asChild>
               <span
@@ -321,6 +328,18 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
             )}
           />
         </div>
+
+        {/* Message type prefix badge */}
+        {prefixInfo && (
+          <div className="mb-1.5">
+            <Badge
+              variant="outline"
+              className={cn('text-[10px] h-5 px-1.5 font-semibold', prefixInfo.className)}
+            >
+              {prefixInfo.label}
+            </Badge>
+          </div>
+        )}
 
         {/* Interleaved thoughts + tool calls timeline */}
         {!isUser && ((thoughts && thoughts.length > 0) || (toolCalls && toolCalls.length > 0)) && (
@@ -356,7 +375,7 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
                   {isCollapsed ? (
                     <>
                       <ChevronDown className="h-3 w-3 mr-1" />
-                      Show more ({message.content.length - displayContent.length}{' '}
+                      Show more ({messageContent.length - displayContent.length}{' '}
                       more chars)
                     </>
                   ) : (

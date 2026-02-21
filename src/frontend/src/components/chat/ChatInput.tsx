@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, type Ref } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Send, Loader2, Bot } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getAgentBadgeLabel, getAgentBadgeColor } from '@/lib/utils';
 import type { Agent } from '@/types/agent';
 
 interface ChatInputProps {
@@ -223,14 +223,17 @@ export function ChatInput({ onSend, isPending, placeholder, inputRef, agents = [
                       </span>
                     )}
                   </div>
-                  <span className={cn(
-                    'ml-auto text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0',
-                    agent.type === 'supervisor'
-                      ? 'bg-amber-500/10 text-amber-500'
-                      : 'bg-blue-500/10 text-blue-500'
-                  )}>
-                    {agent.type === 'supervisor' ? 'SUP' : 'WRK'}
-                  </span>
+                  {(() => {
+                    const label = getAgentBadgeLabel(agent);
+                    return (
+                      <span className={cn(
+                        'ml-auto text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 border',
+                        getAgentBadgeColor(label)
+                      )}>
+                        {label}
+                      </span>
+                    );
+                  })()}
                 </button>
               ))}
             </div>

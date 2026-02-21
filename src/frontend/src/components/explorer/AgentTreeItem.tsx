@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { cn, getAgentBadgeLabel, getAgentBadgeColor } from '@/lib/utils';
 import { Bot, Crown, Loader2, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -44,11 +44,8 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
   // Use display_name if available, fall back to name
   const displayName = agent.display_name || agent.name;
 
-  // Badge label
   const isPermanent = agent.permanent === true;
-  const badgeLabel = isSupervisor
-    ? (isProjectSupervisor ? 'P-SUP' : 'SUP')
-    : isPermanent ? 'PERM' : 'WRK';
+  const badgeLabel = getAgentBadgeLabel(agent);
 
   // Tooltip content: technical name + role type
   const tooltipText = isPermanent
@@ -101,12 +98,7 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
       {/* Type badge */}
       <Badge
         variant="outline"
-        className={cn(
-          'text-[10px] h-4 px-1',
-          isProjectSupervisor ? 'border-purple-500/50 text-purple-600' :
-          isSupervisor ? 'border-amber-500/50 text-amber-600' :
-          isPermanent ? 'border-teal-500/50 text-teal-600' : 'border-muted'
-        )}
+        className={cn('text-[10px] h-4 px-1', getAgentBadgeColor(badgeLabel))}
       >
         {badgeLabel}
       </Badge>
