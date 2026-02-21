@@ -1,0 +1,24 @@
+{
+  "agent": "sup-heroweb",
+  "captured_at": "2026-02-21T16:39:52Z",
+  "terminal_snapshot": "\n    ✻\n    |\n   ▟█▙     Claude Code v2.1.50\n ▐▛███▜▌   Opus 4.6 · Claude Max\n▝▜█████▛▘  ~/Desktop/code/zonko/heroweb\n  ▘▘ ▝▝\n\n✻ Conversation compacted (ctrl+o for history)\n\n\n❯ /compact\n  ⎿  Compacted (ctrl+o to see full summary)\n  ⎿  Read ../../oss/cmux/.cmux/journal/2026-02-21/artifacts/compaction-sup-heroweb-214826.json (25 lines)\n  ⎿  Read ../../oss/cmux/.cmux/worker-contexts/sup-heroweb-context.md (275 lines)\n  ⎿  Referenced file ../../oss/cmux/docs/SUPERVISOR_ROLE.md\n  ⎿  Read ../../oss/cmux/.cmux/journal/2026-02-20/attachments/sup-heroweb-1771578866.md (10 lines)\n  ⎿  Read ../../oss/cmux/.cmux/journal/2026-02-20/attachments/supervisor-1771578823.md (10 lines)\n\n❯ You were just compacted. Read your recovery context from .cmux/journal/2026-02-21/artifacts/compaction-sup-heroweb-*.json (most recent one). Also check your conversation history via GET\n  /api/agents/sup-heroweb/history if anything is unclear.\n\n⏺ Read 1 file (ctrl+o to expand)\n\n⏺ Bash(cd /Users/pankajgarkoti/Desktop/code/oss/cmux && ./tools/mailbox read 20 2>/dev/null)\n  ⎿  Recent mailbox entries:\n\n     [2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-research' missing from tmux\n     … +17 lines (ctrl+o to expand)\n  ⎿  Shell cwd was reset to /Users/pankajgarkoti/Desktop/code/zonko/heroweb\n\n⏺ Bash(git branch --show-current && git status --short)\n  ⎿  fix/rzp-scripts-and-meta-events\n      ? docs\n     ?? .claude/settings.json\n     … +4 lines (ctrl+o to expand)\n\n⏺ Read 1 file (ctrl+o to expand)\n\n⏺ Bash(cd /Users/pankajgarkoti/Desktop/code/oss/cmux && ./tools/mailbox send supervisor \"[STATUS] Recovered\" \"sup-heroweb recovered from 2nd compaction. No in-flight t…)\n  ⎿  ✓ Sent: [STATUS] Recovered -> supervisor\n  ⎿  Shell cwd was reset to /Users/pankajgarkoti/Desktop/code/zonko/heroweb\n\n⏺ [SYS] Recovered from 2nd compaction. State confirmed: no in-flight tasks, branch fix/rzp-scripts-and-meta-events, no active workers. Idle — awaiting tasks.\n\n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n❯ \n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n  ⏵⏵ bypass permissions on (shift+tab to cycle)",
+  "git_branch": "main",
+  "uncommitted_changes": [
+    ".cmux/.compact-timestamps",
+    ".cmux/.log_markers/cmux-server.log.marker",
+    ".cmux/.log_markers/router.log.marker",
+    ".cmux/.router_line",
+    ".cmux/.sup-hero-heartbeat",
+    ".cmux/.sup-heroweb-heartbeat",
+    ".cmux/.supervisor-heartbeat",
+    ".cmux/agent_registry.json",
+    ".cmux/conversations.db",
+    ".cmux/journal/2026-02-21/journal.md",
+    ".cmux/mailbox",
+    ".cmux/projects.json",
+    ".cmux/worker-contexts/sup-hero-context.md",
+    ".cmux/worker-contexts/sup-heroweb-context.md"
+  ],
+  "staged_changes": [],
+  "current_task": ""
+}

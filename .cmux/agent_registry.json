@@ -1,40 +1,20 @@
 {
   "supervisor": {
-    "registered_at": "2026-02-20T23:14:36.855542+00:00",
+    "registered_at": "2026-02-21T16:40:44.519105+00:00",
     "type": "supervisor",
     "created_by": "monitor.sh",
     "agent_id": "ag_0000prim",
-    "display_name": "supervisor",
+    "display_name": "Supervisor",
     "role": "supervisor",
     "project_id": "cmux",
-    "created_at": "2026-02-20T23:14:36.855542+00:00"
-  },
-  "sup-hero": {
-    "registered_at": "2026-02-20T23:14:37Z",
-    "type": "project-supervisor",
-    "created_by": "tools/projects",
-    "created_at": "2026-02-20T23:14:37Z",
-    "agent_id": "ag_akblg59e",
-    "display_name": "sup-hero",
-    "role": "project-supervisor",
-    "project_id": "hero"
-  },
-  "sup-heroweb": {
-    "registered_at": "2026-02-20T23:14:40Z",
-    "type": "project-supervisor",
-    "created_by": "tools/projects",
-    "created_at": "2026-02-20T23:14:40Z",
-    "agent_id": "ag_65dxppl7",
-    "display_name": "sup-heroweb",
-    "role": "project-supervisor",
-    "project_id": "heroweb"
+    "created_at": "2026-02-21T16:40:44.519105+00:00"
   },
   "perm-frontend": {
-    "registered_at": "2026-02-21T04:04:16Z",
+    "registered_at": "2026-02-21T16:40:50Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T04:04:16Z",
-    "agent_id": "ag_2vveyf19",
+    "created_at": "2026-02-21T16:40:50Z",
+    "agent_id": "ag_2gtxam67",
     "display_name": "Mira",
     "role": "permanent-worker",
     "project_id": "cmux",
@@ -44,11 +24,11 @@
     "reset_count": 0
   },
   "perm-backend": {
-    "registered_at": "2026-02-21T04:04:28Z",
+    "registered_at": "2026-02-21T16:40:58Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T04:04:28Z",
-    "agent_id": "ag_geljf2nl",
+    "created_at": "2026-02-21T16:40:58Z",
+    "agent_id": "ag_uvh4iley",
     "display_name": "Kai",
     "role": "permanent-worker",
     "project_id": "cmux",
@@ -58,11 +38,11 @@
     "reset_count": 0
   },
   "perm-infra": {
-    "registered_at": "2026-02-21T04:04:39Z",
+    "registered_at": "2026-02-21T16:41:06Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T04:04:39Z",
-    "agent_id": "ag_p6119gsx",
+    "created_at": "2026-02-21T16:41:06Z",
+    "agent_id": "ag_22w8ucbo",
     "display_name": "Sol",
     "role": "permanent-worker",
     "project_id": "cmux",
@@ -72,11 +52,11 @@
     "reset_count": 0
   },
   "perm-research": {
-    "registered_at": "2026-02-21T05:14:31Z",
+    "registered_at": "2026-02-21T16:41:15Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T05:14:31Z",
-    "agent_id": "ag_y0xg4a5p",
+    "created_at": "2026-02-21T16:41:15Z",
+    "agent_id": "ag_yhp9y3v4",
     "display_name": "Nova",
     "role": "permanent-worker",
     "project_id": "cmux",
@@ -86,11 +66,11 @@
     "reset_count": 0
   },
   "perm-ui-review": {
-    "registered_at": "2026-02-21T05:14:40Z",
+    "registered_at": "2026-02-21T16:41:23Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T05:14:40Z",
-    "agent_id": "ag_u5ld0t65",
+    "created_at": "2026-02-21T16:41:23Z",
+    "agent_id": "ag_v0oevr1a",
     "display_name": "Sage",
     "role": "permanent-worker",
     "project_id": "cmux",
@@ -100,11 +80,11 @@
     "reset_count": 0
   },
   "perm-api-review": {
-    "registered_at": "2026-02-21T05:14:48Z",
+    "registered_at": "2026-02-21T16:41:31Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T05:14:48Z",
-    "agent_id": "ag_g0ygv0mz",
+    "created_at": "2026-02-21T16:41:31Z",
+    "agent_id": "ag_akkgfhth",
     "display_name": "Flint",
     "role": "permanent-worker",
     "project_id": "cmux",
@@ -114,11 +94,11 @@
     "reset_count": 0
   },
   "perm-devops": {
-    "registered_at": "2026-02-21T05:14:56Z",
+    "registered_at": "2026-02-21T16:41:40Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T05:14:56Z",
-    "agent_id": "ag_ltrzg1az",
+    "created_at": "2026-02-21T16:41:40Z",
+    "agent_id": "ag_cq69brrk",
     "display_name": "Bolt",
     "role": "permanent-worker",
     "project_id": "cmux",
@@ -128,11 +108,11 @@
     "reset_count": 0
   },
   "perm-qa": {
-    "registered_at": "2026-02-21T05:15:05Z",
+    "registered_at": "2026-02-21T16:41:48Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T05:15:05Z",
-    "agent_id": "ag_d5nlcp5k",
+    "created_at": "2026-02-21T16:41:48Z",
+    "agent_id": "ag_1tr230k9",
     "display_name": "Echo",
     "role": "permanent-worker",
     "project_id": "cmux",
@@ -142,11 +122,11 @@
     "reset_count": 0
   },
   "hero-squad-lead": {
-    "registered_at": "2026-02-21T10:23:30Z",
+    "registered_at": "2026-02-21T16:41:56Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T10:23:30Z",
-    "agent_id": "ag_5siye560",
+    "created_at": "2026-02-21T16:41:56Z",
+    "agent_id": "ag_qdyweemz",
     "display_name": "Ash",
     "role": "permanent-worker",
     "project_id": "hero",
@@ -156,11 +136,11 @@
     "reset_count": 0
   },
   "hero-backend": {
-    "registered_at": "2026-02-21T10:23:39Z",
+    "registered_at": "2026-02-21T16:42:04Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T10:23:39Z",
-    "agent_id": "ag_emla63n3",
+    "created_at": "2026-02-21T16:42:04Z",
+    "agent_id": "ag_0clxi1me",
     "display_name": "Rune",
     "role": "permanent-worker",
     "project_id": "hero",
@@ -170,11 +150,11 @@
     "reset_count": 0
   },
   "hero-frontend": {
-    "registered_at": "2026-02-21T10:23:47Z",
+    "registered_at": "2026-02-21T16:42:13Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T10:23:47Z",
-    "agent_id": "ag_y2ib9rxa",
+    "created_at": "2026-02-21T16:42:13Z",
+    "agent_id": "ag_172ylxm7",
     "display_name": "Piper",
     "role": "permanent-worker",
     "project_id": "hero",
@@ -184,11 +164,11 @@
     "reset_count": 0
   },
   "hero-tester": {
-    "registered_at": "2026-02-21T10:23:55Z",
+    "registered_at": "2026-02-21T16:42:21Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T10:23:55Z",
-    "agent_id": "ag_pkbyxe8e",
+    "created_at": "2026-02-21T16:42:21Z",
+    "agent_id": "ag_p464zw4i",
     "display_name": "Cleo",
     "role": "permanent-worker",
     "project_id": "hero",
@@ -198,11 +178,11 @@
     "reset_count": 0
   },
   "heroweb-squad-lead": {
-    "registered_at": "2026-02-21T10:25:45Z",
+    "registered_at": "2026-02-21T16:42:29Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T10:25:45Z",
-    "agent_id": "ag_27u39c64",
+    "created_at": "2026-02-21T16:42:29Z",
+    "agent_id": "ag_u6hg6yb5",
     "display_name": "Zara",
     "role": "permanent-worker",
     "project_id": "heroweb",
@@ -212,11 +192,11 @@
     "reset_count": 0
   },
   "heroweb-backend": {
-    "registered_at": "2026-02-21T10:25:53Z",
+    "registered_at": "2026-02-21T16:42:38Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T10:25:53Z",
-    "agent_id": "ag_2r3ubqt2",
+    "created_at": "2026-02-21T16:42:38Z",
+    "agent_id": "ag_edemqtfg",
     "display_name": "Finn",
     "role": "permanent-worker",
     "project_id": "heroweb",
@@ -226,11 +206,11 @@
     "reset_count": 0
   },
   "heroweb-frontend": {
-    "registered_at": "2026-02-21T10:26:01Z",
+    "registered_at": "2026-02-21T16:42:46Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T10:26:01Z",
-    "agent_id": "ag_f9z28m56",
+    "created_at": "2026-02-21T16:42:46Z",
+    "agent_id": "ag_7qo354pq",
     "display_name": "Luna",
     "role": "permanent-worker",
     "project_id": "heroweb",
@@ -240,11 +220,11 @@
     "reset_count": 0
   },
   "heroweb-tester": {
-    "registered_at": "2026-02-21T10:26:09Z",
+    "registered_at": "2026-02-21T16:42:54Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T10:26:09Z",
-    "agent_id": "ag_ua6cav47",
+    "created_at": "2026-02-21T16:42:54Z",
+    "agent_id": "ag_xro4dap3",
     "display_name": "Juno",
     "role": "permanent-worker",
     "project_id": "heroweb",
@@ -253,26 +233,62 @@
     "tasks_since_reset": 0,
     "reset_count": 0
   },
-  "hero-research": {
-    "registered_at": "2026-02-21T11:03:24Z",
+  "sup-hero": {
+    "registered_at": "2026-02-21T16:40:45Z",
+    "type": "project-supervisor",
+    "created_by": "tools/projects",
+    "created_at": "2026-02-21T16:40:45Z",
+    "agent_id": "ag_glezuclp",
+    "display_name": "sup-hero",
+    "role": "project-supervisor",
+    "project_id": "hero"
+  },
+  "sup-heroweb": {
+    "registered_at": "2026-02-21T16:40:47Z",
+    "type": "project-supervisor",
+    "created_by": "tools/projects",
+    "created_at": "2026-02-21T16:40:47Z",
+    "agent_id": "ag_46a5456g",
+    "display_name": "sup-heroweb",
+    "role": "project-supervisor",
+    "project_id": "heroweb"
+  },
+  "worker-set-names": {
+    "registered_at": "2026-02-21T16:44:26Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T11:03:24Z",
-    "agent_id": "ag_59k104m4",
-    "display_name": "Iris",
+    "created_at": "2026-02-21T16:44:26Z",
+    "agent_id": "ag_a0l8pcud",
+    "display_name": "worker-set-names",
+    "role": "worker",
+    "project_id": "cmux"
+  },
+  "hero-research": {
+    "registered_at": "2026-02-21T16:49:43Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-21T16:49:43Z",
+    "agent_id": "ag_71y1ujtr",
+    "display_name": "hero-research",
     "role": "permanent-worker",
     "project_id": "hero",
-    "permanent": true
+    "permanent": true,
+    "role_context": ".cmux/worker-contexts/hero-research-context.md",
+    "tasks_since_reset": 0,
+    "reset_count": 0
   },
   "heroweb-research": {
-    "registered_at": "2026-02-21T11:03:36Z",
+    "registered_at": "2026-02-21T16:49:51Z",
     "type": "worker",
     "created_by": "tools/workers",
-    "created_at": "2026-02-21T11:03:36Z",
-    "agent_id": "ag_1rdlxtbe",
-    "display_name": "Wren",
+    "created_at": "2026-02-21T16:49:51Z",
+    "agent_id": "ag_4bt3rots",
+    "display_name": "heroweb-research",
     "role": "permanent-worker",
     "project_id": "heroweb",
-    "permanent": true
+    "permanent": true,
+    "role_context": ".cmux/worker-contexts/heroweb-research-context.md",
+    "tasks_since_reset": 0,
+    "reset_count": 0
   }
 }

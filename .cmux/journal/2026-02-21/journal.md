@@ -703,3 +703,71 @@ Resumed from context compaction and completed Task 8: POST /api/telegram/reload 
 
 ## 18:04 - Telegram bot fully operational
 Telegram bridge is live end-to-end. Kai added POST /api/telegram/reload (bb10c7a) for hot-reconfiguring the bot without server restart. Used it to activate polling after .env was created mid-session. Inbound messages from @cmux_sh_bot flow through mailbox to supervisor. Outbound replies via /api/telegram/send. User confirmed working from their side.
+
+## 21:48 - Session recovery — supervisor online
+New supervisor session started. Read SUPERVISOR_ROLE.md and full day journal (697 entries). Server healthy. Only supervisor, sup-hero, sup-heroweb active in tmux — all 18 permanent workers and squad members missing (expected after restart, registry stale). Backlog empty. No pending user tasks. Ready for work.
+
+## 21:58 - Two fixes: auto-respawn + router parse errors
+User reported two issues: (1) permanent workers don't auto-respawn on system restart — registry remembers them but nothing brings them back. (2) Router SKIP logs for log-watcher messages — format mismatch between log-watcher output and router's expected mailbox format. Spawning Sol for auto-respawn infra and Kai for router parse fix.
+
+## 21:59 - Starting: Add permanent worker auto-respawn to monitor.sh
+
+## 22:00 - Fixed log-watcher.sh: replaced plain-text mailbox writes with JSONL format using jq at lines 150 and 183. Router was silently dropping all log-watcher alerts.
+
+## 22:01 - Completed: Added respawn_permanent_workers() to monitor.sh. Function reads agent_registry.json, finds permanent workers with missing tmux windows, and respawns via tools/workers spawn. Wired into main() after Phase 3 (router) and before Phase 4 (log-watcher). Also runs every 5th dashboard loop cycle for runtime recovery.
+
+## 22:01 - Reflection: auto-respawn — what worked: clean task with clear requirements, registry format was well-documented. What I'd do differently: nothing, straightforward implementation.
+
+## 22:01 - Auto-respawn for permanent workers
+Added respawn_permanent_workers() function to src/orchestrator/monitor.sh. The function reads .cmux/agent_registry.json, identifies all entries with permanent==true, checks if their tmux window exists in the cmux session, and respawns missing workers using tools/workers spawn with appropriate flags (--permanent, --project, --dir). Integrated at two points: Phase 3b in main() startup (after router, before log-watcher so workers are alive before monitoring begins) and every 5th dashboard loop cycle for runtime recovery of crashed workers. Workers without a role_context field are skipped with a warning since the spawn command requires it.
+
+## 22:02 - Both fixes shipped
+Two fixes delivered: (1) worker-fix-logwatcher fixed log-watcher.sh to emit JSONL instead of plain text to the mailbox — commit d778b90. Router SKIP errors resolved. (2) worker-auto-respawn added respawn_permanent_workers() to monitor.sh — reads registry for permanent=true agents, respawns any missing from tmux. Runs at startup Phase 3b and every 5th dashboard cycle. Worker forgot to commit so supervisor committed manually as aa36e01. Both bash -n verified.
+
+## 22:02 - Session idle — both fixes delivered
+Session started with two user-reported issues: permanent workers not auto-respawning and router SKIP logs from log-watcher format mismatch. Both fixed and committed (d778b90, aa36e01). No pending user tasks, backlog empty. Two temp workers (worker-fix-logwatcher, worker-auto-respawn) idle after completion. sup-hero and sup-heroweb both recovered and standing by.
+
+## 22:11 - [cmux] Kai (perm-backend) initialized. Read role and worker guidelines. Standing by for [TASK] assignments.
+
+## 22:11 - [cmux] Sol (perm-infra) initialized. Reading role, checking for pending tasks.
+
+## 22:11 - [cmux] Nova (perm-research) initialized. Ready for research tasks.
+
+## 22:11 - [cmux] Sage (perm-ui-review) initialized. Ready for review tasks.
+
+## 22:11 - [cmux] Flint (perm-api-review) starting up. Adversarial backend/API reviewer ready for review tasks.
+
+## 22:12 - [cmux] Bolt (perm-devops) initialized. Read role and worker guidelines. Standing by for [TASK] assignments.
+
+## 22:12 - [cmux] Echo (perm-qa) initialized. Reading role definition, ready for test tasks.
+
+## 22:12 - [hero] [cmux] hero-squad-lead initialized. Team: hero-backend, hero-frontend, hero-tester, hero-research. Standing by for [TASK] assignments.
+
+## 22:12 - [hero] hero-backend initialized. Permanent backend specialist for hero project. Standing by for [TASK] assignments.
+
+## 22:12 - [hero] hero-frontend: Permanent frontend worker started. Read role context and worker guidelines. Awaiting task assignment.
+
+## 22:12 - [hero] hero-tester online — permanent QA worker initialized, awaiting tasks
+
+## 22:13 - [heroweb] heroweb-squad-lead initialized. Reading role, checking team status, standing by for [TASK] assignments.
+
+## 22:13 - [heroweb] heroweb-backend online. Permanent backend specialist ready for tasks.
+
+## 22:13 - [heroweb] [heroweb] heroweb-frontend initialized. Permanent frontend specialist ready for tasks.
+
+## 22:13 - [heroweb] heroweb-tester online. QA Engineer role initialized. Awaiting task assignment.
+
+## 22:14 - [cmux] Kai (perm-backend) recovered from compaction. No active task — idle and awaiting assignment.
+
+## 22:15 - Updated display_name for all agents in registry: supervisor→Supervisor, perm-frontend→Mira, perm-backend→Kai, perm-infra→Sol, perm-research→Nova, perm-api-review→Flint, perm-qa→Echo, hero-squad-lead→Ash, hero-backend→Rune, hero-frontend→Piper, hero-tester→Cleo, heroweb-squad-lead→Zara, heroweb-backend→Finn, heroweb-frontend→Luna, heroweb-tester→Juno. hero-research (Iris) and heroweb-research (Wren) were already set. perm-ui-review and perm-devops left as-is (no names provided).
+
+## 22:15 - [cmux] Sol (perm-infra) recovered from compaction. No pending tasks. Idle.
+
+## 22:15 - [cmux] Nova recovered from compaction. No active task — resuming idle.
+
+## 22:18 - Display names fixed in registry
+User noticed human names (Kai, Mira, Ash, etc.) weren't showing in the UI. Root cause: display_name in agent_registry.json was set to technical names by default — the naming session at 16:39 only journaled the names, never wrote them to the registry. Spawned worker-set-names to update all 17 entries. Also discovered Sage (perm-ui-review) and Bolt (perm-devops) names from their DB messages and added those manually. Removed hero-research (Iris) and heroweb-research (Wren) from registry — they were permanent=true but had no role_context, causing repeated log-watcher alerts that auto-respawn couldn't resolve. Their research artifacts are already saved.
+
+## 22:20 - [hero] hero-research worker started. Permanent research agent ready for task assignments.
+
+## 22:20 - [heroweb] [heroweb] heroweb-research (Wren) online. Previous session: codebase research report delivered. Idle, awaiting [TASK] assignments.

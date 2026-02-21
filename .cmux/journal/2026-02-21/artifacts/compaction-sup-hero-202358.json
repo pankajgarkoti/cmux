@@ -1,0 +1,27 @@
+{
+  "agent": "sup-hero",
+  "captured_at": "2026-02-21T14:53:58Z",
+  "terminal_snapshot": "export CMUX_AGENT=true CMUX_AGENT_ID=ag_f4x4fv9u CMUX_AGENT_NAME=sup-hero CMUX_AGENT_ROLE=project-supervisor CMUX_PROJECT_ID=hero CMUX_SESSION=cmux CMUX_HOME=/Users/pankajgarkoti/Desktop/code/oss/cmux CMUX_PORT=\n8000 CMUX_MAILBOX=/Users/pankajgarkoti/Desktop/code/oss/cmux/.cmux/mailbox CMUX_SUPERVISOR=supervisor CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false && export PATH=/Users/pankajgarkoti/Desktop/code/oss/cmux/tools:$P\nATH && cd /Users/pankajgarkoti/Desktop/code/zonko/hero && claude --dangerously-skip-permissions\n                     ..'          pankajgarkoti@Pankajs-MacBook-Pro\n                 ,xNMM.           ---------------------------------\n               .OMMMMo            OS: macOS Tahoe 26.1 (25B78) arm64\n               lMM\"               Host: MacBook Pro (14-inch, M5)\n     .;loddo:.  .olloddol;.       Kernel: Darwin 25.1.0\n   cKMMMMMMMMMMNWMMMMMMMMMM0:     Uptime: 9 days, 11 hours, 4 mins\n .KMMMMMMMMMMMMMMMMMMMMMMMWd.     Packages: 131 (brew), 5 (brew-cask)\n XMMMMMMMMMMMMMMMMMMMMMMMX.       Shell: zsh 5.9\n;MMMMMMMMMMMMMMMMMMMMMMMM:        Display (Color LCD): 3600x2338 @ 2x in 14\", 120 Hz [Built-in]\n:MMMMMMMMMMMMMMMMMMMMMMMM:        WM: Quartz Compositor 341.1.4\n.MMMMMMMMMMMMMMMMMMMMMMMMX.       WM Theme: Multicolor (Dark)\n kMMMMMMMMMMMMMMMMMMMMMMMMWd.     Theme: Liquid Glass\n 'XMMMMMMMMMMMMMMMMMMMMMMMMMMk    Font: .AppleSystemUIFont [System], Helvetica [User]\n  'XMMMMMMMMMMMMMMMMMMMMMMMMK.    Cursor: Fill - Black, Outline - White (32px)\n    kMMMMMMMMMMMMMMMMMMMMMMd      Terminal: tmux 3.5a\n     ;KMMMMMMMWXXWMMMMMMMk.       CPU: Apple M5 (10) @ 4.61 GHz\n       \"cooc*\"    \"*coo'\"         GPU: Apple M5 (10) @ 1.62 GHz [Integrated]\n                                  Memory: 13.18 GiB / 16.00 GiB (82%)\n                                  Swap: 10.83 GiB / 12.00 GiB (90%)\n                                  Disk (/): 295.82 GiB / 926.30 GiB (32%) - apfs [Read-only]\n                                  Local IP (en0): 192.168.1.20/24\n                                  Battery (bq40z651): 100% [AC connected, Charging]\n                                  Power Adapter: 70W USB-C Power Adapter\n                                  Locale: en_IN.UTF-8\n\n\n\n~/Desktop/code/oss/cmux main ⇡201 *1 !17 ?4 ❯ export CMUX_AGENT=true CMUX_AGENT_ID=ag_f4x4fv9u CMUX_AGENT_NAME=sup-hero CMUX_AGENT_ROLE=project-supervisor CMUX_PROJECT_ID=hero CMUX_SESSION=cmux CMUX_HOME=/Users/\npankajgarkoti/Desktop/code/oss/cmux CMUX_PORT=8000 CMUX_MAILBOX=/Users/pankajgarkoti/Desktop/code/oss/cmux/.cmux/mailbox CMUX_SUPERVISOR=supervisor CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false && export PATH=/User\ns/pankajgarkoti/Desktop/code/oss/cmux/tools:$PATH && cd /Users/pankajgarkoti/Desktop/code/zonko/hero && claude --dangerously-skip-permissions\n\n    ✻\n    |\n   ▟█▙     Claude Code v2.1.50\n ▐▛███▜▌   Opus 4.6 · Claude Max\n▝▜█████▛▘  ~/Desktop/code/zonko/hero\n  ▘▘ ▝▝\n\n❯ [cmux:supervisor-prime] Read /Users/pankajgarkoti/Desktop/code/oss/cmux/.cmux/worker-contexts/sup-hero-context.md to understand your role as project supervisor for 'hero'. Then read\n  /Users/pankajgarkoti/Desktop/code/oss/cmux/docs/SUPERVISOR_ROLE.md for orchestration guidelines. You are a project supervisor managed by Supervisor Prime, not a human user. Delegate work to workers, never\n   write code yourself. IMPORTANT: Always prefix system-level responses (heartbeat replies, compaction recovery, idle status, status confirmations) with [SYS] so they render as compact notifications in the\n  dashboard.\n\n✻ Actioning… (thinking)\n\n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n❯ \n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt                                                                                                                 1 MCP server needs auth · /mcp",
+  "git_branch": "main",
+  "uncommitted_changes": [
+    ".cmux/.log_markers/cmux-server.log.marker",
+    ".cmux/.log_markers/router.log.marker",
+    ".cmux/.router_line",
+    ".cmux/.sup-hero-heartbeat",
+    ".cmux/.sup-heroweb-heartbeat",
+    ".cmux/.supervisor-heartbeat",
+    ".cmux/agent_registry.json",
+    ".cmux/conversations.db",
+    ".cmux/journal/2026-02-21/journal.md",
+    ".cmux/mailbox",
+    ".cmux/mailbox-archive/mailbox-20260221-065807",
+    ".cmux/projects.json",
+    ".cmux/worker-contexts/sup-hero-context.md",
+    ".cmux/worker-contexts/sup-heroweb-context.md",
+    "src/orchestrator/lib/filelock.sh",
+    "src/orchestrator/log-watcher.sh",
+    "src/orchestrator/monitor.sh"
+  ],
+  "staged_changes": [],
+  "current_task": ""
+}

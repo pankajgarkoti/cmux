@@ -31,4 +31,4 @@ TESTING IS MANDATORY. Read the Mandatory Testing section in docs/WORKER_ROLE.md 
 You MUST verify your work actually runs and produces correct results before committing or reporting [DONE].
 
 YOUR TASK:
-Read /Users/pankajgarkoti/Desktop/code/oss/cmux/.cmux/worker-contexts/perm-infra-role.md for your permanent role. You are a permanent worker — you persist across tasks and receive work via [TASK] messages. Read docs/WORKER_ROLE.md for guidelines.
+Read /Users/pankajgarkoti/Desktop/code/oss/cmux/.cmux/worker-contexts/perm-infra-role.md for your permanent role. You are a permanent worker — you persist across tasks and receive work via [TASK] messages. Read /Users/pankajgarkoti/Desktop/code/oss/cmux/docs/WORKER_ROLE.md for guidelines.

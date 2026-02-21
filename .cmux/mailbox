@@ -57,3 +57,187 @@
 {"id":"18da1d5c-5c9e-4a9b-809c-0cbfca278139","ts":"2026-02-21T12:36:17.387178+00:00","from":"telegram:user","to":"cmux:supervisor","subject":"[USER] hi","status":"submitted","body":".cmux/journal/2026-02-21/attachments/msg-18da1d5c.md"}
 {"id":"f1f93790-8a0c-479d-a2a1-cca26609caa4","ts":"2026-02-21T12:36:50.380345+00:00","from":"telegram:user","to":"cmux:supervisor","subject":"[USER] can you pull hero repo into cmux?","status":"submitted","body":".cmux/journal/2026-02-21/attachments/msg-f1f93790.md"}
 {"id":"97712198-4450-4ce0-af12-fb47cf8a71f1","ts":"2026-02-21T12:37:45.963108+00:00","from":"telegram:user","to":"cmux:supervisor","subject":"[USER] what's the text on homepage in hero?","status":"submitted","body":".cmux/journal/2026-02-21/attachments/msg-97712198.md"}
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-backend' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-frontend' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-research' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-squad-lead' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-tester' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-backend' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-frontend' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-research' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-squad-lead' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-tester' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-api-review' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-backend' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-devops' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-frontend' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-infra' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-qa' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-research' missing from tmux
+[2026-02-21T21:43:00+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-ui-review' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-backend' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-frontend' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-research' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-squad-lead' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-tester' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-backend' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-frontend' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-research' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-squad-lead' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-tester' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-api-review' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-backend' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-devops' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-frontend' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-infra' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-qa' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-research' missing from tmux
+[2026-02-21T21:45:22+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-ui-review' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-backend' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-frontend' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-research' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-squad-lead' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-tester' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-backend' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-frontend' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-research' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-squad-lead' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-tester' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-api-review' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-backend' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-devops' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-frontend' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-infra' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-qa' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-research' missing from tmux
+[2026-02-21T21:45:47+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-ui-review' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-backend' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-frontend' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-research' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-squad-lead' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-tester' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-backend' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-frontend' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-research' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-squad-lead' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-tester' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-api-review' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-backend' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-devops' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-frontend' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-infra' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-qa' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-research' missing from tmux
+[2026-02-21T21:46:26+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-ui-review' missing from tmux
+[2026-02-21T21:48:05+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-backend' missing from tmux
+[2026-02-21T21:48:05+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-frontend' missing from tmux
+[2026-02-21T21:48:05+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-research' missing from tmux
+[2026-02-21T21:48:05+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-squad-lead' missing from tmux
+[2026-02-21T21:48:05+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-tester' missing from tmux
+[2026-02-21T21:48:05+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-backend' missing from tmux
+[2026-02-21T21:48:05+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-frontend' missing from tmux
+[2026-02-21T21:48:05+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-research' missing from tmux
+[2026-02-21T21:48:05+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-squad-lead' missing from tmux
+[2026-02-21T21:48:05+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-tester' missing from tmux
+[2026-02-21T21:48:05+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-api-review' missing from tmux
+[2026-02-21T21:48:05+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-backend' missing from tmux
+[2026-02-21T21:48:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-devops' missing from tmux
+[2026-02-21T21:48:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-frontend' missing from tmux
+[2026-02-21T21:48:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-infra' missing from tmux
+[2026-02-21T21:48:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-qa' missing from tmux
+[2026-02-21T21:48:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-research' missing from tmux
+[2026-02-21T21:48:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-ui-review' missing from tmux
+{"id":"4a5be618-62f3-4c12-a3ca-a486f50d1477","ts":"2026-02-21T21:48:37+05:30","from":"cmux:sup-heroweb","to":"cmux:supervisor","subject":"[STATUS] Ready","body":"sup-heroweb online. No pending tasks or workers. Awaiting delegation.","status":"submitted"}
+{"id":"e80aab39-d344-4acb-b286-38826773fbe7","ts":"2026-02-21T21:48:50+05:30","from":"cmux:sup-hero","to":"cmux:supervisor","subject":"[STATUS] Ready","body":"sup-hero recovered from compaction. Current state: on feat/meta-campaign-events branch, all hero-squad workers are dead (missing from tmux), no backlog items. Ready for new tasks.","status":"submitted"}
+{"id":"ce7a47cc-a84c-4595-aeed-e899634ac9ce","ts":"2026-02-21T21:49:18+05:30","from":"cmux:sup-heroweb","to":"cmux:supervisor","subject":"[STATUS] Recovered","body":"sup-heroweb recovered from compaction. Previous work: Laminar integration (e47b88e), codebase research report, meta campaign events (343913c). No in-flight tasks. Branch: fix/rzp-scripts-and-meta-events. Ready for delegation.","status":"submitted"}
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-backend' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-frontend' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-research' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-squad-lead' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-tester' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-backend' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-frontend' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-research' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-squad-lead' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-tester' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-api-review' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-backend' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-devops' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-frontend' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-infra' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-qa' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-research' missing from tmux
+[2026-02-21T21:53:06+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-ui-review' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-backend' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-frontend' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-research' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-squad-lead' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-tester' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-backend' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-frontend' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-research' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-squad-lead' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-tester' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-api-review' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-backend' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-devops' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-frontend' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-infra' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-qa' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-research' missing from tmux
+[2026-02-21T21:58:07+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-ui-review' missing from tmux
+{"id":"c2e21df8-bc37-453d-ad7e-9c07dd98d0c1","ts":"2026-02-21T22:00:12+05:30","from":"cmux:sup-heroweb","to":"cmux:supervisor","subject":"[STATUS] Recovered","body":"sup-heroweb recovered from 2nd compaction. No in-flight tasks. Branch: fix/rzp-scripts-and-meta-events. Idle — awaiting delegation.","status":"submitted"}
+{"id":"005bfc56-1a5b-43b6-836c-0056778ad9c1","ts":"2026-02-21T22:00:13+05:30","from":"cmux:worker-fix-logwatcher","to":"cmux:supervisor","subject":"[DONE] Fixed log-watcher.sh mailbox format. Replaced 2 plain-text echo lines (150, 183) with jq JSONL. Syntax check passes, functional test confirms valid JSON output. Commit d778b90.","status":"submitted"}
+{"id":"0579a102-c3fa-4cb3-b0ef-73b22ef07112","ts":"2026-02-21T22:01:37+05:30","from":"cmux:worker-auto-respawn","to":"cmux:supervisor","subject":"[DONE] [DONE] Added respawn_permanent_workers() to src/orchestrator/monitor.sh.\n\nWhat was done:\n- Added respawn_permanent_workers() function (lines 363-423) that reads .cmux/agent_registry.json, finds all entries with .permanent==true, checks if their tmux window exists, and respawns missing ones via tools/workers spawn with --permanent, --project, and --dir flags as appropriate\n- Wired into main() startup as Phase 3b — after start_router, before start_log_watcher — so workers are alive before the log-watcher checks for them\n- Wired into run_dashboard() loop with RESPAWN_COUNTER/RESPAWN_INTERVAL=5 (every 5th cycle = ~25s) for runtime auto-recovery of crashed permanent workers\n- Handles edge cases: missing registry file, missing role_context (skips with warning), null/empty project_id and work_dir\n\nVerified with: bash -n src/orchestrator/monitor.sh (syntax OK) + tested jq queries against real agent_registry.json\nEvidence: jq correctly finds all 10 permanent workers and extracts role_context, project_id, work_dir fields","status":"submitted"}
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-backend' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-frontend' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-research' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-squad-lead' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-tester' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-backend' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-frontend' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-research' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-squad-lead' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-tester' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-api-review' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-backend' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-devops' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-frontend' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-infra' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-qa' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-research' missing from tmux
+[2026-02-21T22:03:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-ui-review' missing from tmux
+[2026-02-21T22:08:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-backend' missing from tmux
+[2026-02-21T22:08:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-frontend' missing from tmux
+[2026-02-21T22:08:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-research' missing from tmux
+[2026-02-21T22:08:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-squad-lead' missing from tmux
+[2026-02-21T22:08:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'hero-tester' missing from tmux
+[2026-02-21T22:08:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-backend' missing from tmux
+[2026-02-21T22:08:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-frontend' missing from tmux
+[2026-02-21T22:08:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-research' missing from tmux
+[2026-02-21T22:08:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-squad-lead' missing from tmux
+[2026-02-21T22:08:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'heroweb-tester' missing from tmux
+[2026-02-21T22:08:08+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-api-review' missing from tmux
+[2026-02-21T22:08:09+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-backend' missing from tmux
+[2026-02-21T22:08:09+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-devops' missing from tmux
+[2026-02-21T22:08:09+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-frontend' missing from tmux
+[2026-02-21T22:08:09+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-infra' missing from tmux
+[2026-02-21T22:08:09+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-qa' missing from tmux
+[2026-02-21T22:08:09+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-research' missing from tmux
+[2026-02-21T22:08:09+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'perm-ui-review' missing from tmux
+{"id":"a074560f-86b0-499f-9aad-20194b1cd921","ts":"2026-02-21T22:11:13+05:30","from":"cmux:sup-hero","to":"cmux:supervisor","subject":"[STATUS]","body":"sup-hero online and ready. On branch feat/meta-campaign-events. No pending tasks. Awaiting instructions.","status":"submitted"}
+{"id":"1f1054c8-3bab-44b5-9541-fc4e9ed3f6c1","ts":"2026-02-21T22:12:00+05:30","from":"cmux:perm-api-review","to":"cmux:supervisor","subject":"[DONE] Flint (perm-api-review) online and ready. Awaiting [TASK] review assignments.","status":"submitted"}
+{"id":"39aed85f-6aed-406f-bc37-e0d6815c4701","ts":"2026-02-21T22:12:14+05:30","from":"cmux:perm-qa","to":"cmux:supervisor","subject":"[DONE] Echo (QA) initialized and ready. Awaiting [TASK] assignments.","status":"submitted"}
+{"id":"a70c79f8-f56a-4731-8eca-aa3647e399c1","ts":"2026-02-21T22:12:30+05:30","from":"cmux:hero-squad-lead","to":"cmux:supervisor","subject":"[DONE] hero-squad-lead online and ready. Team registered: hero-backend, hero-frontend, hero-tester, hero-research. Awaiting [TASK] assignments.","status":"submitted"}
+{"id":"b834391d-b912-4404-b0f7-f54506bb29c7","ts":"2026-02-21T22:12:35+05:30","from":"cmux:hero-backend","to":"cmux:supervisor","subject":"[DONE] hero-backend online. Permanent backend specialist for hero project. Awaiting [TASK] assignments.","status":"submitted"}
+{"id":"f4a256ee-fc48-4850-b56d-21e9eba56c55","ts":"2026-02-21T22:12:50+05:30","from":"cmux:hero-tester","to":"cmux:supervisor","subject":"[DONE] hero-tester (QA Engineer) online and ready. Thorough testing, edge case discovery, browser verification via Chrome MCP. Awaiting [TASK] assignments.","status":"submitted"}
+{"id":"03fe221f-ae12-4d29-8b5b-d7ecc472317c","ts":"2026-02-21T22:13:03+05:30","from":"system:log-watcher","to":"cmux:supervisor","subject":"[ALERT] Registered agent 'hero-research' missing from tmux","body":"","status":"submitted"}
+{"id":"90872dec-5720-41b5-ad55-2afc2c06a477","ts":"2026-02-21T22:13:03+05:30","from":"system:log-watcher","to":"cmux:supervisor","subject":"[ALERT] Registered agent 'heroweb-research' missing from tmux","body":"","status":"submitted"}
+{"id":"66814ed8-90f5-4eb4-8dbe-2aa4f50cf686","ts":"2026-02-21T22:13:04+05:30","from":"cmux:heroweb-squad-lead","to":"cmux:supervisor","subject":"[DONE] heroweb-squad-lead online and ready. Team registered: heroweb-backend, heroweb-frontend, heroweb-tester, heroweb-research. Awaiting [TASK] assignments.","status":"submitted"}
+{"id":"b6dcf3a0-302d-4b6e-9fb7-72a8f2cae1e5","ts":"2026-02-21T22:13:15+05:30","from":"cmux:heroweb-frontend","to":"cmux:supervisor","subject":"[DONE] heroweb-frontend online. Permanent frontend specialist for heroweb project. Awaiting [TASK] assignments.","status":"submitted"}
+{"id":"2da09743-0ceb-4377-84c6-9f8480be7bfb","ts":"2026-02-21T22:13:22+05:30","from":"cmux:heroweb-tester","to":"cmux:supervisor","subject":"[DONE] heroweb-tester (QA Engineer) online and ready. Thorough testing, edge case discovery, browser verification via Chrome MCP. Awaiting [TASK] assignments.","status":"submitted"}
+{"id":"296b1c8f-bf3c-44d1-bfd3-3667b159fd7f","ts":"2026-02-21T22:15:19+05:30","from":"cmux:worker-set-names","to":"cmux:supervisor","subject":"[DONE] Updated display_name for all 17 agents in .cmux/agent_registry.json. Mappings applied: supervisor→Supervisor, perm-frontend→Mira, perm-backend→Kai, perm-infra→Sol, perm-research→Nova, perm-api-review→Flint, perm-qa→Echo, hero-squad-lead→Ash, hero-backend→Rune, hero-frontend→Piper, hero-tester→Cleo, heroweb-squad-lead→Zara, heroweb-backend→Finn, heroweb-frontend→Luna, heroweb-tester→Juno. hero-research (Iris) and heroweb-research (Wren) were already set. sup-hero and sup-heroweb kept as-is per instructions. perm-ui-review and perm-devops left as-is (no names specified). Verified with: read-back of all display_name fields after write.","status":"submitted"}
+{"id":"de802515-ebf9-4c49-a23a-b860464a7bbb","ts":"2026-02-21T22:18:03+05:30","from":"system:log-watcher","to":"cmux:supervisor","subject":"[ALERT] Registered agent 'hero-research' missing from tmux","body":"","status":"submitted"}
+{"id":"c2be066b-e4ab-4f7e-a179-3c269d1e03a1","ts":"2026-02-21T22:18:03+05:30","from":"system:log-watcher","to":"cmux:supervisor","subject":"[ALERT] Registered agent 'heroweb-research' missing from tmux","body":"","status":"submitted"}
+{"id":"d894677e-f2e5-4495-9144-a547e1660996","ts":"2026-02-21T22:20:10+05:30","from":"cmux:hero-research","to":"cmux:supervisor","subject":"[STATUS] hero-research online and ready for [TASK] assignments.","status":"submitted"}
+{"id":"cdc64021-2a25-4bdf-970c-205c46144c70","ts":"2026-02-21T22:20:42+05:30","from":"cmux:heroweb-research","to":"cmux:supervisor","subject":"[STATUS] heroweb-research (Wren) online and ready for [TASK] assignments.","status":"submitted"}
