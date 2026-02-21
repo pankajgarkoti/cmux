@@ -21,7 +21,7 @@ export function useWebSocket() {
   const { addActivity } = useActivityStore();
   const { addEvent } = useAgentEventStore();
   const { addSession, removeSession, updateSession } = useSessionStore();
-  const { addArchivedAgent, viewArchive, selectedAgentId } = useAgentStore();
+  const { addArchivedAgent } = useAgentStore();
   const { addThought } = useThoughtStore();
   const { setLatest: setLatestHeartbeat } = useHeartbeatStore();
 
@@ -132,11 +132,6 @@ export function useWebSocket() {
           };
           addArchivedAgent(archived);
 
-          // If the archived agent was currently selected, switch to archived view
-          if (selectedAgentId === data.data.agent_id) {
-            viewArchive(data.data.archive_id);
-          }
-
           // Refresh agents list since one was archived (and will be killed)
           queryClient.invalidateQueries({ queryKey: ['agents'] });
         }
@@ -190,7 +185,7 @@ export function useWebSocket() {
     };
 
     wsRef.current = ws;
-  }, [setConnected, setReconnecting, addActivity, addEvent, addThought, setLatestHeartbeat, queryClient, getReconnectDelay, sendPong, addSession, removeSession, updateSession, addArchivedAgent, viewArchive, selectedAgentId]);
+  }, [setConnected, setReconnecting, addActivity, addEvent, addThought, setLatestHeartbeat, queryClient, getReconnectDelay, sendPong, addSession, removeSession, updateSession, addArchivedAgent]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
