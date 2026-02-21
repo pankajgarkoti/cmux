@@ -43,6 +43,7 @@ async def receive_agent_event(event: AgentEvent):
         "tool_output": _truncate_content(event.tool_output),
         "timestamp": event.timestamp.isoformat(),
         "message_id": None,
+        "usage": event.usage,
     }
 
     # Persist to SQLite

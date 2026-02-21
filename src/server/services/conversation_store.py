@@ -113,6 +113,11 @@ class ConversationStore:
                 conn.execute("ALTER TABLE messages ADD COLUMN task_status TEXT")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_task_status ON messages(task_status)")
 
+            # Migration: add usage column to agent_events
+            event_columns = [row[1] for row in conn.execute("PRAGMA table_info(agent_events)").fetchall()]
+            if "usage" not in event_columns:
+                conn.execute("ALTER TABLE agent_events ADD COLUMN usage TEXT")
+
     @contextmanager
     def _get_connection(self):
         """Get a database connection with proper cleanup."""
@@ -430,8 +435,8 @@ class ConversationStore:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO agent_events
-                (id, event_type, session_id, agent_id, tool_name, tool_input, tool_output, timestamp, message_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, event_type, session_id, agent_id, tool_name, tool_input, tool_output, timestamp, message_id, usage)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     event_data["id"],
@@ -443,6 +448,7 @@ class ConversationStore:
                     json.dumps(event_data.get("tool_output")) if event_data.get("tool_output") is not None else None,
                     event_data["timestamp"],
                     event_data.get("message_id"),
+                    json.dumps(event_data.get("usage")) if event_data.get("usage") is not None else None,
                 ),
             )
 
@@ -621,7 +627,7 @@ class ConversationStore:
     @staticmethod
     def _row_to_event(row: sqlite3.Row) -> dict:
         """Convert a database row to an event dict."""
-        return {
+        result = {
             "id": row["id"],
             "event_type": row["event_type"],
             "session_id": row["session_id"],
@@ -632,6 +638,85 @@ class ConversationStore:
             "timestamp": row["timestamp"],
             "message_id": row["message_id"],
         }
+        # usage column may not exist in older databases before migration runs
+        try:
+            result["usage"] = json.loads(row["usage"]) if row["usage"] else None
+        except (IndexError, KeyError):
+            result["usage"] = None
+        return result
+
+    # --- Budget / Token Usage ---
+
+    def get_budget_summary(self) -> list[dict]:
+        """Get per-agent token usage totals from events with usage data."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT
+                    agent_id,
+                    COUNT(*) as event_count,
+                    SUM(json_extract(usage, '$.input_tokens')) as input_tokens,
+                    SUM(json_extract(usage, '$.output_tokens')) as output_tokens,
+                    SUM(json_extract(usage, '$.cache_read_input_tokens')) as cache_read_tokens,
+                    SUM(json_extract(usage, '$.cache_creation_input_tokens')) as cache_creation_tokens
+                FROM agent_events
+                WHERE usage IS NOT NULL
+                GROUP BY agent_id
+                ORDER BY input_tokens DESC
+                """
+            )
+            return [
+                {
+                    "agent_id": row["agent_id"],
+                    "input_tokens": row["input_tokens"] or 0,
+                    "output_tokens": row["output_tokens"] or 0,
+                    "cache_read_tokens": row["cache_read_tokens"] or 0,
+                    "cache_creation_tokens": row["cache_creation_tokens"] or 0,
+                    "event_count": row["event_count"],
+                }
+                for row in cursor.fetchall()
+            ]
+
+    def get_agent_budget(self, agent_id: str, limit: int = 50) -> dict:
+        """Get token usage detail for a single agent."""
+        with self._get_connection() as conn:
+            # Totals
+            cursor = conn.execute(
+                """
+                SELECT
+                    COUNT(*) as event_count,
+                    SUM(json_extract(usage, '$.input_tokens')) as input_tokens,
+                    SUM(json_extract(usage, '$.output_tokens')) as output_tokens,
+                    SUM(json_extract(usage, '$.cache_read_input_tokens')) as cache_read_tokens,
+                    SUM(json_extract(usage, '$.cache_creation_input_tokens')) as cache_creation_tokens
+                FROM agent_events
+                WHERE agent_id = ? AND usage IS NOT NULL
+                """,
+                (agent_id,),
+            )
+            row = cursor.fetchone()
+            totals = {
+                "agent_id": agent_id,
+                "input_tokens": row["input_tokens"] or 0,
+                "output_tokens": row["output_tokens"] or 0,
+                "cache_read_tokens": row["cache_read_tokens"] or 0,
+                "cache_creation_tokens": row["cache_creation_tokens"] or 0,
+                "event_count": row["event_count"],
+            }
+
+            # Recent events with usage
+            cursor = conn.execute(
+                """
+                SELECT * FROM agent_events
+                WHERE agent_id = ? AND usage IS NOT NULL
+                ORDER BY timestamp DESC
+                LIMIT ?
+                """,
+                (agent_id, limit),
+            )
+            events = [self._row_to_event(r) for r in cursor.fetchall()]
+
+            return {"totals": totals, "recent_events": events}
 
 
 # Singleton instance

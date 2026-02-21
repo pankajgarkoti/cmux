@@ -20,6 +20,7 @@ class AgentEvent(BaseModel):
     tool_output: Optional[Any] = None
     transcript_path: Optional[str] = None
     response_content: Optional[str] = None  # Agent's response text (extracted from transcript on Stop)
+    usage: Optional[dict] = None  # Token usage: {input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens}
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

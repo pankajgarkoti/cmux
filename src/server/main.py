@@ -19,6 +19,7 @@ from .routes import (
     tasks,
     heartbeat,
     prefs,
+    budget,
 )
 from .websocket.manager import ws_manager
 
@@ -68,6 +69,7 @@ app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
 app.include_router(heartbeat.router, prefix="/api/heartbeat", tags=["heartbeat"])
 app.include_router(prefs.router, prefix="/api/prefs", tags=["prefs"])
+app.include_router(budget.router, prefix="/api/budget", tags=["budget"])
 
 # Static files (frontend) - only mount if directory exists
 frontend_dir = Path("src/frontend/dist")
