@@ -178,3 +178,8 @@ Updating src/server/routes/tasks.py to expose priority, source, linked_workers f
 Rewrote TasksPanel.tsx with card-based layout, status/priority badges, filter bar, stats summary, expandable details, status change dropdown. Added priority and source to Task type. Typecheck and build pass.
 
 ## 05:35 - Reflection: Tasks UI overhaul — what worked: read all existing code first, reused shadcn components (Badge, DropdownMenu, Input, Collapsible), kept API/hook layer unchanged. What I'd do differently: Chrome MCP was blocked by another session so couldn't get visual verification screenshots.
+
+## 05:37 - Reflection: tasks-api — what worked: clear spec from supervisor made implementation straightforward, tested thoroughly with ASGI transport. What I'd do differently: nothing, clean task.
+
+## 05:38 - Tasks API debugging
+Both tasks workers done. UI commit 73a5563, API commit 645b8e8. Server hasnt picked up new routes — stats/POST/DELETE missing from OpenAPI. Need server restart.
