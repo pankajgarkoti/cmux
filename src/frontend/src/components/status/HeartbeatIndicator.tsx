@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { Button } from '../ui/button';
 
 const SECTION_ICONS: Record<string, typeof Inbox> = {
@@ -218,7 +219,16 @@ export function HeartbeatIndicator() {
               const isEditing = editKey === key;
               return (
                 <div key={key} className="flex items-center justify-between text-[11px]">
-                  <span className="text-muted-foreground cursor-help" title={tooltip}>{label}</span>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-muted-foreground">{label}</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="max-w-[200px] text-xs">
+                        {tooltip}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   {isEditing ? (
                     <span className="flex items-center gap-1">
                       <input
