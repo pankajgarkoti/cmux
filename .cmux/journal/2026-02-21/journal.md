@@ -422,3 +422,29 @@ Building InboxView component for worker chat panel. Pinned task card at top, inb
 
 ## 11:44 - Inbox redesign complete
 Completed worker inbox redesign (commit b8e4c9d). New InboxView component with: (1) Pinned task card at top showing first [TASK] message with clipboard icon and indigo styling; (2) Worker-centric alignment via inboxAgentId prop on ChatMessage — worker's own messages left, incoming messages (supervisor, user) right-aligned with primary colors; (3) Filter toggle hidden for workers (always shows all messages); (4) System notifications as collapsed dividers. ChatPanel gates on isWorker to choose InboxView vs ChatMessages. Supervisor/command center views unchanged. Verified in browser: Kai's inbox shows pinned task, two left-aligned DONE messages, one right-aligned TASK from supervisor.
+
+## 11:45 - Inbox redesign complete + light theme
+Inbox redesign backlog item done. Kai added GET /api/messages/inbox/{agent_id} endpoint (commit 6d402a8) with pinned_task, messages, total. Mira created InboxView.tsx (commit b8e4c9d) with pinned task card at top, worker-centric alignment (worker left, incoming right), filter toggle hidden for workers. Also changed default theme from dark to light (commit 982dee8). User asked about project supervisors creating permanent workers and project team scoping — answered that it's not supported yet but the lightweight approach (project-scoped role files, same tooling) is recommended.
+
+## 11:45 - Session progress summary
+Deployed 5 new permanent workers (Nova, Sage, Flint, Bolt, Echo) bringing team to 8. Completed inbox redesign backlog item — Kai added backend endpoint, Mira built InboxView with pinned task card and worker-centric alignment. Changed default theme to light. Created docs/TEAM.md as living team architecture reference. Answered user questions about project-scoped permanent teams (not yet supported, recommended lightweight approach). Tab margin fix in ActivityTimeline. All commits clean, system healthy.
+
+## 11:47 - Standing by after inbox redesign
+Completed three tasks this session: (1) display names with tooltips (30384a0), (2) prefix badges + unified agent labels (a760bbd + a8ba40f), (3) worker inbox redesign with pinned task card and worker-centric alignment (b8e4c9d). All verified via Chrome MCP, typecheck+build clean. Awaiting next assignment from supervisor.
+
+## 11:50 - Project-scoped permanent workers implementation
+Implementing project-scoped permanent worker support. Updated tools/workers with absolute path for WORKER_ROLE.md, added workers team command for listing permanent workers by project. Still need to add BOLD/DIM color vars and update docs.
+
+## 11:52 - Starting task: Verify project-scoped permanent workers end-to-end (code review + CLI tests)
+
+## 11:52 - Verified project-scoped permanent workers: workers team shows all 8 CMUX workers, filters work, WORKER_ROLE.md uses absolute path, CMUX_PROJECT_ID inheritance works. No issues.
+
+## 11:55 - Starting task: Write docs/PERMANENT_WORKER_GUIDE.md — guide for project supervisors on setting up permanent workers with deep project context.
+
+## 11:56 - Delegated permanent worker onboarding guide and tooling
+Assigned two parallel tasks: Nova writes docs/PERMANENT_WORKER_GUIDE.md — a comprehensive guide teaching project supervisors how to do a thorough codebase scan and create context-rich role files for their permanent workers. Bolt builds tools/workers-init-role — a scanning tool that automates the initial project scan and generates starter role files with project-specific context (tech stack, directory structure, conventions, key files). Both working in parallel.
+
+## 11:58 - Completed: docs/PERMANENT_WORKER_GUIDE.md — 584 lines covering onboarding scans, role file template, Hero project example, spawning commands, and maintenance. Commit 17d99d8.
+
+## 11:59 - Built workers-init-role tool
+Created tools/workers-init-role — a shell script that scans a project directory and generates a starter role file for permanent workers. Detects package.json, pyproject.toml, go.mod for tech stack and dependencies. Finds key source files, config conventions, and recent git activity. Supports 7 role types (frontend, backend, fullstack, qa, devops, research, reviewer) each with tailored specialization and standards templates. Output lands in .cmux/worker-contexts/<name>-role.md. Tested against cmux (Python+JS mixed) and hero (React Native/Expo) projects. Had to work around macOS bash 3.2 limitations — no ${var,,} lowercase, and backticks inside unquoted heredocs get interpreted as command substitution. Rewrote output generation to use section-by-section echo/cat instead of a single heredoc.
