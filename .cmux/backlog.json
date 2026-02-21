@@ -125,7 +125,7 @@
     "description": "Implement scheduled future check-ins with context notes, inspired by tmux-orchestrator's schedule_with_note pattern. Lets supervisor schedule itself to follow up on delegated work.",
     "priority": 3,
     "source": "self",
-    "status": "pending",
+    "status": "in_progress",
     "created_at": "2026-02-21T01:23:10Z",
     "completed_at": null
   }

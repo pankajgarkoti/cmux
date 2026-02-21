@@ -277,6 +277,21 @@ if [[ -f "$registry" ]]; then
 fi
 
 #───────────────────────────────────────────────────────────────────────────────
+# 4a. Scheduled check-ins — fire due reminders
+#───────────────────────────────────────────────────────────────────────────────
+
+schedule_summary=""
+schedule_tool="${CMUX_PROJECT_ROOT}/tools/schedule"
+if [[ -x "$schedule_tool" ]]; then
+    fired_notes=$("$schedule_tool" fire 2>/dev/null || true)
+    if [[ -n "$fired_notes" ]]; then
+        fired_count=$(echo "$fired_notes" | wc -l | tr -d ' ')
+        schedule_summary="${fired_count} reminder(s): ${fired_notes}"
+        highest_priority="Scheduled reminder: $(echo "$fired_notes" | head -1)"
+    fi
+fi
+
+#───────────────────────────────────────────────────────────────────────────────
 # 4b. Watchdog — stuck agent detection
 #───────────────────────────────────────────────────────────────────────────────
 
@@ -341,6 +356,7 @@ has_findings=false
 [[ -n "$worker_summary" ]] && has_findings=true
 [[ -n "$backlog_summary" ]] && has_findings=true
 [[ -n "$supervisor_summary" ]] && has_findings=true
+[[ -n "$schedule_summary" ]] && has_findings=true
 [[ -n "$watchdog_summary" ]] && has_findings=true
 [[ -n "$git_summary" ]] && has_findings=true
 [[ -n "$health_summary" ]] && has_findings=true
@@ -363,6 +379,7 @@ if [[ "$OUTPUT_MODE" == "summary" ]]; then
     [[ -n "$worker_summary" ]]     && echo "Workers: ${worker_summary}"
     [[ -n "$backlog_summary" ]]    && echo "Backlog: ${backlog_summary}"
     [[ -n "$supervisor_summary" ]] && echo "Supervisors: ${supervisor_summary}"
+    [[ -n "$schedule_summary" ]]   && echo "Reminders: ${schedule_summary}"
     [[ -n "$watchdog_summary" ]]   && echo "Watchdog: ${watchdog_summary}"
     [[ -n "$git_summary" ]]        && echo "Git: ${git_summary}"
     [[ -n "$health_summary" ]]     && echo "Health: ${health_summary}"
