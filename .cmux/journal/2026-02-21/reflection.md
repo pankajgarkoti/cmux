@@ -21,6 +21,8 @@
 - **Sat idle instead of being proactive** — multiple heartbeat cycles with nothing but "system healthy, ready for tasks". Should have been reflecting, improving, finding work.
 - **Delegated generic academic research instead of introspecting** — user wanted self-analysis of our own failures, not a literature review. Listen to what's actually being asked.
 - **Asked permission when not needed** — used AskUserQuestion/EnterPlanMode in tmux context where no human is at the terminal. Blocks forever.
+- **Used temp workers for domain-owned work** — spawned two temp workers to fix HeartbeatIndicator.tsx (frontend) instead of sending to Mira. First temp worker got the colors wrong, needed a second. Mira would have had the context to get it right first try. Rule: if a permanent worker owns the domain, use them. Temp workers are for truly ownerless one-offs.
+- **Asked user for permission on obvious decisions** — "Want me to add this to SUPERVISOR_ROLE.md?" User rightly said "trust yourself." If I identified a problem and know the fix, just do it.
 
 ### 2026-02-20
 - **compact.sh was missing** — a critical daemon referenced in docs but the file didn't exist. Nobody noticed until compaction failures cascaded.
