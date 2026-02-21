@@ -47,7 +47,7 @@ export function ChatInput({ onSend, isPending, placeholder, inputRef, agents = [
       textarea.style.height = 'auto';
       textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
     }
-  }, [message]);
+  }, [message, textareaRef]);
 
   // Filter agents based on mention query
   const filteredAgents = mention.active
@@ -95,7 +95,7 @@ export function ChatInput({ onSend, isPending, placeholder, inputRef, agents = [
       textarea.selectionEnd = cursorPos;
       textarea.focus();
     });
-  }, [message, mention.startIndex]);
+  }, [message, mention.startIndex, textareaRef]);
 
   const handleSubmit = () => {
     const trimmed = message.trim();

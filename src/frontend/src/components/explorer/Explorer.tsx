@@ -101,8 +101,8 @@ export function Explorer() {
     },
   });
 
-  const agents = agentsData?.agents || [];
-  const projects = projectsData?.projects || [];
+  const agents = useMemo(() => agentsData?.agents || [], [agentsData]);
+  const projects = useMemo(() => projectsData?.projects || [], [projectsData]);
 
   // Group agents by project
   const projectGroups = useMemo((): ProjectGroup[] => {
