@@ -29,16 +29,6 @@
     "role": "project-supervisor",
     "project_id": "heroweb"
   },
-  "impl-perm-infra": {
-    "registered_at": "2026-02-21T03:59:26Z",
-    "type": "worker",
-    "created_by": "tools/workers",
-    "created_at": "2026-02-21T03:59:26Z",
-    "agent_id": "ag_5p7lou1c",
-    "display_name": "impl-perm-infra",
-    "role": "worker",
-    "project_id": "cmux"
-  },
   "perm-frontend": {
     "registered_at": "2026-02-21T04:04:16Z",
     "type": "worker",
