@@ -12,7 +12,9 @@
 - [ ] Review the port 8000 conflict incident — what systemic fix prevents this class of error?
 - [ ] Study compaction reliability: 6 findings from Feb 19 investigation, how many are actually fixed?
 - [ ] Check if workers are actually reading their role files or ignoring them
-- [ ] Audit the hook system: stop-gate, pre-compact, compact-recovery — are they all working?
+- [x] Audit the hook system: stop-gate, pre-compact, compact-recovery — are they all working?
+  - **Result**: All 8 hooks working. compact.sh exists but NOTHING STARTS IT — entire compaction pipeline is dormant. health.sh is dead code (absorbed into monitor.sh). See artifacts/hook-daemon-audit.md.
+  - **Action needed**: Add `start_compact_daemon()` to monitor.sh → added to backlog.
 
 ## Mistakes & Patterns Found
 

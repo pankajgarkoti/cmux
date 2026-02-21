@@ -543,3 +543,10 @@ User called out that I asked 'want me to add this?' when I had already identifie
 ## 14:50 - Added 'Delegation Protocol: Permanent vs Temp Workers' section to docs/SUPERVISOR_ROLE.md after team templates section. Table format with clear criteria for when to use each type, plus anti-pattern callout.
 
 ## 14:50 - Reflection: delegation-protocol — what worked: clean task, read both files first, inserted at the right spot between Team Templates and Core Responsibilities. What I'd do differently: nothing, straightforward doc edit.
+
+## 15:01 - Starting task: failure pattern analysis across Feb 19-21 journals. Investigating idle loop, recurring mistakes, and unlearned lessons.
+
+## 15:01 - Starting task: Audit CMUX hook and daemon system — comprehensive review of all hooks, daemons, and their wiring
+
+## 15:03 - Hook and daemon audit complete
+Audited all 8 hooks and 6 daemons. All hooks functional. Key finding: compact.sh exists and is well-implemented but NOTHING starts it — agents will hit context limits. health.sh is also dead code, superseded by monitor.sh's built-in recovery. Saved full report to .cmux/journal/2026-02-21/artifacts/hook-daemon-audit.md. Recommendation: add start_compact_daemon() to monitor.sh.
