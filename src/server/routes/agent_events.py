@@ -12,6 +12,13 @@ from ..websocket.manager import ws_manager
 
 logger = logging.getLogger(__name__)
 
+# Laminar trace context (optional — noop if not initialized)
+try:
+    from lmnr import Laminar as _Laminar
+    _lmnr_available = _Laminar.is_initialized()
+except Exception:
+    _lmnr_available = False
+
 router = APIRouter()
 
 
@@ -31,6 +38,17 @@ async def receive_agent_event(event: AgentEvent):
 
     # Use agent_id if available, fallback to session_id
     display_agent_id = event.agent_id if event.agent_id and event.agent_id != "unknown" else event.session_id
+
+    # Set Laminar trace metadata so traces are grouped per agent
+    if _lmnr_available:
+        try:
+            _Laminar.set_trace_metadata({
+                "agent_id": display_agent_id,
+                "event_type": event.event_type.value,
+                "session_id": event.session_id,
+            })
+        except Exception:
+            pass  # Observability must never break event handling
 
     # Build event data
     event_data = {

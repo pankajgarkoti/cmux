@@ -190,6 +190,7 @@ Key settings (in `src/server/config.py`):
 - `CMUX_HOST` / `CMUX_PORT` - Server bind (default: 0.0.0.0:8000)
 - `CMUX_SESSION` - tmux session name (default: cmux)
 - `CMUX_MAILBOX` - Message queue path (default: .cmux/mailbox)
+- `LMNR_PROJECT_API_KEY` - Laminar observability API key (optional, traces LLM calls and agent events)
 
 ## Self-Improvement Safety Model
 

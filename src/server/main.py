@@ -3,9 +3,24 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
+import os
 from pathlib import Path
 
 from .config import settings
+
+# --- Laminar observability (optional) ---
+# Initialize early, before any Anthropic SDK usage, so it can patch the SDK.
+# Gracefully skipped if LMNR_PROJECT_API_KEY is not set.
+_lmnr_api_key = os.getenv("LMNR_PROJECT_API_KEY")
+if _lmnr_api_key:
+    try:
+        from lmnr import Laminar, Instruments
+        Laminar.initialize(
+            project_api_key=_lmnr_api_key,
+            instruments={Instruments.ANTHROPIC},
+        )
+    except Exception:
+        logging.getLogger(__name__).warning("Failed to initialize Laminar observability", exc_info=True)
 from .routes import (
     webhooks,
     agents,
