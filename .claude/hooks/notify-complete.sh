@@ -80,22 +80,18 @@ if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
     tail -50 "$transcript_path" | jq -c 'select(.type == "assistant") | [.message.content[]? | select(.type == "text") | .text[0:40]]' 2>/dev/null | tail -5 >> "$DEBUG_LOG"
 fi
 
-# Extract usage/token data from the last assistant message
+# Extract cumulative usage/token data across ALL assistant messages
 usage_json="null"
 if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
-    usage_json=$(tail -100 "$transcript_path" | \
-        jq -rs '
-            [.[] | select(.type == "assistant")] |
-            if length > 0 then
-                .[-1].message.usage // null |
-                if . then {
-                    input_tokens: (.input_tokens // 0),
-                    output_tokens: (.output_tokens // 0),
-                    cache_creation_input_tokens: (.cache_creation_input_tokens // 0),
-                    cache_read_input_tokens: (.cache_read_input_tokens // 0)
-                } else null end
-            else null end
-        ' 2>/dev/null || echo "null")
+    usage_json=$(timeout 5 jq -rs '
+        [.[] | select(.type == "assistant") | .message.usage // empty] |
+        if length > 0 then {
+            input_tokens: (map(.input_tokens // 0) | add),
+            output_tokens: (map(.output_tokens // 0) | add),
+            cache_creation_input_tokens: (map(.cache_creation_input_tokens // 0) | add),
+            cache_read_input_tokens: (map(.cache_read_input_tokens // 0) | add)
+        } else null end
+    ' "$transcript_path" 2>/dev/null || echo "null")
 
     echo "usage=$usage_json" >> "$DEBUG_LOG"
 fi
