@@ -150,3 +150,31 @@ Added all 5 cross-agent visibility features to tools/tasks: (1) --supervisor and
 
 ## 05:26 - Task visibility — final summary
 Completed all cross-agent visibility features for tools/tasks. Five requirements delivered: supervisor/worker list filtering via --supervisor and --worker flags, project-scoped views via for-project command, worker tracking via link command with linked_workers DB column and task_status_history table, dashboard project breakdown with live supervisor status, and global system overview command. Workers tool updated to auto-link on --task. Committed 31c3fa4, reported done to supervisor.
+
+## 05:26 - Session progress: 8 commits, research artifact saved
+This session shipped 8 feature/fix commits: (1) e1e4ea5 health check identity verification, (2) cc8766f port reservation warnings, (3) f036809 multi-stage recovery in monitor.sh, (4) 37a9f41 @mention CSS fix, (5) 7bfaa92 enhanced task system with priorities/dashboard, (6) 45a587a runtime state, (7) 8a1834f heartbeat redesigned as autonomy engine, (8) 31c3fa4 cross-agent task visibility. Also completed research on long-running agent architectures — report saved to artifacts. Key findings: three-tier memory model (episodic/semantic/procedural), autonomy loops with self-scheduling, Reflexion pattern for self-improvement, and Tmux-Orchestrator as closest comparable system. Remaining backlog: 7 pending tasks including role doc evolution, test suite, frontend typecheck, codebase audit.
+
+## 05:27 - Continuing autonomous work
+All worker deliverables reviewed and committed. 8 commits this session across health resilience, task management, autonomy engine, and mention fix. Research artifact saved. Moving to next backlog items — role doc evolution from observed failures (t_50trgof1) is highest priority remaining at P2-high.
+
+## 05:28 - Starting: Evolve CMUX role docs based on today's observed failures. 6 lessons to encode across SUPERVISOR_ROLE.md, WORKER_ROLE.md, SELF_IMPROVEMENT_GUIDE.md, plus 2 research patterns (Reflection After Task, Failure Memory).
+
+## 05:30 - Role docs evolved with operational lessons
+Encoded 6 failure lessons from today's session plus 2 research patterns into SUPERVISOR_ROLE.md, WORKER_ROLE.md, and SELF_IMPROVEMENT_GUIDE.md. Key additions: mandatory heartbeat response protocol with idle autonomy cascade, anti-compaction-on-idle warning, reserved resources section (port 8000), integration verification best practice, Failure Memory pre-task journal check, Reflection After Task pattern. All changes surgical — added specific sections without rewriting existing content. 144 insertions, 6 deletions. Commit 0395a7c.
+
+## 05:30 - Reflection: evolve-docs — what worked: reading all source material upfront (journal, research, all 3 docs) before making any edits. Made all 8 edits cleanly in one pass. What I'd do differently: nothing, task was well-scoped by supervisor.
+
+## 05:32 - Starting: Update tasks REST API to expose all SQLite fields (priority, source, linked_workers) + add POST, DELETE, stats endpoints
+
+## 05:32 - Tasks UI overhaul in progress
+User requested tasks UI overhaul: card-based display, auto-loading, better UX. Spawned two parallel workers: worker-tasks-api (extending REST API with priority/source/linked_workers fields, POST/DELETE endpoints, stats endpoint) and worker-tasks-ui (card-based TasksPanel with status badges, priority badges, filter bar, status actions, expandable details). Both linked to parent task t_acojhpom. Role docs evolution also shipped (0395a7c) encoding 6 operational lessons + 2 research patterns. Total session commits: 9.
+
+## 05:32 - Starting: Tasks UI overhaul — card-based display, filters, status actions, stats summary
+
+## 05:34 - Tasks API update in progress
+Updating src/server/routes/tasks.py to expose priority, source, linked_workers fields from SQLite schema. Adding POST, DELETE, and /stats endpoints. All 45 existing tests pass. Server runs without --reload so changes need manual restart to take effect on live server.
+
+## 05:34 - Tasks UI overhaul
+Rewrote TasksPanel.tsx with card-based layout, status/priority badges, filter bar, stats summary, expandable details, status change dropdown. Added priority and source to Task type. Typecheck and build pass.
+
+## 05:35 - Reflection: Tasks UI overhaul — what worked: read all existing code first, reused shadcn components (Badge, DropdownMenu, Input, Collapsible), kept API/hook layer unchanged. What I'd do differently: Chrome MCP was blocked by another session so couldn't get visual verification screenshots.

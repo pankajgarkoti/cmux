@@ -98,5 +98,35 @@
     "display_name": "worker-task-visibility",
     "role": "worker",
     "project_id": "cmux"
+  },
+  "worker-evolve-docs": {
+    "registered_at": "2026-02-20T23:57:40Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-20T23:57:40Z",
+    "agent_id": "ag_ciy5w3z3",
+    "display_name": "worker-evolve-docs",
+    "role": "worker",
+    "project_id": "cmux"
+  },
+  "worker-tasks-api": {
+    "registered_at": "2026-02-21T00:01:52Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-21T00:01:52Z",
+    "agent_id": "ag_l0q2t9wz",
+    "display_name": "worker-tasks-api",
+    "role": "worker",
+    "project_id": "cmux"
+  },
+  "worker-tasks-ui": {
+    "registered_at": "2026-02-21T00:02:10Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-21T00:02:10Z",
+    "agent_id": "ag_1kgtpnof",
+    "display_name": "worker-tasks-ui",
+    "role": "worker",
+    "project_id": "cmux"
   }
 }
