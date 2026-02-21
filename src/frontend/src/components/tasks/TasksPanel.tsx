@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import { useTasks, useUpdateTask } from '@/hooks/useTasks';
-import { useAgentStore } from '@/stores/agentStore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -195,10 +194,10 @@ function TaskCard({ task, depth = 0 }: { task: Task; depth?: number }) {
   const childCount = task.children?.length ?? 0;
 
   return (
-    <div className={cn(depth > 0 && 'ml-3 border-l border-border/50 pl-2')}>
+    <div className={cn(depth > 0 && 'ml-4 border-l border-border/50 pl-3')}>
       <div
         className={cn(
-          'group rounded-md border bg-card p-2.5 cursor-pointer transition-colors',
+          'group rounded-lg border bg-card p-3 cursor-pointer transition-colors',
           'hover:bg-accent/50 hover:border-border',
           expanded && 'bg-accent/30 border-border',
         )}
@@ -207,17 +206,17 @@ function TaskCard({ task, depth = 0 }: { task: Task; depth?: number }) {
         {/* Top row: status + title + actions */}
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 mb-1">
+            <div className="flex items-center gap-1.5 mb-1.5">
               <StatusBadge status={task.status} />
               <PriorityBadge priority={task.priority} />
             </div>
-            <h4 className="text-xs font-medium leading-snug truncate">{task.title}</h4>
+            <h4 className="text-[13px] font-medium leading-snug truncate">{task.title}</h4>
           </div>
           <StatusDropdown task={task} />
         </div>
 
         {/* Meta row */}
-        <div className="flex items-center gap-2.5 mt-1.5 flex-wrap">
+        <div className="flex items-center gap-3 mt-2 flex-wrap">
           {task.assigned_to && (
             <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
               <User className="h-2.5 w-2.5" />
@@ -245,7 +244,7 @@ function TaskCard({ task, depth = 0 }: { task: Task; depth?: number }) {
 
         {/* Expanded details */}
         {expanded && (
-          <div className="mt-2 pt-2 border-t border-border/50 space-y-1.5">
+          <div className="mt-2.5 pt-2.5 border-t border-border/50 space-y-2">
             {task.description && (
               <p className="text-[11px] text-muted-foreground whitespace-pre-wrap leading-relaxed">
                 {task.description}
@@ -285,7 +284,7 @@ function TaskCard({ task, depth = 0 }: { task: Task; depth?: number }) {
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="space-y-1.5 mt-1">
+            <div className="space-y-2 mt-1.5">
               {task.children!.map((child) => (
                 <TaskCard key={child.id} task={child} depth={depth + 1} />
               ))}
@@ -304,7 +303,7 @@ function StatsSummary({ counts, total }: { counts: Record<string, number>; total
     .map((s) => ({ status: s, count: counts[s], config: STATUS_CONFIGS[s] }));
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 text-[10px] flex-wrap">
+    <div className="flex items-center gap-2 px-3 py-2 text-[10px] flex-wrap">
       <span className="text-muted-foreground font-medium">{total} total</span>
       <span className="text-border">|</span>
       {items.map(({ status, count, config }) => (
@@ -335,15 +334,15 @@ function FilterBar({
   const hasFilters = statusFilter !== 'all' || priorityFilter !== 'all' || search.length > 0;
 
   return (
-    <div className="px-3 py-1.5 space-y-1.5 border-b border-border/50">
+    <div className="px-3 py-2 space-y-2 border-b border-border/50">
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
         <Input
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search tasks..."
-          className="h-6 pl-6 pr-6 text-xs bg-muted/50 border-none"
+          className="h-7 pl-7 pr-6 text-xs bg-muted/50 border-none"
         />
         {search && (
           <button
@@ -356,7 +355,7 @@ function FilterBar({
       </div>
 
       {/* Filter chips */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap">
         <Filter className="h-3 w-3 text-muted-foreground shrink-0" />
 
         {/* Status filter */}
@@ -448,15 +447,12 @@ function FilterBar({
 // -- Main component --
 
 export function TasksPanel() {
-  const { selectedAgentId, agents } = useAgentStore();
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
   const [search, setSearch] = useState('');
 
-  const selectedAgent = selectedAgentId ? agents.find((a) => a.id === selectedAgentId) : null;
-  const projectFilter = selectedAgent?.project_id || undefined;
-
-  const { data, isLoading, error, isFetching } = useTasks(projectFilter);
+  // Always fetch all tasks globally — no project scoping
+  const { data, isLoading, error, isFetching } = useTasks();
 
   const tasks = data?.tasks || [];
   const allCounts = useMemo(() => countByStatus(tasks), [tasks]);
@@ -492,7 +488,7 @@ export function TasksPanel() {
           <ListTodo className="h-6 w-6 text-muted-foreground" />
         </div>
         <p className="text-sm text-muted-foreground">
-          {projectFilter ? 'No tasks for this project' : 'No tasks yet. Tasks will appear as agents create them.'}
+          No tasks yet. Tasks will appear as agents create them.
         </p>
       </div>
     );
@@ -501,7 +497,7 @@ export function TasksPanel() {
   return (
     <div className="flex flex-col h-full">
       {/* Stats summary */}
-      <div className="flex items-center justify-between pr-3">
+      <div className="flex items-center justify-between pr-3 border-b border-border/30">
         <StatsSummary counts={allCounts} total={totalFlat} />
         {isFetching && !isLoading && (
           <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />
@@ -520,16 +516,16 @@ export function TasksPanel() {
 
       {/* Task cards */}
       <ScrollArea className="flex-1">
-        <div className="p-2 space-y-1.5">
+        <div className="p-3 space-y-2.5">
           {filteredTasks.length === 0 ? (
-            <div className="text-center py-8">
+            <div className="text-center py-10">
               <p className="text-xs text-muted-foreground">
                 No tasks match your filters.
               </p>
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-xs mt-2 h-6"
+                className="text-xs mt-3 h-7"
                 onClick={() => {
                   setStatusFilter('all');
                   setPriorityFilter('all');
