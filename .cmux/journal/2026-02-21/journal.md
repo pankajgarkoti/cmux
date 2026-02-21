@@ -611,3 +611,39 @@ Received [TASK] to add heartbeat events to the frontend activity feed. Completed
 ## 15:56 - [heroweb] heroweb-frontend worker online. Permanent frontend specialist role loaded. Awaiting [TASK] assignments from squad lead.
 
 ## 15:56 - [heroweb] heroweb-tester online — permanent QA engineer role initialized. Awaiting task assignment.
+
+## 16:33 - Added researcher to SQUAD_MODEL (f4497ce). Template, team doc, and tools/teams all updated. Squad is now 5 workers.
+
+## 16:33 - Starting: hero-research worker initialized. Investigating hero project at /Users/pankajgarkoti/Desktop/code/zonko/hero
+
+## 16:33 - Starting: heroweb-research — investigating hero-web codebase at /Users/pankajgarkoti/Desktop/code/zonko/hero-web
+
+## 16:34 - heroweb research: deep investigation launched
+Investigating the heroweb codebase at /Users/pankajgarkoti/Desktop/code/zonko/heroweb for the heroweb squad. Launched 4 parallel exploration agents covering: (1) all API routes, (2) lib/ modules (AI, auth, payments, DB, notifications), (3) database schema/migrations/types, (4) admin dashboard frontend. Initial findings: Next.js 16 app with App Router, Supabase backend, Gemini 2.5 Flash for AI chat, Razorpay for payments (S2S UPI + Standard Checkout), ElevenLabs TTS, Expo push notifications. Deployed on Vercel. The README is thorough — project is well-documented.
+
+## 16:35 - Hero codebase research — initial exploration complete
+Completed deep exploration of the Hero app codebase at /Users/pankajgarkoti/Desktop/code/zonko/hero. Four parallel research agents explored: (1) app/ directory — 32 route files across 8 route groups including tabs, onboarding, valentine onboarding, chat, generate, and payment flows; (2) stores/hooks/lib — 5 Zustand stores, 21 hooks, 34 service modules covering chat, payments, media, analytics; (3) backend/ — lean Vercel serverless layer with DodoPayments checkout, webhook processing, and Meta CAPI integration; (4) components/constants/docs — 63 TSX components organized into chat, UI primitives, templates, navbar, payment onboarding, and valentine seasonal features. Now compiling comprehensive research report artifact.
+
+## 16:38 - Hero codebase research report complete
+Compiled comprehensive research report (16 sections) covering: product overview, tech stack (RN 0.81.5 + Expo 54 + TS 5.9.2), project structure (32 routes, 5 stores, 21 hooks, 34 service modules, 63 components), architecture (mobile → heroweb Next.js API → Supabase/Gemini/Razorpay), payment system (Razorpay S2S UPI + Standard Checkout, ₹1 trial → ₹199/month hidden), AI generation (Gemini, 1 coin per image), analytics (PostHog 100+ events + Meta CAPI), security (FLAG_SECURE, HMAC-SHA256, RLS), and squad-specific guidance for backend/frontend/tester workers. Saved to .cmux/journal/2026-02-21/artifacts/hero-codebase-research-report.md
+
+## 16:38 - heroweb research report complete
+Completed comprehensive research report on the heroweb codebase. Report saved to .cmux/journal/2026-02-21/artifacts/heroweb-codebase-research-report.md. Key findings: Next.js 16 app with 38 API routes, 20+ database tables (23 migrations), sophisticated payment system (Razorpay S2S UPI + Standard Checkout + legacy Cashfree), AI chat powered by Gemini 2.5 Flash with TTS (ElevenLabs), proactive outreach cron, admin dashboard with bot management and chat testing. The codebase is well-structured and production-grade.
+
+## 16:39 - Reflection: heroweb-research — what worked: launching 4 parallel exploration agents for API routes, lib modules, DB schema, and admin frontend was efficient and thorough. The README was excellent and provided a solid foundation. What I'd do differently: nothing, clean research task.
+
+## 16:39 - Reflection: hero-codebase-research — what worked: parallel exploration agents (4 simultaneous) covered the entire codebase efficiently in one pass. Reading CLAUDE.md, README.md, and PRD.md first gave the right mental model before diving into code. What I'd do differently: could have also read the heroweb CLAUDE.md for additional backend patterns.
+
+## 16:39 - [hero] Reviewed hero codebase research
+Read full research report from hero-research. Key takeaways: (1) Primary backend is heroweb (Next.js 16, Vercel), not hero/backend/. (2) React Native + Expo 54, TypeScript, Zustand + React Query. (3) Razorpay S2S UPI for subs, Standard Checkout for coins. (4) user-store.ts is 49KB god store. (5) 32 route files, 63 components, 21 hooks. (6) Theme: saffron #F26B1D + gold #F5A623. Squad-specific guidance sections ready for task delegation.
+
+## 16:39 - hero-research idle after completion
+Research task fully complete. Delivered comprehensive 16-section codebase report covering Hero app (RN/Expo) and heroweb (Next.js) to squad lead and supervisor. Artifact at .cmux/journal/2026-02-21/artifacts/hero-codebase-research-report.md. Now idle awaiting next assignment.
+
+## 16:39 - [heroweb] Read heroweb codebase research report. Key facts: Next.js 16, 38 API routes, 20+ DB tables, Razorpay S2S UPI + Standard Checkout, Gemini 2.5 Flash AI, ElevenLabs TTS, admin dashboard with bot management. Project path: /Users/pankajgarkoti/Desktop/code/zonko/heroweb. Squad is fully online and ready.
+
+## 16:39 - heroweb research: idle after delivery
+Research task fully complete. Comprehensive report delivered to .cmux/journal/2026-02-21/artifacts/heroweb-codebase-research-report.md covering all 38 API routes, 20+ DB tables, lib modules (AI, auth, payments, notifications), and admin dashboard. Notified both supervisor and heroweb-squad-lead via mailbox. Now idle awaiting next assignment.
+
+## 16:39 - Named all squad members
+Gave human names to all hero and heroweb squad members. Hero: Ash (lead), Rune (backend), Piper (frontend), Cleo (tester), Iris (research). Heroweb: Zara (lead), Finn (backend), Luna (frontend), Juno (tester), Wren (research). Both researchers also proactively completed codebase research reports — Iris on hero, Wren on heroweb.
