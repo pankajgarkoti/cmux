@@ -512,7 +512,10 @@ check_supervisor_heartbeat() {
             local nudge_msg
             nudge_msg=$(printf '[HEARTBEAT] Autonomy scan results (idle %ds): ' "$staleness")
 
-            # Append each finding as a bullet
+            # Parse --summary lines into sections dict for API POST
+            local hb_sections="{}"
+            local hb_priority=""
+            local hb_all_clear="false"
             while IFS= read -r scan_line; do
                 [[ -z "$scan_line" ]] && continue
                 if [[ "$scan_line" == "---" ]]; then
@@ -520,12 +523,45 @@ check_supervisor_heartbeat() {
                     continue
                 fi
                 nudge_msg="${nudge_msg}  - ${scan_line}"
+                # Parse "Section: value" lines into JSON sections
+                if [[ "$scan_line" == *": "* ]]; then
+                    local section_key section_val
+                    section_key=$(echo "$scan_line" | cut -d: -f1 | tr '[:upper:]' '[:lower:]' | tr ' ' '_')
+                    section_val=$(echo "$scan_line" | cut -d: -f2- | sed 's/^ *//')
+                    # Escape JSON special chars
+                    section_val=$(echo "$section_val" | sed 's/\\/\\\\/g; s/"/\\"/g')
+                    hb_sections=$(echo "$hb_sections" | jq --arg k "$section_key" --arg v "$section_val" '. + {($k): $v}' 2>/dev/null || echo "$hb_sections")
+                fi
+                # Extract highest priority line
+                if [[ "$scan_line" == "Highest priority:"* ]]; then
+                    hb_priority=$(echo "$scan_line" | sed 's/^Highest priority: *//')
+                fi
             done <<< "$autonomy_output"
 
             nudge_msg="${nudge_msg}  Act on the highest priority item."
             tmux_safe_send "$CMUX_SESSION" "supervisor" "$nudge_msg" --retry 2
+
+            # POST heartbeat data to API (best-effort, 2s timeout)
+            local hb_json
+            hb_json=$(jq -n \
+                --argjson ts "$now" \
+                --argjson sections "$hb_sections" \
+                --arg priority "$hb_priority" \
+                --argjson all_clear "$hb_all_clear" \
+                '{timestamp: $ts, sections: $sections, highest_priority: (if $priority == "" then null else $priority end), all_clear: $all_clear}' 2>/dev/null)
+            if [[ -n "$hb_json" ]]; then
+                curl -sf --max-time 2 -X POST "http://localhost:${CMUX_PORT}/api/heartbeat" \
+                    -H "Content-Type: application/json" \
+                    -d "$hb_json" >/dev/null 2>&1 || true
+            fi
         else
             tmux_safe_send "$CMUX_SESSION" "supervisor" "[HEARTBEAT] Autonomy scan (idle ${staleness}s): All clear — no pending mailbox, backlog, or worker issues found. Look for proactive work: code improvements, test coverage, documentation, or check ./tools/backlog list." --retry 2
+
+            # POST all-clear heartbeat to API (best-effort, 2s timeout)
+            curl -sf --max-time 2 -X POST "http://localhost:${CMUX_PORT}/api/heartbeat" \
+                -H "Content-Type: application/json" \
+                -d "{\"timestamp\": ${now}, \"sections\": {}, \"highest_priority\": null, \"all_clear\": true}" \
+                >/dev/null 2>&1 || true
         fi
         return
     fi

@@ -220,3 +220,22 @@ Built tools/schedule — self-scheduling check-ins for supervisor. Supports add 
 
 ## 07:48 - Resource locking for parallel workers
 Extended lib/filelock.sh with resource_lock/resource_trylock/resource_unlock using flock(2). Created tools/lock CLI with acquire, release, run (auto-release), and status commands. Workers can now coordinate edits to shared files when running in parallel. Updated WORKER_ROLE.md with usage examples. Commit cd2e5ff.
+
+## 07:49 - Session progress: 4 tools shipped
+Post-compaction session has been highly productive. Shipped 4 new tools: (1) tools/watchdog — stuck-agent detection via tmux pane heuristics, integrated into autonomy-check. (2) tools/schedule — self-scheduling check-ins that fire through heartbeat system. (3) tools/lock — flock-based resource locking for parallel worker coordination. (4) lessons-learned.md — memory consolidation distilling 2 days of journal entries into reusable patterns. Also: cleaned stale contexts, archived 180 mailbox messages, seeded forward-looking backlog. All original 13 backlog items completed, 2 remaining (Reflexion pattern, budget tracking). System healthy, 45/45 tests, typecheck clean.
+
+## 07:55 - Starting heartbeat UI task: building backend route, monitor integration, and frontend indicator
+
+## 07:58 - Spawned workers for heartbeat UI and tasks polish
+User requested heartbeat scans visible on frontend — spawned worker-heartbeat-ui for full-stack implementation (POST /api/heartbeat, WebSocket broadcast, HeartbeatIndicator component in Header). Also spawned worker-tasks-polish to fix tasks panel showing 'No tasks for this project' (should show global view) and improve spacing/margins. Removed todo-backend and todo-frontend projects per user request. Both workers actively coding.
+
+## 07:58 - Starting: Fix tasks panel UI — show global tasks by default, polish margins/padding
+
+## 07:58 - Tasks panel global view
+Removing project-scoped filtering from TasksPanel. Previously derived projectFilter from selected agent's project_id, which caused 'No tasks for this project' when an agent was selected. Now fetches all tasks globally by default.
+
+## 07:58 - Heartbeat UI feature complete
+Built full heartbeat display for the CMUX dashboard. Three parts: (1) Backend route src/server/routes/heartbeat.py with POST/GET endpoints, stores in memory, broadcasts via WebSocket. (2) Monitor integration parses autonomy-check summary into JSON and POSTs to API. (3) Frontend HeartbeatIndicator in Header with pulsing dot, dropdown with sections. All verified: typecheck, build, API, browser.
+
+## 07:59 - Heartbeat UI shipped
+Completed the full heartbeat display feature for the CMUX frontend dashboard. Created backend route (heartbeat.py) with POST/GET endpoints that store latest scan in memory and broadcast via WebSocket. Integrated monitor.sh to parse autonomy-check --summary output into a JSON sections dict and POST it to the API after each idle scan. Built HeartbeatIndicator component using shadcn DropdownMenu — shows pulsing colored dot (green=all clear, yellow=items found, red=health/critical) and expands to show each scan section with a live-updating 'Last scan: Xs ago' timer. Used Zustand store for state, wired into useWebSocket.ts. All verified with typecheck, build, API curl tests, and browser testing via Chrome MCP.

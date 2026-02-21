@@ -38,32 +38,6 @@
       "git_remote": "git@github-zonko:zonko-ai/heroweb.git",
       "language": "javascript",
       "description": "Hero web frontend"
-    },
-    {
-      "id": "todo-backend",
-      "name": "todo-backend",
-      "path": "/Users/pankajgarkoti/Desktop/code/todo-backend",
-      "is_self": false,
-      "active": true,
-      "supervisor_agent_id": "ag_v7yivb8e",
-      "hooks_installed": false,
-      "added_at": "2026-02-20T16:19:40Z",
-      "git_remote": "",
-      "language": "unknown",
-      "description": "FastAPI + SQLite todo API backend"
-    },
-    {
-      "id": "todo-frontend",
-      "name": "todo-frontend",
-      "path": "/Users/pankajgarkoti/Desktop/code/todo-frontend",
-      "is_self": false,
-      "active": true,
-      "supervisor_agent_id": "ag_zg0kcdz0",
-      "hooks_installed": false,
-      "added_at": "2026-02-20T16:19:41Z",
-      "git_remote": "",
-      "language": "unknown",
-      "description": "React + Vite + TypeScript todo frontend"
     }
   ]
 }

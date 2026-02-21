@@ -4,6 +4,7 @@ import { useThemeStore } from '../../stores/themeStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useProjects } from '../../hooks/useProjects';
 import { RegisterProjectDialog } from '../projects/RegisterProjectDialog';
+import { HeartbeatIndicator } from '../status/HeartbeatIndicator';
 import { Button } from '../ui/button';
 
 type HeartPhase = 'default' | 'red' | 'beating' | 'shining' | 'star';
@@ -67,6 +68,9 @@ export function Header() {
         <span className="text-xs text-muted-foreground font-mono hidden sm:inline">
           multi-agent orchestrator
         </span>
+
+        {/* Heartbeat indicator — system scan status */}
+        <HeartbeatIndicator />
 
         {/* Heart toggle: default → red → beating(5x) → shining star → static star → default */}
         <Button

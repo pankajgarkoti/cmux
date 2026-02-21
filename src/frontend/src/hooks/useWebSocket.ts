@@ -6,6 +6,7 @@ import { useAgentEventStore } from '../stores/agentEventStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { useAgentStore } from '../stores/agentStore';
 import { useThoughtStore } from '../stores/thoughtStore';
+import { useHeartbeatStore } from '../stores/heartbeatStore';
 import { WS_URL, RECONNECT_DELAY_BASE, RECONNECT_DELAY_MAX } from '../lib/constants';
 import type { Activity } from '../types/activity';
 import type { AgentEvent } from '../types/agent_event';
@@ -22,6 +23,7 @@ export function useWebSocket() {
   const { addSession, removeSession, updateSession } = useSessionStore();
   const { addArchivedAgent, viewArchive, selectedAgentId } = useAgentStore();
   const { addThought } = useThoughtStore();
+  const { setLatest: setLatestHeartbeat } = useHeartbeatStore();
 
   // Calculate delay with exponential backoff
   const getReconnectDelay = useCallback(() => {
@@ -92,6 +94,12 @@ export function useWebSocket() {
           });
         }
 
+        // Handle heartbeat updates from monitor
+        if (data.event === 'heartbeat_update') {
+          setLatestHeartbeat(data.data);
+          return; // Don't add to activity feed
+        }
+
         // Handle new messages for chat UI
         if (data.event === 'new_message' || data.event === 'user_message') {
           queryClient.invalidateQueries({ queryKey: ['messages'] });
@@ -140,6 +148,7 @@ export function useWebSocket() {
         const handledEvents = new Set([
           'agent_event',
           'agent_thought',
+          'heartbeat_update',
           'session_created',
           'session_terminated',
           'session_status_changed',
@@ -181,7 +190,7 @@ export function useWebSocket() {
     };
 
     wsRef.current = ws;
-  }, [setConnected, setReconnecting, addActivity, addEvent, addThought, queryClient, getReconnectDelay, sendPong, addSession, removeSession, updateSession, addArchivedAgent, viewArchive, selectedAgentId]);
+  }, [setConnected, setReconnecting, addActivity, addEvent, addThought, setLatestHeartbeat, queryClient, getReconnectDelay, sendPong, addSession, removeSession, updateSession, addArchivedAgent, viewArchive, selectedAgentId]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {

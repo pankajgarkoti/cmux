@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "id": "s_144d9ef0",
+    "note": "Check worker-heartbeat-ui progress — should have backend endpoint and frontend component by now",
+    "due_at": 1771640847,
+    "created_at": 1771640667
+  }
+]
