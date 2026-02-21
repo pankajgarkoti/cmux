@@ -550,3 +550,8 @@ User called out that I asked 'want me to add this?' when I had already identifie
 
 ## 15:03 - Hook and daemon audit complete
 Audited all 8 hooks and 6 daemons. All hooks functional. Key finding: compact.sh exists and is well-implemented but NOTHING starts it — agents will hit context limits. health.sh is also dead code, superseded by monitor.sh's built-in recovery. Saved full report to .cmux/journal/2026-02-21/artifacts/hook-daemon-audit.md. Recommendation: add start_compact_daemon() to monitor.sh.
+
+## 15:05 - Failure Pattern Analysis Complete
+Analyzed ~550 journal entries across Feb 19-21. Reconstructed the idle loop: Phase 1 was a sentry rapid-fire loop (5 recoveries in 20 min, heartbeat thresholds too aggressive), Phase 2 was 6+ hours of idle-but-alive supervisor ignoring nudges. Top 5 recurring mistakes: (1) supervisor writes code directly, (2) killing workers after DONE, (3) port 8000 conflicts, (4) broken infrastructure assumed to work, (5) asking permission for obvious actions. Key insight: behavioral fixes (docs, MEMORY.md) don't stick across supervisor instances — need mechanical enforcement (hooks, tool-level checks). 10 ranked fix recommendations in artifact.
+
+## 15:05 - Reflection: failure-analysis — what worked: reading all 3 journals in full provided the timeline granularity needed to reconstruct the idle loop precisely. Grep searches confirmed specific timestamps. What I'd do differently: would have also checked conversations.db for heartbeat message records to quantify exactly how many nudges were sent during the 6-hour gap.

@@ -7,8 +7,10 @@
 
 ## Investigate Next
 
-- [ ] Read past journal entries (Feb 19-21) for recurring failure patterns
-- [ ] Analyze why the supervisor sat idle for 5+ hours ignoring heartbeat nudges (journal Feb 21 05:10)
+- [x] Read past journal entries (Feb 19-21) for recurring failure patterns
+  - **Result**: 5 recurring categories, all documented in MEMORY.md before they recurred. Key insight: mechanical enforcement > documentation. See artifacts/failure-pattern-analysis.md.
+- [x] Analyze why the supervisor sat idle for 5+ hours ignoring heartbeat nudges (journal Feb 21 05:10)
+  - **Result**: Two-phase failure. Phase 1: aggressive thresholds caused sentry rapid-fire loop (5 recoveries in 20min). Phase 2: after thresholds fixed, supervisor ACK'd nudges but took no action. Fixed with autonomy-check tool + actionable nudge text. Residual risk: still suggestive not enforced — need --inject mode.
 - [ ] Review the port 8000 conflict incident — what systemic fix prevents this class of error?
 - [ ] Study compaction reliability: 6 findings from Feb 19 investigation, how many are actually fixed?
 - [ ] Check if workers are actually reading their role files or ignoring them
