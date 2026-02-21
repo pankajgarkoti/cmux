@@ -478,3 +478,27 @@ Added frontend support for worker clones in sidebar. Agent type gets clone_of fi
 
 ## 12:22 - Session continuity - clone sidebar task
 Continued from previous session that ran out of context. Completed the clone sidebar display task (commit a443668). Three files changed: added clone_of field to Agent type, implemented clone grouping in Explorer.tsx sidebar sorting, and updated AgentTreeItem.tsx with split-styled clone names (ParentName | task summary), indentation, lighter status indicators, and clone-aware tooltips. All three implementation steps from the supervisor's task spec were completed. Typecheck and build clean.
+
+## 12:26 - Clone system fully deployed
+Completed the clone system for permanent workers across all three layers. Sol built CLI commands (workers clone/merge-clone/list-clones, +214 lines, commit f539d6f). Kai added clone_of and clone_index fields to the Agent model (commit 3fc8393). Mira implemented sidebar UI with indented clone display showing 'ParentName | task' split styling, dimmed icons, and clone tooltips (commit a443668). All verified — typecheck clean, build passing, system healthy. Also committed hero project dry-run role files (hero-squad-lead, hero-backend, hero-frontend, hero-tester) ready for deployment. Backlog remaining: content-based message dedup (P3) and agent budget tracking (P4).
+
+## 12:28 - Content-based message dedup
+Closed backlog item 206c8978. Extended the collapsedMessages useMemo in both ChatMessages.tsx and InboxView.tsx to detect and collapse consecutive identical messages from the same sender. When duplicates are found, only the last message renders with a ×N badge next to the timestamp. System notification collapse continues to work as before. Commit 621e26e, 3 files changed.
+
+## 12:31 - Session wrap-up — clone system + dedup complete
+Completed all pending work from the clone system feature request. Three parallel tracks landed: Sol built clone/merge-clone/list-clones CLI commands (+214 lines, f539d6f), Kai added clone_of/clone_index to Agent model (3fc8393), Mira implemented clone sidebar UI with indented split-styled display (a443668). Also closed the P3 backlog item for content-based message dedup (621e26e) — extended collapsedMessages useMemo in both ChatMessages.tsx and InboxView.tsx to collapse consecutive identical messages from the same sender with a ×N badge. Hero project role files pre-generated and committed. System healthy, all 8 permanent workers online, backlog down to 1 P4-low item.
+
+## 12:43 - Starting task: Extract usage/token data from transcripts in Stop hook (notify-complete.sh)
+
+## 12:43 - Budget tracking delegated to team
+Picked up the last backlog item (7966ee6a) — agent budget tracking. Researched the data pipeline: Claude Code transcripts contain usage objects with input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens on every assistant message. Delegated three parallel tracks: Sol updates the Stop hook to extract and send usage data, Kai builds backend model/storage/aggregation API (GET /api/budget), Mira adds compact token count indicator to agent sidebar. Keeping scope minimal — just token counts, no cost calculations or budget limits in v1.
+
+## 12:44 - Added usage/token extraction to Stop hook. Extracts 4 token fields from transcript's last assistant message, includes in API payload. Tested against real transcript + null fallback.
+
+## 12:44 - Implementing budget tracking: model updated, store_event + migration + aggregation queries done, budget.py route created. Wiring up main.py and tests next.
+
+## 12:45 - Token usage tracking and budget endpoints
+Added full token usage tracking pipeline for agent budget monitoring. AgentEvent model gets a usage dict field (input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens). conversation_store stores usage as JSON in a new column on agent_events (with ALTER TABLE migration for existing DBs). Budget aggregation uses SQLite json_extract to SUM token fields per agent. Two new endpoints: GET /api/budget (all agents) and GET /api/budget/{agent_id} (single agent with recent events). 5 new tests, all 55 passing. Commit 7601dbf.
+
+## 12:45 - Budget token display in sidebar
+Added frontend budget/token usage display to agent sidebar. New getBudget() API call in api.ts with BudgetResponse type. Explorer.tsx fetches budget data via React Query (staleTime 30s), builds tokensByAgent map, passes through ProjectAgentGroup to AgentTreeItem. AgentTreeItem shows compact token count in text-muted-foreground/60. Only renders when totalTokens > 0. Backend endpoint not yet live (Kai building), so UI gracefully shows nothing until data is available.
