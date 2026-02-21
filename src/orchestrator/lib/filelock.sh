@@ -62,3 +62,82 @@ tmux_send_lock() {
 tmux_send_unlock() {
     eval "exec ${_CMUX_TMX_LOCK_FD}>&-"
 }
+
+#-------------------------------------------------------------------------------
+# Resource locking for parallel worker coordination
+# Prevents two workers from editing the same file simultaneously.
+# Uses a named lock derived from the resource path.
+#
+# Usage:
+#   resource_lock "src/server/routes/agents.py"
+#   # ... edit the file ...
+#   resource_unlock
+#
+# Or with timeout (non-blocking, returns 1 if lock not acquired):
+#   resource_trylock "src/server/routes/agents.py" 5   # 5 second timeout
+#-------------------------------------------------------------------------------
+
+_CMUX_RES_LOCK_FD=7
+_CMUX_RES_LOCKDIR="/tmp/cmux-resource-locks"
+
+_resource_lockfile() {
+    local resource="$1"
+    mkdir -p "$_CMUX_RES_LOCKDIR"
+    # Hash the resource path to get a safe filename
+    local hash
+    hash=$(echo -n "$resource" | md5sum 2>/dev/null | cut -d' ' -f1 || echo -n "$resource" | md5 2>/dev/null)
+    echo "${_CMUX_RES_LOCKDIR}/${hash}.lock"
+}
+
+resource_lock() {
+    local resource="$1"
+    local lockfile
+    lockfile=$(_resource_lockfile "$resource")
+
+    # Write the resource path and holder into the lockfile for debugging
+    eval "exec ${_CMUX_RES_LOCK_FD}>\"${lockfile}\""
+
+    if command -v flock &>/dev/null; then
+        flock -x ${_CMUX_RES_LOCK_FD}
+    else
+        python3 -c "import fcntl; fcntl.flock(${_CMUX_RES_LOCK_FD}, fcntl.LOCK_EX)"
+    fi
+
+    # Record holder info for debugging
+    echo "${CMUX_AGENT_NAME:-unknown} $(date +%s) $resource" >&${_CMUX_RES_LOCK_FD}
+}
+
+resource_trylock() {
+    local resource="$1"
+    local timeout="${2:-0}"
+    local lockfile
+    lockfile=$(_resource_lockfile "$resource")
+
+    eval "exec ${_CMUX_RES_LOCK_FD}>\"${lockfile}\""
+
+    if command -v flock &>/dev/null; then
+        if ((timeout > 0)); then
+            flock -x -w "$timeout" ${_CMUX_RES_LOCK_FD}
+        else
+            flock -x -n ${_CMUX_RES_LOCK_FD}
+        fi
+    else
+        python3 -c "
+import fcntl, time, sys
+timeout = $timeout
+start = time.time()
+while True:
+    try:
+        fcntl.flock(${_CMUX_RES_LOCK_FD}, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        break
+    except BlockingIOError:
+        if timeout == 0 or time.time() - start >= timeout:
+            sys.exit(1)
+        time.sleep(0.1)
+"
+    fi
+}
+
+resource_unlock() {
+    eval "exec ${_CMUX_RES_LOCK_FD}>&-"
+}

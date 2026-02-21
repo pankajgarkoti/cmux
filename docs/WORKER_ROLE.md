@@ -210,6 +210,23 @@ Certain system resources are reserved for CMUX infrastructure. Using them will b
 | 5000, 5173 | Vite, Flask defaults |
 | 8001, 8080, 9000 | Backend API servers |
 
+### Parallel Worker Coordination — File Locks
+
+When multiple workers run in parallel, use `tools/lock` to prevent edit conflicts on shared files:
+
+```bash
+./tools/lock run "src/server/routes/agents.py" -- git add src/server/routes/agents.py
+```
+
+Or acquire/release manually:
+```bash
+./tools/lock acquire "src/server/routes/agents.py"
+# ... edit, test, commit ...
+./tools/lock release "src/server/routes/agents.py"
+```
+
+Locks auto-release if your process crashes. Use `./tools/lock status` to see active locks.
+
 ### .cmux/ Directory
 
 Do not delete, move, or restructure files in `.cmux/`. This is CMUX runtime state — mailbox, journal, agent registry, task database. You may **read** files here and **append** to the journal, but do not modify structure.
