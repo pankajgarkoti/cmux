@@ -208,3 +208,6 @@ Resumed session after compaction. All major user tasks from previous session com
 
 ## 06:54 - Memory consolidation complete
 Distilled 2 days of journal entries (Feb 20-21, ~200 entries) into reusable semantic knowledge. Created lessons-learned.md with 12 categories: architecture/ports, worker management, heartbeat/autonomy, frontend patterns, API development, delegation, self-improvement, testing, recovery. Updated MEMORY.md with new Technical Patterns section covering FastAPI routing, CSS theming, TabsContent layout, uvicorn reloads, port reservation. This is the first implementation of the memory consolidation pipeline from the research report.
+
+## 06:56 - Building stuck-agent watchdog
+Created tools/watchdog — a CLI tool that scans all agent tmux windows for stuck patterns using pane content heuristics. Detects: permission prompts, plan mode, interactive questions, process exit, error loops, git conflicts, resource exhaustion, rate limiting. First test revealed false positives from loose regex matching text about plan mode vs actual plan mode UI. Tightened patterns to match only Claude Code's actual UI indicators (line-starting permission format, plan approval prompt, numbered options).
