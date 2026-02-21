@@ -175,3 +175,5 @@
 [2026-02-21T06:24:56+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'worker-mention-routing' missing from tmux
 [2026-02-21T06:29:56+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'worker-mention-routing' missing from tmux
 [2026-02-21T06:34:56+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'worker-mention-routing' missing from tmux
+[2026-02-21T06:39:56+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'worker-mention-routing' missing from tmux
+[2026-02-21T06:44:57+05:30] system:log-watcher -> cmux:supervisor: [ALERT] Registered agent 'worker-mention-routing' missing from tmux
