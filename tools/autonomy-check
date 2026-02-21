@@ -80,15 +80,23 @@ if [[ -f "$CMUX_MAILBOX" ]] && [[ -s "$CMUX_MAILBOX" ]]; then
             fi
             [[ -n "$sender" ]] && senders+=("$sender")
 
-            # Extract message type tag — match as standalone prefix (not embedded in other text)
-            # Use word-boundary-like anchoring: tag at start of subject or after whitespace/quote
-            if echo "$line" | grep -qE '(^|[" ])\[BLOCKED\]'; then
+            # Extract subject field, then match tag at the START of subject only
+            # JSON format: "subject":"[TAG] ..." → extract after "subject":"
+            # Plain text: -> target: [TAG] ... → extract after ": "
+            local subject=""
+            if echo "$line" | grep -q '"subject"'; then
+                subject=$(echo "$line" | sed -n 's/.*"subject":"\([^"]*\)".*/\1/p')
+            else
+                subject=$(echo "$line" | sed -n 's/.*-> [^:]*: *\(.*\)/\1/p')
+            fi
+
+            if echo "$subject" | grep -qE '^\[BLOCKED\]'; then
                 ((blocked_count++))
-            elif echo "$line" | grep -qE '(^|[" ])\[DONE\]'; then
+            elif echo "$subject" | grep -qE '^\[DONE\]'; then
                 ((done_count++))
-            elif echo "$line" | grep -qE '(^|[" ])\[STATUS\]'; then
+            elif echo "$subject" | grep -qE '^\[STATUS\]'; then
                 ((status_count++))
-            elif echo "$line" | grep -qE '(^|[" ])\[QUESTION\]'; then
+            elif echo "$subject" | grep -qE '^\[QUESTION\]'; then
                 ((question_count++))
             else
                 ((other_count++))
