@@ -5,6 +5,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useProjects } from '../../hooks/useProjects';
 import { RegisterProjectDialog } from '../projects/RegisterProjectDialog';
 import { HeartbeatIndicator } from '../status/HeartbeatIndicator';
+import { BudgetStatusline } from '../budget/BudgetPanel';
 import { Button } from '../ui/button';
 
 export function Header() {
@@ -65,6 +66,10 @@ export function Header() {
         <span className="text-xs text-muted-foreground font-mono hidden sm:inline">
           multi-agent orchestrator
         </span>
+
+        <div className="h-4 w-px bg-border" />
+
+        <BudgetStatusline />
 
         <div className="h-4 w-px bg-border" />
 
