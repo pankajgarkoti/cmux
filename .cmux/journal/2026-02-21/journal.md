@@ -569,3 +569,14 @@ Completed the highest-priority finding from the hook/daemon audit: compact.sh wa
 
 ## 15:20 - Compact daemon wiring complete
 Wired compact.sh into monitor.sh as the final step of the hook/daemon audit. The compact daemon was fully implemented but dead code — nothing started it. Added start_compact_daemon() following the identical pattern as start_router() and start_journal_nudge(), with four integration points: function definition, Phase 6 startup call in main(), dashboard loop auto-restart check, and cleanup kill on shutdown. Commit d210784. Now awaiting next task from supervisor.
+
+## 15:21 - Delete dead code health.sh
+Removed src/orchestrator/health.sh (400+ lines) — dead code confirmed by the hook/daemon audit. Its multi-stage recovery logic was fully absorbed into monitor.sh's attempt_recovery(). Updated 8 files that still referenced health.sh as active: CLAUDE.md, README.md, docs/SELF_IMPROVEMENT_GUIDE.md, docs/CONCEPTS.md, docs/README.md, docs/templates/roles/REVIEWER.md, monitor.sh comment, perm-infra-role.md. All now point to monitor.sh as the recovery system. No journal/archive entries updated — those are historical records.
+
+## 15:25 - health.sh cleanup complete
+Deleted src/orchestrator/health.sh and updated all 8 live references across docs and configs. Decision: option 1 (full delete) because grep confirmed nothing sources or calls health.sh — its recovery logic was fully absorbed into monitor.sh's attempt_recovery(). Updated CLAUDE.md, README.md, SELF_IMPROVEMENT_GUIDE.md, CONCEPTS.md, docs/README.md, REVIEWER.md, monitor.sh comment, and perm-infra-role.md. Journal/archive entries left as historical records. Commit cc1ddbb, -492 lines.
+
+## 15:34 - Enrich sentry recovery briefing
+Enhanced the sentry recovery briefing in monitor.sh so recovered supervisors get immediate context instead of a clean slate. Added four new context sources: top 3 backlog items from tasks.db, last 5 mailbox message subjects, tail of today's journal.md, and today's reflection.md path. The briefing is now written to sentry-briefing.md as a file the supervisor reads, rather than a single-line tmux send-keys. Includes concrete action items: read reflection, run autonomy-check, resume operations.
+
+## 15:34 - Built tools/system-verify (ac79f86). 29 checks across hooks, daemons, health, files, tmux. Runs in <5s.
