@@ -252,5 +252,27 @@
     "role_context": "/Users/pankajgarkoti/Desktop/code/oss/cmux/.cmux/worker-contexts/heroweb-tester-role.md",
     "tasks_since_reset": 0,
     "reset_count": 0
+  },
+  "hero-research": {
+    "registered_at": "2026-02-21T11:03:24Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-21T11:03:24Z",
+    "agent_id": "ag_59k104m4",
+    "display_name": "Archivist",
+    "role": "permanent-worker",
+    "project_id": "hero",
+    "permanent": true
+  },
+  "heroweb-research": {
+    "registered_at": "2026-02-21T11:03:36Z",
+    "type": "worker",
+    "created_by": "tools/workers",
+    "created_at": "2026-02-21T11:03:36Z",
+    "agent_id": "ag_1rdlxtbe",
+    "display_name": "Scout",
+    "role": "permanent-worker",
+    "project_id": "heroweb",
+    "permanent": true
   }
 }
