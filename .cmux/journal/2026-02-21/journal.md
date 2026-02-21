@@ -580,3 +580,9 @@ Deleted src/orchestrator/health.sh and updated all 8 live references across docs
 Enhanced the sentry recovery briefing in monitor.sh so recovered supervisors get immediate context instead of a clean slate. Added four new context sources: top 3 backlog items from tasks.db, last 5 mailbox message subjects, tail of today's journal.md, and today's reflection.md path. The briefing is now written to sentry-briefing.md as a file the supervisor reads, rather than a single-line tmux send-keys. Includes concrete action items: read reflection, run autonomy-check, resume operations.
 
 ## 15:34 - Built tools/system-verify (ac79f86). 29 checks across hooks, daemons, health, files, tmux. Runs in <5s.
+
+## 15:35 - Task inject mode in progress
+Working on adding --inject mode to heartbeat nudge escalation. After 3 unanswered nudges, monitor.sh will force-inject a backlog task (or reflection task) before escalating to sentry. Added TASK_INJECTED state variable and reset logic. Now implementing the injection step between nudge exhaustion and sentry spawn.
+
+## 15:36 - Task injection escalation step
+Added --inject mode to heartbeat nudge escalation in monitor.sh. After 3 unanswered nudges, the monitor now force-injects a [TASK] message before resorting to sentry. Queries sqlite3 tasks.db for highest-priority backlog/pending item; falls back to a reflection.md task if backlog is empty. Resets nudge counter after injection so supervisor gets another full cycle to respond. New state variable TASK_INJECTED tracks whether injection has occurred (reset with other heartbeat state). Flow: nudge x3 → inject task → nudge x3 → sentry if still dead.
