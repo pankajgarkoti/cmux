@@ -217,3 +217,6 @@ Completed 5 commits after session compaction. (1) Cleaned up stale sup-hello-wor
 
 ## 07:14 - Self-scheduling + backlog refresh
 Built tools/schedule — self-scheduling check-ins for supervisor. Supports add (seconds), add-at (HH:MM), list, fire (called by autonomy-check), clear. Integrated into autonomy-check as Reminders section. Also cleaned up 4 stale in-progress backlog items and seeded 3 new forward-looking items from research report: lock-based parallel worker coordination, Reflexion pattern for task improvement, agent budget tracking. All 13 original backlog items now completed.
+
+## 07:48 - Resource locking for parallel workers
+Extended lib/filelock.sh with resource_lock/resource_trylock/resource_unlock using flock(2). Created tools/lock CLI with acquire, release, run (auto-release), and status commands. Workers can now coordinate edits to shared files when running in parallel. Updated WORKER_ROLE.md with usage examples. Commit cd2e5ff.
