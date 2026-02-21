@@ -600,7 +600,10 @@ check_supervisor_heartbeat() {
             local today
             today=$(date +%Y-%m-%d)
             local reflection_path=".cmux/journal/${today}/reflection.md"
-            tmux_safe_send "$CMUX_SESSION" "supervisor" "[HEARTBEAT] Idle for ${staleness}s. Read ${reflection_path} for your self-improvement queue, then: (1) Check pending work — mailbox, worker status, backlog. (2) If nothing pending, work through the Investigate Next items in your reflection file. (3) Update the reflection file with any new findings — mistakes, patterns, ideas. (4) Commit the updated reflection file to git. Never just sit idle." --retry 2
+            tmux_safe_send "$CMUX_SESSION" "supervisor" "[HEARTBEAT] You have been idle for ${staleness}s with no tool activity. Check for pending work — mailbox, worker status, journal TODOs — or find proactive work to do." --retry 2
+
+            # Second message: reference AMBITION.md for self-improvement work
+            tmux_safe_send "$CMUX_SESSION" "supervisor" "[AMBITION] Read .cmux/AMBITION.md for your growth agenda. Pick an unchecked short-term goal, spawn a worker to investigate or implement it. Update the file with results. If all short-term goals are done, advance a long-term goal. Never just sit idle — improve something." --retry 2
 
             # POST all-clear heartbeat to API (best-effort, 2s timeout)
             curl -sf --max-time 2 -X POST "http://localhost:${CMUX_PORT}/api/heartbeat" \
