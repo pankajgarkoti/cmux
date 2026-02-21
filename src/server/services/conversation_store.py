@@ -360,6 +360,68 @@ class ConversationStore:
         """Get all messages involving a specific agent."""
         return self.get_messages(limit=limit, agent_id=agent_id)
 
+    def get_inbox(
+        self,
+        agent_id: str,
+        limit: int = 200,
+        offset: int = 0,
+    ) -> tuple[Optional[Message], List[Message], int]:
+        """Get inbox data for an agent: pinned task, messages, and total count.
+
+        Returns:
+            Tuple of (pinned_task, messages, total_count).
+            pinned_task is the first [TASK] message sent TO this agent, or None.
+            messages are ordered ASC (oldest first) for inbox view.
+        """
+        with self._get_connection() as conn:
+            # 1. Pinned task: first [TASK] message sent TO this agent
+            cursor = conn.execute(
+                """
+                SELECT * FROM messages
+                WHERE to_agent = ? AND content LIKE '[TASK]%'
+                ORDER BY timestamp ASC
+                LIMIT 1
+                """,
+                (agent_id,),
+            )
+            pinned_row = cursor.fetchone()
+            pinned_task = self._row_to_message(pinned_row) if pinned_row else None
+
+            # 2. Total count of messages involving this agent
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM messages WHERE from_agent = ? OR to_agent = ?",
+                (agent_id, agent_id),
+            )
+            total = cursor.fetchone()[0]
+
+            # 3. Messages involving this agent, ordered ASC (oldest first)
+            cursor = conn.execute(
+                """
+                SELECT * FROM messages
+                WHERE from_agent = ? OR to_agent = ?
+                ORDER BY timestamp ASC
+                LIMIT ? OFFSET ?
+                """,
+                (agent_id, agent_id, limit, offset),
+            )
+            messages = [self._row_to_message(row) for row in cursor.fetchall()]
+
+            return pinned_task, messages, total
+
+    @staticmethod
+    def _row_to_message(row: sqlite3.Row) -> Message:
+        """Convert a database row to a Message model."""
+        return Message(
+            id=row["id"],
+            timestamp=datetime.fromisoformat(row["timestamp"]),
+            from_agent=row["from_agent"],
+            to_agent=row["to_agent"],
+            type=MessageType(row["type"]),
+            content=row["content"],
+            metadata=json.loads(row["metadata"]) if row["metadata"] else None,
+            task_status=TaskStatus(row["task_status"]) if row["task_status"] else None,
+        )
+
     # --- Agent Events ---
 
     def store_event(self, event_data: dict) -> None:

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional
 import uuid
 
-from ..models.message import Message, MessageList, UserMessage, InternalMessage, MessageType, TaskStatus, StatusUpdateRequest
+from ..models.message import Message, MessageList, UserMessage, InternalMessage, InboxResponse, MessageType, TaskStatus, StatusUpdateRequest
 from ..services.mailbox import mailbox_service
 from ..services.conversation_store import conversation_store
 
@@ -38,6 +38,26 @@ async def get_tasks(
     """Get all messages with task lifecycle status, optionally filtered by status."""
     messages = conversation_store.get_tasks(status=status, limit=limit, offset=offset)
     return MessageList(messages=messages, total=len(messages))
+
+
+@router.get("/inbox/{agent_id}", response_model=InboxResponse)
+async def get_inbox(
+    agent_id: str,
+    limit: int = Query(default=200, le=500),
+    offset: int = Query(default=0, ge=0),
+):
+    """Get inbox for an agent: pinned task assignment and all messages.
+
+    Returns the first [TASK] message sent to this agent as the pinned task,
+    plus all messages where the agent is sender or recipient, ordered
+    timestamp ASC (oldest first).
+    """
+    pinned_task, messages, total = conversation_store.get_inbox(
+        agent_id=agent_id,
+        limit=limit,
+        offset=offset,
+    )
+    return InboxResponse(pinned_task=pinned_task, messages=messages, total=total)
 
 
 @router.patch("/{message_id}/status")

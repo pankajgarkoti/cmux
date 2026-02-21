@@ -54,6 +54,13 @@ class InternalMessage(BaseModel):
     task_status: Optional[TaskStatus] = None
 
 
+class InboxResponse(BaseModel):
+    """Response for the agent inbox endpoint."""
+    pinned_task: Optional[Message] = None
+    messages: list[Message]
+    total: int
+
+
 class StatusUpdateRequest(BaseModel):
     """Request to update a message's task lifecycle status."""
     status: TaskStatus

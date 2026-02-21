@@ -150,3 +150,106 @@ def test_update_message_status_invalid(client):
         "status": "invalid-status"
     })
     assert response.status_code == 422
+
+
+def test_get_inbox_empty(client):
+    """Test inbox for agent with no messages."""
+    response = client.get("/api/messages/inbox/nonexistent-agent")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["pinned_task"] is None
+    assert data["messages"] == []
+    assert data["total"] == 0
+
+
+def test_get_inbox_with_messages(client):
+    """Test inbox returns messages involving the agent, ordered ASC."""
+    # Send messages to and from the agent
+    client.post("/api/messages/internal", json={
+        "from_agent": "supervisor",
+        "to_agent": "worker-inbox",
+        "content": "Hello worker",
+    })
+    client.post("/api/messages/internal", json={
+        "from_agent": "worker-inbox",
+        "to_agent": "supervisor",
+        "content": "Hello supervisor",
+    })
+
+    response = client.get("/api/messages/inbox/worker-inbox")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] >= 2
+    assert len(data["messages"]) >= 2
+    # Verify ASC order — content we inserted should appear in order
+    contents = [m["content"] for m in data["messages"]]
+    hw_idx = contents.index("Hello worker")
+    hs_idx = contents.index("Hello supervisor")
+    assert hw_idx < hs_idx, "Messages should be in ASC timestamp order"
+
+
+def test_get_inbox_pinned_task(client):
+    """Test inbox returns first [TASK] message as pinned_task."""
+    # Send a task assignment
+    client.post("/api/messages/internal", json={
+        "from_agent": "supervisor",
+        "to_agent": "worker-pinned",
+        "content": "[TASK] Fix the login bug",
+    })
+    # Send a follow-up task (should NOT be pinned — only first counts)
+    client.post("/api/messages/internal", json={
+        "from_agent": "supervisor",
+        "to_agent": "worker-pinned",
+        "content": "[TASK] Also fix the logout bug",
+    })
+    # Send a regular message
+    client.post("/api/messages/internal", json={
+        "from_agent": "worker-pinned",
+        "to_agent": "supervisor",
+        "content": "[STATUS] Working on it",
+    })
+
+    response = client.get("/api/messages/inbox/worker-pinned")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["pinned_task"] is not None
+    assert data["pinned_task"]["content"] == "[TASK] Fix the login bug"
+    assert data["total"] >= 3
+    assert len(data["messages"]) >= 3
+
+
+def test_get_inbox_no_pinned_task_without_task_prefix(client):
+    """Test inbox returns null pinned_task when no [TASK] messages exist."""
+    client.post("/api/messages/internal", json={
+        "from_agent": "supervisor",
+        "to_agent": "worker-notask",
+        "content": "Just a regular message",
+    })
+
+    response = client.get("/api/messages/inbox/worker-notask")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["pinned_task"] is None
+    assert data["total"] >= 1
+
+
+def test_get_inbox_pagination(client):
+    """Test inbox respects limit and offset params."""
+    for i in range(5):
+        client.post("/api/messages/internal", json={
+            "from_agent": "supervisor",
+            "to_agent": "worker-page",
+            "content": f"Message {i}",
+        })
+
+    # Fetch with limit=2 — should return exactly 2 messages
+    response = client.get("/api/messages/inbox/worker-page?limit=2&offset=0")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] >= 5
+    assert len(data["messages"]) == 2
+
+    # Fetch page 2
+    response = client.get("/api/messages/inbox/worker-page?limit=2&offset=2")
+    data = response.json()
+    assert len(data["messages"]) == 2
