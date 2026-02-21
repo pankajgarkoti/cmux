@@ -364,6 +364,7 @@ HEARTBEAT_MAX_NUDGES=${CMUX_HEARTBEAT_MAX_NUDGES:-3}     # failed nudges before 
 HEARTBEAT_OBSERVE_TIMEOUT=${CMUX_HEARTBEAT_OBSERVE_TIMEOUT:-1200}  # seconds of FROZEN output before escalating
 NUDGE_COUNT=0               # how many consecutive nudges sent without heartbeat response
 NUDGE_SENT_AT=0             # timestamp when last nudge was sent (0 = not sent)
+TASK_INJECTED=0             # whether a task has been force-injected after nudges failed (0=no, 1=yes)
 OBSERVE_STARTED_AT=0        # timestamp when observation mode began (0 = not observing)
 OBSERVE_PANE_HASH=""         # md5 hash of last captured pane output during observation
 OBSERVE_FROZEN_SINCE=0       # timestamp when pane output last changed (frozen timer starts here)
@@ -378,6 +379,7 @@ SENTRY_STARTED_AT=${SENTRY_STARTED_AT:-0}           # timestamp when sentry was 
 reset_heartbeat_state() {
     NUDGE_COUNT=0
     NUDGE_SENT_AT=0
+    TASK_INJECTED=0
     OBSERVE_STARTED_AT=0
     OBSERVE_PANE_HASH=""
     OBSERVE_FROZEN_SINCE=0
@@ -609,12 +611,43 @@ check_supervisor_heartbeat() {
         return
     fi
 
-    # All nudges exhausted — liveness check before sentry.
-    # An idle supervisor at prompt with a live process is not stuck, just quiet.
+    # All nudges exhausted — try task injection before sentry.
+    # If we haven't injected a task yet, force one in and give another nudge cycle.
+    if ((TASK_INJECTED == 0)) && is_supervisor_process_alive; then
+        TASK_INJECTED=1
+        local inject_msg=""
+
+        # Query backlog for highest-priority pending item
+        local backlog_row=""
+        backlog_row=$(sqlite3 "${CMUX_PROJECT_ROOT}/.cmux/tasks.db" \
+            "SELECT id, title FROM tasks WHERE status IN ('backlog','pending') ORDER BY priority LIMIT 1;" 2>/dev/null || true)
+
+        if [[ -n "$backlog_row" ]]; then
+            local task_id task_title
+            task_id=$(echo "$backlog_row" | cut -d'|' -f1)
+            task_title=$(echo "$backlog_row" | cut -d'|' -f2-)
+            inject_msg="[TASK] ${task_title} (from backlog item ${task_id})"
+        else
+            local today
+            today=$(date +%Y-%m-%d)
+            inject_msg="[TASK] Read .cmux/journal/${today}/reflection.md and work through the next investigation item."
+        fi
+
+        printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - injecting task after ${NUDGE_COUNT} failed nudges\n"
+        log_status "HEARTBEAT" "Supervisor ignored ${NUDGE_COUNT} nudges, force-injecting task: ${inject_msg}"
+        tmux_safe_send "$CMUX_SESSION" "supervisor" "$inject_msg" --retry 2
+
+        # Reset nudge counter to give supervisor another cycle to respond to injected task
+        NUDGE_COUNT=0
+        NUDGE_SENT_AT=$now
+        return
+    fi
+
+    # Task already injected and supervisor still idle — liveness check before sentry.
     if is_supervisor_process_alive; then
-        printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - alive at prompt after ${NUDGE_COUNT} nudges (not stuck)\n"
-        log_status "HEARTBEAT" "Supervisor idle (${staleness}s) after ${NUDGE_COUNT} nudges, but process alive + at prompt — not stuck"
-        # Reset nudge cycle so we'll nudge again next round
+        printf "  Heartbeat:  ${YELLOW}●${NC} idle (${staleness}s) - alive at prompt after task injection + ${NUDGE_COUNT} nudges (not stuck)\n"
+        log_status "HEARTBEAT" "Supervisor idle (${staleness}s) after task injection + ${NUDGE_COUNT} nudges, but process alive + at prompt — not stuck"
+        # Full reset including TASK_INJECTED — start over
         reset_heartbeat_state
         return
     fi
