@@ -355,3 +355,39 @@ Implemented all 7 changes from the debate rebuttal plan: --permanent flag on spa
 ## 09:34 - Kai (perm-backend) online. Permanent backend worker initialized and ready for tasks.
 
 ## 09:35 - Sol (perm-infra) online. Permanent infrastructure engineer initialized. Awaiting tasks.
+
+## 09:35 - Permanent team deployed — Mira, Kai, Sol
+Permanent worker system fully implemented and deployed. Infrastructure: tools/workers extended with --permanent flag, workers reset (graceful context reset preserving identity), workers kill --force (deletion protection with audit log), workers assign (task assignment shorthand). Pre-compact hook created for state capture. stop-gate.sh updated for permanent workers. auto-maintenance updated to protect permanent workers. Backend: Agent model extended with permanent/role_context/reset_count/tasks_since_reset fields. Frontend: teal PERM badge in agent sidebar, Permanent badge in chat header with reset/task counters. Three permanent workers deployed: Mira (frontend, meticulous pixel-perfectionist), Kai (backend, calm methodical data thinker), Sol (infra, cautious safety-first guardian). All idle and awaiting task assignments.
+
+## 09:36 - Permanent team fully operational
+All permanent team implementation complete and deployed. Mira (frontend), Kai (backend), Sol (infra) are online and idle awaiting tasks. Seven commits this session covering thought stream bug fixes, permanent worker infrastructure (tools/workers extensions, pre-compact hook, stop-gate, auto-maintenance), backend/frontend support (Agent model fields, teal PERM badges, chat header counters), role context files with distinct personalities, and the deployment milestone. Backlog items for doubled thoughts and assistant-as-thoughts marked done. Next steps: assign tasks to permanent workers from backlog, monitor utilization over the coming week to validate the 3-worker decision from the debate.
+
+## 09:58 - Fixed lost messages when PreToolUse hook blocks tool calls. block-interactive.sh now extracts assistant text from transcript_path and POSTs to /api/messages/internal before blocking. Tested with mock transcripts — normal text, [SYS] prefix, and empty cases all handled correctly.
+
+## 09:59 - Fix lost messages on blocked tool calls
+When block-interactive.sh rejects AskUserQuestion/EnterPlanMode for unattended CMUX agents, the agent turn aborts before the Stop event fires. This meant the assistant's text from that turn was silently dropped. Fixed by adding transcript extraction logic to the hook: it reads transcript_path from stdin JSON, extracts the last assistant text block via jq, and POSTs it to /api/messages/internal before exiting with the block code. The curl is fire-and-forget with --max-time 3 so it cannot delay the hook. Also handles [SYS] prefix detection to match agent_events.py behavior. All 45 existing tests pass. Commit 06a70f0.
+
+## 09:59 - Starting task 63c59df4: Auto-detect and submit stuck paste buffers in tmux
+
+## 10:01 - Auto-detect stuck paste buffers
+Added tmux_unstick_paste() and tmux_sweep_stuck_pastes() to lib/tmux.sh. Integrated into tmux_send_keys() post-Enter, tools/workers cmd_send() post-send, and monitor.sh dashboard loop. All three scripts pass bash -n syntax check. Tested sweep against live cmux session — scans all windows correctly.
+
+## 10:01 - Reflection: paste-buffer-detect — what worked: clean implementation across all 3 layers, syntax-checked all files, tested sweep against live session. What I'd do differently: nothing, task was well-scoped.
+
+## 10:02 - Starting task 2cf80f3d: Show permanent worker given names in sidebar with tooltip. Exploring key files now.
+
+## 10:04 - Display names task progress
+Working on task 2cf80f3d: showing permanent worker given names in UI. Completed: AgentTreeItem tooltip (shows agent name + role on hover when display_name differs), ChatHeader uses display_name as title with technical name in subtitle, ChatMessage shows display_name with tooltip for technical name, ChatInput @mention dropdown swapped emphasis (given name bold, agent.id lighter). All typecheck + build passing. Verifying in browser now.
+
+## 10:06 - Completed task 2cf80f3d: display names in sidebar, chat header, chat messages, and @mention dropdown. Commit 30384a0.
+
+## 10:06 - Starting task 73447cf9: message prefix badges + unified badge labels across UI.
+
+## 10:09 - Prefix badges + unified labels
+Task 73447cf9: Added message prefix badge parsing ([TASK], [DONE], [STATUS], etc.) as styled colored badges stripped from content. Unified badge labels (SUP/P-SUP/PERM/WRK) via shared getAgentBadgeLabel/getAgentBadgeColor helpers in utils.ts, used across AgentTreeItem, ChatMessage, and ChatInput @mention dropdown. Typecheck + build clean. Verified TASK badge in browser.
+
+## 10:11 - Task 73447cf9: Prefix badges + unified agent labels
+Completed both sub-tasks. (1) Added parseMessagePrefix() to utils.ts that parses [TASK], [DONE], [STATUS], [UPDATE], [BLOCKED], [QUESTION], [PRIORITY], [COMPLETE], [REVIEW-REQUEST], [TASK-CANCEL] prefixes and renders them as styled colored Badge components in ChatMessage, stripping the prefix from displayed text. (2) Extracted getAgentBadgeLabel() and getAgentBadgeColor() into shared utils.ts, replacing duplicated inline logic across AgentTreeItem, ChatMessage, and ChatInput. All three locations now use consistent SUP/P-SUP/PERM/WRK labels with matching colors. Commit a760bbd.
+
+## 10:15 - Move prefix badges inline
+Moved message prefix badges (TASK, DONE, STATUS, UPDATE, etc.) from a separate div above message content into the header row, inline alongside agent name, role badge (SUP/PERM/WRK), and timestamp. Reduced badge height from h-5 to h-4 to match the role badge sizing. Commit a8ba40f.
