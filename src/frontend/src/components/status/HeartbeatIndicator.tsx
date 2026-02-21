@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Activity, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { Heart, Clock, Inbox, Users, ListTodo, Monitor, Shield, Bell, GitBranch, Activity } from 'lucide-react';
 import { useHeartbeatStore } from '../../stores/heartbeatStore';
 import { cn } from '../../lib/utils';
 import { API_BASE } from '../../lib/constants';
@@ -12,9 +12,23 @@ import {
 } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
 
+const SECTION_ICONS: Record<string, typeof Inbox> = {
+  mailbox: Inbox,
+  workers: Users,
+  backlog: ListTodo,
+  supervisors: Monitor,
+  watchdog: Shield,
+  reminders: Bell,
+  git: GitBranch,
+  health: Activity,
+};
+
+type HeartStatus = 'idle' | 'clear' | 'active' | 'alert';
+
 export function HeartbeatIndicator() {
   const { latest, setLatest } = useHeartbeatStore();
   const [secondsAgo, setSecondsAgo] = useState<number | null>(null);
+  const [pulse, setPulse] = useState(false);
 
   // Fetch initial heartbeat on mount
   useEffect(() => {
@@ -25,6 +39,14 @@ export function HeartbeatIndicator() {
       })
       .catch(() => {});
   }, [setLatest]);
+
+  // Pulse animation on new heartbeat data
+  useEffect(() => {
+    if (!latest) return;
+    setPulse(true);
+    const timer = setTimeout(() => setPulse(false), 2000);
+    return () => clearTimeout(timer);
+  }, [latest]);
 
   // Update "X seconds ago" every second
   useEffect(() => {
@@ -38,59 +60,57 @@ export function HeartbeatIndicator() {
     return () => clearInterval(interval);
   }, [latest]);
 
-  // Determine status color
-  const getStatusColor = () => {
-    if (!latest) return 'bg-muted-foreground/50';
-    if (latest.all_clear) return 'bg-emerald-500';
-    if (
-      latest.highest_priority?.toLowerCase().includes('failed') ||
-      latest.highest_priority?.toLowerCase().includes('health') ||
-      latest.highest_priority?.toLowerCase().includes('stuck') ||
-      latest.highest_priority?.toLowerCase().includes('down')
-    )
-      return 'bg-red-500';
-    return 'bg-yellow-500';
-  };
+  const getStatus = useCallback((): HeartStatus => {
+    if (!latest) return 'idle';
+    if (latest.all_clear) return 'clear';
+    const pri = latest.highest_priority?.toLowerCase() || '';
+    if (pri.includes('failed') || pri.includes('health') || pri.includes('stuck') || pri.includes('down')) {
+      return 'alert';
+    }
+    return 'active';
+  }, [latest]);
 
-  const getStatusIcon = () => {
-    if (!latest) return <Activity className="h-3.5 w-3.5 text-muted-foreground" />;
-    if (latest.all_clear) return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />;
-    if (
-      latest.highest_priority?.toLowerCase().includes('failed') ||
-      latest.highest_priority?.toLowerCase().includes('health')
-    )
-      return <AlertTriangle className="h-3.5 w-3.5 text-red-500" />;
-    return <Activity className="h-3.5 w-3.5 text-yellow-500" />;
-  };
+  const status = getStatus();
+
+  const heartColor = {
+    idle: 'text-muted-foreground',
+    clear: 'text-emerald-500 fill-emerald-500',
+    active: 'text-red-500 fill-red-500',
+    alert: 'text-red-600 fill-red-600',
+  }[status];
 
   const formatAgo = (s: number | null) => {
-    if (s === null) return 'never';
+    if (s === null) return 'No data';
     if (s < 60) return `${s}s ago`;
     if (s < 3600) return `${Math.floor(s / 60)}m ago`;
     return `${Math.floor(s / 3600)}h ago`;
   };
 
-  const sectionEntries = latest ? Object.entries(latest.sections).filter(([k]) => k !== 'highest_priority') : [];
+  const sectionEntries = latest
+    ? Object.entries(latest.sections).filter(([, v]) => v && v.length > 0)
+    : [];
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="h-8 w-8 relative" title="System heartbeat">
-          {getStatusIcon()}
-          <div
+          <Heart
             className={cn(
-              'absolute top-1 right-1 h-2 w-2 rounded-full',
-              getStatusColor(),
-              latest && 'animate-pulse'
+              'h-4 w-4 transition-colors',
+              heartColor,
+              pulse && status !== 'idle' && 'animate-heartbeat',
             )}
           />
           <span className="sr-only">System heartbeat</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72">
+      <DropdownMenuContent align="end" className="w-80">
         <DropdownMenuLabel className="flex items-center justify-between">
-          <span>Autonomy Scan</span>
-          <span className="text-xs font-normal text-muted-foreground flex items-center gap-1">
+          <span className="flex items-center gap-1.5">
+            <Heart className={cn('h-3.5 w-3.5', heartColor)} />
+            Autonomy Scan
+          </span>
+          <span className="text-[11px] font-normal text-muted-foreground flex items-center gap-1">
             <Clock className="h-3 w-3" />
             {formatAgo(secondsAgo)}
           </span>
@@ -98,36 +118,45 @@ export function HeartbeatIndicator() {
         <DropdownMenuSeparator />
 
         {!latest && (
-          <div className="px-2 py-3 text-xs text-muted-foreground text-center">
-            No heartbeat data yet
+          <div className="px-3 py-4 text-xs text-muted-foreground text-center">
+            Waiting for first heartbeat scan...
           </div>
         )}
 
         {latest?.all_clear && sectionEntries.length === 0 && (
-          <div className="px-2 py-3 flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-            <CheckCircle2 className="h-4 w-4" />
-            All clear — no pending work
+          <div className="px-3 py-4 flex items-center justify-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+            <Heart className="h-4 w-4 fill-emerald-500 text-emerald-500" />
+            All clear — system healthy
           </div>
         )}
 
         {sectionEntries.length > 0 && (
-          <div className="px-2 py-1.5 space-y-1.5">
-            {sectionEntries.map(([key, value]) => (
-              <div key={key} className="text-xs">
-                <span className="font-medium text-foreground capitalize">
-                  {key.replace(/_/g, ' ')}:
-                </span>{' '}
-                <span className="text-muted-foreground">{value}</span>
-              </div>
-            ))}
+          <div className="px-1 py-1 space-y-0.5">
+            {sectionEntries.map(([key, value]) => {
+              const Icon = SECTION_ICONS[key] || Activity;
+              return (
+                <div
+                  key={key}
+                  className="flex items-start gap-2.5 px-2 py-1.5 rounded-md text-xs hover:bg-accent/50"
+                >
+                  <Icon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-foreground capitalize">
+                      {key.replace(/_/g, ' ')}
+                    </span>
+                    <p className="text-muted-foreground mt-0.5 leading-snug">{value}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
         {latest?.highest_priority && (
           <>
             <DropdownMenuSeparator />
-            <div className="px-2 py-1.5 text-xs">
-              <span className="font-medium text-orange-600 dark:text-orange-400">Priority: </span>
+            <div className="px-3 py-2 text-xs">
+              <span className="font-semibold text-orange-600 dark:text-orange-400">Next action: </span>
               <span className="text-muted-foreground">{latest.highest_priority}</span>
             </div>
           </>

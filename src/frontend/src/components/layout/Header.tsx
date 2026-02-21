@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Terminal, Sun, Moon, GitBranch, Heart, Star, FolderPlus } from 'lucide-react';
+import { Terminal, Sun, Moon, GitBranch, FolderPlus } from 'lucide-react';
 import { useThemeStore } from '../../stores/themeStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useProjects } from '../../hooks/useProjects';
@@ -7,13 +7,10 @@ import { RegisterProjectDialog } from '../projects/RegisterProjectDialog';
 import { HeartbeatIndicator } from '../status/HeartbeatIndicator';
 import { Button } from '../ui/button';
 
-type HeartPhase = 'default' | 'red' | 'beating' | 'shining' | 'star';
-
 export function Header() {
   const { theme, toggleTheme } = useThemeStore();
   const { selectedProjectId, selectProject } = useProjectStore();
   const { data: projectsData } = useProjects();
-  const [phase, setPhase] = useState<HeartPhase>('default');
   const [registerOpen, setRegisterOpen] = useState(false);
 
   const projects = projectsData?.projects || [];
@@ -69,35 +66,8 @@ export function Header() {
           multi-agent orchestrator
         </span>
 
-        {/* Heartbeat indicator — system scan status */}
+        {/* Heartbeat indicator — heart icon with system scan status */}
         <HeartbeatIndicator />
-
-        {/* Heart toggle: default → red → beating(5x) → shining star → static star → default */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => {
-            if (phase === 'default') setPhase('red');
-            else if (phase === 'red') setPhase('beating');
-            else if (phase === 'star') setPhase('default');
-          }}
-          className="h-8 w-8"
-        >
-          {phase === 'shining' || phase === 'star' ? (
-            <Star
-              className={`h-4 w-4 fill-yellow-400 text-yellow-400 ${phase === 'shining' ? 'animate-star-shine' : ''}`}
-              onAnimationEnd={() => setPhase('star')}
-            />
-          ) : (
-            <Heart
-              className={`h-4 w-4 transition-colors ${
-                phase !== 'default' ? 'fill-red-500 text-red-500' : 'text-muted-foreground'
-              } ${phase === 'beating' ? 'animate-heartbeat' : ''}`}
-              onAnimationEnd={() => setPhase('shining')}
-            />
-          )}
-          <span className="sr-only">Toggle heart</span>
-        </Button>
 
         {/* Dark mode toggle */}
         <Button
