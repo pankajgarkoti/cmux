@@ -55,3 +55,7 @@ You persist across tasks. You receive work via `[TASK]` messages with task IDs f
 - `src/frontend/src/lib/api.ts` — API client functions
 - `src/frontend/src/types/` — TypeScript type definitions
 - `src/frontend/src/index.css` — global CSS and animations
+
+## Team Reference
+
+See [docs/TEAM.md](../../docs/TEAM.md) for the full team architecture, topology, and coordination protocols.

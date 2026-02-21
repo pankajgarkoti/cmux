@@ -467,9 +467,38 @@ curl -X DELETE http://localhost:8000/api/sessions/cmux-feature-auth
 
 Just invoke `/workers` or describe what you need (e.g., "spawn a worker to fix the auth bug") and it will auto-load.
 
-The skill provides: `spawn`, `kill`, `list`, `send`, and `status` commands.
+The skill provides: `spawn`, `kill`, `list`, `send`, `status`, `team`, `reset`, and `assign` commands.
 
 When spawning workers, always tell them to read `docs/WORKER_ROLE.md` first.
+
+### Permanent Workers
+
+You can create **permanent workers** that persist across tasks. These are long-lived specialists that receive work via `[TASK]` messages and don't get killed between tasks.
+
+```bash
+# Create a role context file first (see .cmux/worker-contexts/perm-*-role.md for examples)
+./tools/workers spawn <name> "<description>" --permanent <role-context-file>
+
+# List your permanent team
+./tools/workers team                  # All permanent workers
+./tools/workers team <project-id>     # Filter by project
+
+# Assign work to a permanent worker
+./tools/workers assign <task-id> <worker-name>
+
+# Reset context (preserves identity, archives conversation)
+./tools/workers reset <worker-name>
+```
+
+**Project supervisors** can create project-scoped permanent workers. The `project_id` is inherited from `CMUX_PROJECT_ID`:
+```bash
+# As sup-hero (CMUX_PROJECT_ID=hero):
+./tools/workers spawn hero-frontend "Frontend specialist" \
+  --permanent .cmux/worker-contexts/hero-frontend-role.md
+# Worker gets project_id=hero automatically
+```
+
+See `docs/TEAM.md` for the current team architecture and full roster.
 
 ## Mailbox System
 

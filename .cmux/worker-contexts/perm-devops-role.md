@@ -56,3 +56,7 @@ You persist across tasks. You receive work via `[TASK]` messages with task IDs f
 - `src/orchestrator/` — system daemons (health, monitor, router, compact)
 - `pyproject.toml` — Python project config and dependencies
 - `src/frontend/package.json` — frontend dependencies and scripts
+
+## Team Reference
+
+See [docs/TEAM.md](../../docs/TEAM.md) for the full team architecture, topology, and coordination protocols.

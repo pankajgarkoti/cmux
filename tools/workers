@@ -7,6 +7,7 @@
 #   workers kill <name> [--force]  - Terminate a worker (--force for permanent workers)
 #   workers reset <name>           - Reset a permanent worker's context
 #   workers assign <task-id> <name> - Assign a task and notify worker
+#   workers team [project-id]      - List permanent workers (optionally by project)
 #   workers list                   - List all workers
 #   workers send <name> <message>  - Send message to a worker
 #   workers status <name>          - Get worker terminal output
@@ -23,6 +24,8 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
 NC='\033[0m'
 
 #───────────────────────────────────────────────────────────────────────────────
@@ -285,7 +288,7 @@ cmd_spawn() {
 
     # Override task content for permanent workers
     if [[ -n "${permanent_role_ctx}" ]]; then
-        task="Read ${permanent_role_ctx} for your permanent role. You are a permanent worker — you persist across tasks and receive work via [TASK] messages. Read docs/WORKER_ROLE.md for guidelines."
+        task="Read ${permanent_role_ctx} for your permanent role. You are a permanent worker — you persist across tasks and receive work via [TASK] messages. Read ${CMUX_PROJECT_ROOT}/docs/WORKER_ROLE.md for guidelines."
     fi
 
     # Write worker context to temp file to avoid multiline paste issues
@@ -542,6 +545,62 @@ cmd_status() {
     tmux capture-pane -t "${CMUX_SESSION}:${name}" -p -S "-${lines}"
 }
 
+cmd_team() {
+    local filter_project="${1:-}"
+    local reg_file="${CMUX_PROJECT_ROOT}/.cmux/agent_registry.json"
+
+    if [[ ! -f "$reg_file" ]]; then
+        warn "No agent registry found"
+        return 1
+    fi
+
+    # If no project filter specified, use current project context
+    if [[ -z "$filter_project" ]]; then
+        filter_project="${CMUX_PROJECT_ID:-}"
+    fi
+
+    echo -e "${BOLD}Permanent Team${NC}${filter_project:+ (project: ${filter_project})}:"
+    echo ""
+    printf "  ${DIM}%-18s %-12s %-12s %-8s %-8s %s${NC}\n" "NAME" "DISPLAY" "PROJECT" "RESETS" "TASKS" "STATUS"
+    printf "  ${DIM}%-18s %-12s %-12s %-8s %-8s %s${NC}\n" "──────────────" "──────────" "──────────" "──────" "──────" "──────"
+
+    local count=0
+    local workers
+    workers=$(jq -r 'to_entries[] | select(.value.permanent == true) | .key' "$reg_file" 2>/dev/null)
+
+    while IFS= read -r name; do
+        [[ -z "$name" ]] && continue
+
+        local proj disp resets tasks
+        proj=$(jq -r --arg k "$name" '.[$k].project_id // "cmux"' "$reg_file")
+        disp=$(jq -r --arg k "$name" '.[$k].display_name // $k' "$reg_file")
+        resets=$(jq -r --arg k "$name" '.[$k].reset_count // 0' "$reg_file")
+        tasks=$(jq -r --arg k "$name" '.[$k].tasks_since_reset // 0' "$reg_file")
+
+        # Apply project filter if specified
+        if [[ -n "$filter_project" ]] && [[ "$proj" != "$filter_project" ]]; then
+            continue
+        fi
+
+        local status_color="${GREEN}"
+        local status_label="online"
+        if ! window_exists "$name"; then
+            status_color="${RED}"
+            status_label="offline"
+        fi
+
+        printf "  %-18s %-12s %-12s %-8s %-8s ${status_color}%s${NC}\n" "$name" "$disp" "$proj" "$resets" "$tasks" "$status_label"
+        ((count++))
+    done <<< "$workers"
+
+    echo ""
+    echo "Total permanent workers: $count"
+
+    if [[ -z "$filter_project" ]]; then
+        echo -e "\n${DIM}Tip: 'workers team <project-id>' to filter by project${NC}"
+    fi
+}
+
 cmd_reset() {
     local name="${1:-}"
     [[ -z "$name" ]] && die "usage: workers reset <name>"
@@ -692,6 +751,7 @@ COMMANDS:
     kill <name> [--force]           Terminate a worker (not supervisors)
     reset <name>                    Reset a permanent worker's context (preserves identity)
     assign <task-id> <worker>       Assign a task to a worker and notify them
+    team [project-id]               List permanent workers (optionally filtered by project)
     list                            List all workers in the session
     send <name> <message>           Send a message to a worker
     status <name> [lines]           Show recent terminal output (default: 30 lines)
@@ -752,6 +812,7 @@ main() {
         kill)   cmd_kill "$@" ;;
         reset)  cmd_reset "$@" ;;
         assign) cmd_assign "$@" ;;
+        team)   cmd_team "$@" ;;
         list)   cmd_list "$@" ;;
         send)   cmd_send "$@" ;;
         status) cmd_status "$@" ;;

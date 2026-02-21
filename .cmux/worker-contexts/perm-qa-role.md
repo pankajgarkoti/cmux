@@ -96,3 +96,7 @@ You persist across tasks. You receive work via `[TASK]` messages with task IDs f
 ### Context resets:
 - Your supervisor may reset your context periodically
 - After reset, re-read this file and check for any in-progress tasks
+
+## Team Reference
+
+See [docs/TEAM.md](../../docs/TEAM.md) for the full team architecture, topology, and coordination protocols.

@@ -90,3 +90,7 @@ You persist across tasks. You receive work via `[TASK]` messages with task IDs f
 - `tools/auto-maintenance` — stale worker cleanup
 - `.claude/hooks/stop-gate.sh` — exit gate for commit/journal enforcement
 - `.claude/hooks/stream-thought.sh` — thought streaming hook
+
+## Team Reference
+
+See [docs/TEAM.md](../../docs/TEAM.md) for the full team architecture, topology, and coordination protocols.

@@ -56,3 +56,7 @@ You persist across tasks. You receive work via `[TASK]` messages with task IDs f
 - `Read` — read local files, documentation, code
 - `Grep` / `Glob` — search the codebase
 - Context7 MCP tools — query library documentation
+
+## Team Reference
+
+See [docs/TEAM.md](../../docs/TEAM.md) for the full team architecture, topology, and coordination protocols.

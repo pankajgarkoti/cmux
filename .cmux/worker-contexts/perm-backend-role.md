@@ -59,3 +59,7 @@ You persist across tasks. You receive work via `[TASK]` messages with task IDs f
 - `src/server/config.py` — server configuration and environment variables
 - `.cmux/tasks.db` — task database schema
 - `.cmux/conversations.db` — conversations, thoughts, events storage
+
+## Team Reference
+
+See [docs/TEAM.md](../../docs/TEAM.md) for the full team architecture, topology, and coordination protocols.

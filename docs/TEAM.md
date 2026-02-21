@@ -109,6 +109,46 @@ This team structure emerged from an adversarial debate (see `.cmux/journal/2026-
 4. **Tester as permanent, not ephemeral** — QA benefits from accumulated knowledge of what breaks and where the gaps are. Echo remembers previous test runs (until context reset).
 5. **Research as dedicated role** — following links, synthesizing information, and saving artifacts is a distinct workflow that shouldn't interrupt builders.
 
+## Project Teams
+
+Project supervisors (sup-hero, sup-heroweb, etc.) can create their own permanent workers scoped to their project. These use the same `--permanent` tooling as CMUX permanent workers.
+
+### How It Works
+
+Project supervisors inherit `CMUX_PROJECT_ID` from their environment. When they spawn permanent workers, the `project_id` is set automatically:
+
+```bash
+# From a project supervisor's context (CMUX_PROJECT_ID=hero):
+./tools/workers spawn hero-frontend "Frontend specialist for Hero" \
+  --permanent .cmux/worker-contexts/hero-frontend-role.md
+```
+
+The worker gets `project_id=hero` in the registry automatically. All permanent worker features work identically: deletion protection, context reset, proactive reset policy, cleanup immunity.
+
+### Listing Project Teams
+
+```bash
+./tools/workers team          # All permanent workers (or current project)
+./tools/workers team hero     # Only hero project permanent workers
+./tools/workers team cmux     # Only CMUX permanent workers
+```
+
+### Role Files for Project Workers
+
+Project supervisors create role context files in `.cmux/worker-contexts/` with a project prefix:
+- `.cmux/worker-contexts/hero-frontend-role.md`
+- `.cmux/worker-contexts/heroweb-api-role.md`
+
+Role files follow the same format as CMUX roles (see existing files for examples). Each role file should include the worker's name, personality, specialization, standards, and the "As a Permanent Worker" protocol section.
+
+### Current Project Roster
+
+| Project | Workers | Supervisor |
+|---------|---------|------------|
+| cmux | 8 (see above) | supervisor |
+| hero | — | sup-hero |
+| heroweb | — | sup-heroweb |
+
 ## Ephemeral Workers
 
 Not everything needs a permanent worker. The supervisor still spawns ephemeral workers for:
@@ -124,4 +164,5 @@ When adding or removing permanent workers:
 1. Create/remove the role context file in `.cmux/worker-contexts/`
 2. Spawn/kill the worker with `--permanent` / `--force`
 3. Update the roster table and topology diagram above
-4. Commit this file with the change
+4. Run `./tools/workers team` to verify
+5. Commit this file with the change
