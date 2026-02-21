@@ -354,6 +354,75 @@ check_project_supervisor_heartbeats() {
 }
 
 #───────────────────────────────────────────────────────────────────────────────
+# Permanent Worker Auto-Respawn
+#───────────────────────────────────────────────────────────────────────────────
+
+RESPAWN_COUNTER=0
+RESPAWN_INTERVAL=5  # check every 5th dashboard cycle
+
+respawn_permanent_workers() {
+    local registry="${CMUX_PROJECT_ROOT}/.cmux/agent_registry.json"
+    if [[ ! -f "$registry" ]]; then
+        return 0
+    fi
+
+    # Get all permanent worker names
+    local perm_workers
+    perm_workers=$(jq -r 'to_entries[] | select(.value.permanent == true) | .key' "$registry" 2>/dev/null || true)
+
+    if [[ -z "$perm_workers" ]]; then
+        return 0
+    fi
+
+    local respawned=0
+
+    while IFS= read -r name; do
+        [[ -z "$name" ]] && continue
+
+        # Skip if tmux window already exists
+        if tmux_window_exists "$CMUX_SESSION" "$name"; then
+            continue
+        fi
+
+        # Read fields from registry
+        local role_context description project_id work_dir
+        role_context=$(jq -r --arg k "$name" '.[$k].role_context // empty' "$registry" 2>/dev/null)
+        description=$(jq -r --arg k "$name" '.[$k].description // "Permanent worker"' "$registry" 2>/dev/null)
+        project_id=$(jq -r --arg k "$name" '.[$k].project_id // empty' "$registry" 2>/dev/null)
+        work_dir=$(jq -r --arg k "$name" '.[$k].work_dir // empty' "$registry" 2>/dev/null)
+
+        # Must have role_context to respawn
+        if [[ -z "$role_context" ]]; then
+            log_warn "Skipping respawn of '$name': no role_context in registry"
+            continue
+        fi
+
+        # Build spawn command
+        local spawn_cmd=("${CMUX_PROJECT_ROOT}/tools/workers" spawn "$name" "$description" --permanent "$role_context")
+
+        if [[ -n "$project_id" && "$project_id" != "null" ]]; then
+            spawn_cmd+=(--project "$project_id")
+        fi
+
+        if [[ -n "$work_dir" && "$work_dir" != "null" ]]; then
+            spawn_cmd+=(--dir "$work_dir")
+        fi
+
+        log_step "Respawning permanent worker: $name"
+        if "${spawn_cmd[@]}" 2>/dev/null; then
+            log_ok "Respawned permanent worker: $name"
+            ((respawned++))
+        else
+            log_warn "Failed to respawn permanent worker: $name"
+        fi
+    done <<< "$perm_workers"
+
+    if ((respawned > 0)); then
+        log_ok "Respawned $respawned permanent worker(s)"
+    fi
+}
+
+#───────────────────────────────────────────────────────────────────────────────
 # Supervisor Heartbeat Monitor
 #───────────────────────────────────────────────────────────────────────────────
 
@@ -432,7 +501,7 @@ check_supervisor_heartbeat() {
         # POST healthy heartbeat with rich system stats
         local hb_supervisor="active (${staleness}s idle)"
         local hb_workers hb_mailbox hb_backlog hb_health hb_git
-        hb_workers=$(tmux list-windows -t "$CMUX_SESSION" -F '#{window_name}' 2>/dev/null | grep -v -e '^supervisor$' -e '^monitor$' -e '^sup-' -e '^sentry$' | wc -l | xargs)
+        hb_workers=$(tmux list-windows -t "$CMUX_SESSION" -F '#{window_name}' 2>/dev/null | { grep -v -e '^supervisor$' -e '^monitor$' -e '^sup-' -e '^sentry$' || true; } | wc -l | xargs)
         hb_mailbox=$(grep -c '"status":"submitted"' "$CMUX_MAILBOX" 2>/dev/null || echo "0")
         hb_backlog=$(sqlite3 "${CMUX_PROJECT_ROOT}/.cmux/tasks.db" "SELECT COUNT(*) FROM tasks WHERE status='backlog';" 2>/dev/null || echo "0")
         hb_health=$(curl -sf --max-time 1 "http://localhost:${CMUX_PORT}/api/webhooks/health" 2>/dev/null | grep -q '"api":"healthy"' && echo "healthy" || echo "degraded")
@@ -744,7 +813,7 @@ spawn_sentry() {
     # Gather context: recent mailbox subjects
     local mailbox_subjects=""
     if [[ -f "$CMUX_MAILBOX" ]]; then
-        mailbox_subjects=$(tail -5 "$CMUX_MAILBOX" 2>/dev/null | grep -o '"subject":"[^"]*"' | sed 's/"subject":"//;s/"$//' || echo "(empty)")
+        mailbox_subjects=$(tail -5 "$CMUX_MAILBOX" 2>/dev/null | { grep -o '"subject":"[^"]*"' || true; } | sed 's/"subject":"//;s/"$//' || echo "(empty)")
     fi
     [[ -z "$mailbox_subjects" ]] && mailbox_subjects="(no recent messages)"
 
@@ -1192,6 +1261,13 @@ run_dashboard() {
         # Sweep all panes for stuck paste buffers (cheap — just capture + grep)
         tmux_sweep_stuck_pastes "$CMUX_SESSION" 2>/dev/null || true
 
+        # Periodic permanent worker respawn check (every RESPAWN_INTERVAL cycles)
+        ((RESPAWN_COUNTER++)) || true
+        if ((RESPAWN_COUNTER >= RESPAWN_INTERVAL)); then
+            RESPAWN_COUNTER=0
+            respawn_permanent_workers 2>/dev/null || true
+        fi
+
         # Periodic auto-maintenance (every MAINTENANCE_INTERVAL iterations)
         ((MAINTENANCE_COUNTER++)) || true
         if ((MAINTENANCE_COUNTER >= MAINTENANCE_INTERVAL)); then
@@ -1426,6 +1502,10 @@ main() {
 
     # Phase 3: Start router in background
     start_router
+    echo ""
+
+    # Phase 3b: Respawn permanent workers that are missing
+    respawn_permanent_workers
     echo ""
 
     # Phase 4: Start log watcher in background
