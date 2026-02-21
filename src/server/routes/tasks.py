@@ -40,6 +40,7 @@ class TaskResponse(BaseModel):
     created_at: str
     updated_at: str
     completed_at: str
+    remarks: str
     children: Optional[list["TaskResponse"]] = None
 
 
@@ -69,6 +70,7 @@ class TaskUpdate(BaseModel):
     assigned_to: Optional[str] = None
     priority: Optional[str] = None
     source: Optional[str] = None
+    remarks: Optional[str] = None
 
 
 class TaskStatsResponse(BaseModel):
@@ -130,6 +132,7 @@ def _row_to_task(row: sqlite3.Row) -> TaskResponse:
         created_at=row["created_at"] or "",
         updated_at=row["updated_at"] or "",
         completed_at=row["completed_at"] or "",
+        remarks=(row["remarks"] or "") if "remarks" in keys else "",
     )
 
 
@@ -401,6 +404,10 @@ async def update_task(task_id: str, update: TaskUpdate):
         if update.source is not None:
             updates.append("source = ?")
             params.append(update.source)
+
+        if update.remarks is not None:
+            updates.append("remarks = ?")
+            params.append(update.remarks)
 
         params.append(task_id)
         conn.execute(
