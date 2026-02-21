@@ -5,7 +5,7 @@ import type { JournalDayResponse, JournalDatesResponse, JournalSearchResponse } 
 import type { FilesystemResponse } from '../types/filesystem';
 import type { SessionListResponse, Session, SessionCreateRequest } from '../types/session';
 import type { ProjectList, Project, ProjectCreate, ProjectAgentsResponse } from '../types/project';
-import type { TaskListResponse, TaskTreeResponse, Task } from '../types/task';
+import type { TaskListResponse, TaskTreeResponse, TaskStatsResponse, Task } from '../types/task';
 import { API_BASE } from './constants';
 
 export const api = {
@@ -314,13 +314,37 @@ export const api = {
     return res.json();
   },
 
-  async updateTask(taskId: string, update: { status?: string; assigned_to?: string }): Promise<Task> {
+  async updateTask(taskId: string, update: { status?: string; assigned_to?: string; priority?: string; source?: string }): Promise<Task> {
     const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(taskId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(update),
     });
     if (!res.ok) throw new Error('Failed to update task');
+    return res.json();
+  },
+
+  async createTask(task: { title: string; description?: string; project?: string; priority?: string; source?: string; parent_id?: string; assigned_to?: string; resources?: string[] }): Promise<Task> {
+    const res = await fetch(`${API_BASE}/api/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(task),
+    });
+    if (!res.ok) throw new Error('Failed to create task');
+    return res.json();
+  },
+
+  async deleteTask(taskId: string): Promise<{ deleted: number; task_id: string }> {
+    const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(taskId)}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete task');
+    return res.json();
+  },
+
+  async getTaskStats(): Promise<TaskStatsResponse> {
+    const res = await fetch(`${API_BASE}/api/tasks/stats`);
+    if (!res.ok) throw new Error('Failed to fetch task stats');
     return res.json();
   },
 };
