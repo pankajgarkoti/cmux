@@ -300,6 +300,14 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
               </Badge>
             );
           })()}
+          {prefixInfo && (
+            <Badge
+              variant="outline"
+              className={cn('text-[10px] h-4 px-1 font-semibold', prefixInfo.className)}
+            >
+              {prefixInfo.label}
+            </Badge>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <span
@@ -328,18 +336,6 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount }: Cha
             )}
           />
         </div>
-
-        {/* Message type prefix badge */}
-        {prefixInfo && (
-          <div className="mb-1.5">
-            <Badge
-              variant="outline"
-              className={cn('text-[10px] h-5 px-1.5 font-semibold', prefixInfo.className)}
-            >
-              {prefixInfo.label}
-            </Badge>
-          </div>
-        )}
 
         {/* Interleaved thoughts + tool calls timeline */}
         {!isUser && ((thoughts && thoughts.length > 0) || (toolCalls && toolCalls.length > 0)) && (
