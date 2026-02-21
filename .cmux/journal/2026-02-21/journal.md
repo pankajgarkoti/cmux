@@ -511,3 +511,8 @@ Session complete — backlog fully cleared. 13 feature commits this session cove
 
 ## 13:11 - ESLint config added — all lint warnings resolved
 Proactive maintenance: added missing .eslintrc.cjs for the frontend (ESLint 8 + TypeScript + React hooks + react-refresh). Fixed real issues: memoized agents/projects arrays in Explorer.tsx to satisfy exhaustive-deps, added textareaRef to dependency arrays in ChatInput.tsx. Suppressed expected shadcn UI react-refresh warnings via overrides. npm run lint now passes cleanly with --max-warnings 0. Commit 391f87f.
+
+## 14:12 - Starting deep research: autonomous LLM agent systems survey — memory, RAG, multi-agent coordination, self-improvement, cognitive architecture. Focus on practical CMUX improvements.
+
+## 14:12 - Self-improvement research loop activated
+User requested that idle heartbeat time be used for self-improvement research instead of sitting idle. Updated monitor.sh heartbeat all-clear message to direct supervisor toward research on autonomous LLM systems, memory architectures, RAG, agent coordination, and cognitive scaffolding. Updated MEMORY.md with the new idle behavior policy. Delegated first deep research survey to Nova (perm-research) covering 5 areas: memory systems, retrieval-augmented cognition, multi-agent coordination, self-improvement/meta-learning, and cognitive architecture. Output will be saved as an artifact for concrete CMUX improvement recommendations.
