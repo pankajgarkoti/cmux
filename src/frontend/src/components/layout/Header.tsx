@@ -61,8 +61,8 @@ export function Header() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-3">
-        <span className="text-xs text-muted-foreground font-mono hidden sm:inline">
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-muted-foreground font-mono hidden sm:inline mr-1.5">
           multi-agent orchestrator
         </span>
 

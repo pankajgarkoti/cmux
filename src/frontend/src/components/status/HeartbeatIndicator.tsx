@@ -28,7 +28,6 @@ type HeartStatus = 'idle' | 'clear' | 'active' | 'alert';
 export function HeartbeatIndicator() {
   const { latest, setLatest } = useHeartbeatStore();
   const [secondsAgo, setSecondsAgo] = useState<number | null>(null);
-  const [pulse, setPulse] = useState(false);
 
   // Fetch initial heartbeat on mount
   useEffect(() => {
@@ -39,14 +38,6 @@ export function HeartbeatIndicator() {
       })
       .catch(() => {});
   }, [setLatest]);
-
-  // Pulse animation on new heartbeat data
-  useEffect(() => {
-    if (!latest) return;
-    setPulse(true);
-    const timer = setTimeout(() => setPulse(false), 2000);
-    return () => clearTimeout(timer);
-  }, [latest]);
 
   // Update "X seconds ago" every second
   useEffect(() => {
@@ -98,7 +89,7 @@ export function HeartbeatIndicator() {
             className={cn(
               'h-4 w-4 transition-colors',
               heartColor,
-              pulse && status !== 'idle' && 'animate-heartbeat',
+              status !== 'idle' && 'animate-heartbeat',
             )}
           />
           <span className="sr-only">System heartbeat</span>

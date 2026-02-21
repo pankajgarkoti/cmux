@@ -79,7 +79,7 @@ interface ChatMessageProps {
 }
 
 const COLLAPSE_THRESHOLD = 500;
-const PREVIEW_LENGTH = 800;
+const PREVIEW_LENGTH = 1200;
 
 // Regex to match @mentions (agent names are alphanumeric with hyphens)
 const MENTION_REGEX = /@([\w-]+)/g;
