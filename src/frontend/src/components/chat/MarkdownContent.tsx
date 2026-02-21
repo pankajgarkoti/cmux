@@ -62,7 +62,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
           // Style code blocks
           pre: ({ children, ...props }) => (
             <pre
-              className="bg-muted/50 rounded-md p-3 overflow-x-auto text-xs"
+              className="bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-md p-3 overflow-x-auto text-xs border border-zinc-200 dark:border-zinc-700"
               {...props}
             >
               {children}
@@ -72,7 +72,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
             const isInline = !className;
             return isInline ? (
               <code
-                className="bg-muted/50 rounded px-1 py-0.5 text-xs font-mono"
+                className="bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 rounded px-1.5 py-0.5 text-xs font-mono border border-zinc-200/60 dark:border-zinc-700/60"
                 {...props}
               >
                 {children}

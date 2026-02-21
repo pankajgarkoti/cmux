@@ -361,7 +361,7 @@ export function ChatMessage({ message, toolCalls, thoughts, collapseCount, inbox
               className={cn(
                 'text-sm',
                 '[&_p]:mb-1 [&_p]:last:mb-0',
-                '[&_pre]:bg-background/20 [&_code]:bg-background/20'
+                '[&_pre]:bg-zinc-100 [&_pre]:dark:bg-zinc-800 [&_code]:bg-zinc-100 [&_code]:dark:bg-zinc-800'
               )}
             />
 
