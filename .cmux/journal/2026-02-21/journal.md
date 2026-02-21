@@ -292,3 +292,60 @@ Rewrote tools/backlog CLI to use sqlite3 against .cmux/tasks.db instead of .cmux
 
 ## 09:01 - Show more 0 chars bug fix
 Fixed the 'Show more (0 more chars)' bug in chat messages. Root cause: COLLAPSE_THRESHOLD (500) was lower than PREVIEW_LENGTH (1200), so messages between 500-1200 chars triggered the collapse button but getPreviewContent returned the full text. Fix: set COLLAPSE_THRESHOLD = PREVIEW_LENGTH + 200, and added a guard that only shows the button when the preview is actually shorter than the original content. Commit 73ca22a.
+
+## 09:13 - Permanent team design task
+User wants a permanent team of always-on workers instead of ephemeral spawn-and-kill. Key requirements: (1) analyze journals/conversations to identify which worker roles recur, (2) design permanent roles based on responsibility areas, (3) workers can't be deleted without a reason — at most context reset + reinstructions, (4) supervisor points permanent workers to task IDs from the unified tasks DB, (5) use adversarial debate to refine the plan before executing. User stepping away — this is autonomous work.
+
+## 09:15 - Permanent team research complete
+Completed comprehensive worker pattern analysis from journals and archives. 26 workers spawned across 2 days. Top categories: Frontend UI (31%, 8 workers), Feature Development (27%, 7 workers), Research/Debate (15%, 4 workers), Policy/Docs (15%, 4 workers), Infrastructure (12%, 3 workers), Testing (8%, 2 workers). Also read debate templates for adversarial planning phase. User clarified: ephemeral workers still exist for ad-hoc tasks, but permanent workers handle the most common recurring categories automatically.
+
+## 09:16 - Starting: Defender role for permanent team debate. Reading research + exploring codebase.
+
+## 09:18 - Critic prep: codebase exploration
+Completed Phase 1 preparation as debate critic for permanent team design. Read role instructions (DEBATE_CRITIC.md), research artifact (permanent-team-research.md), and launched deep codebase exploration of the ephemeral worker system. Key findings: 20-75s startup tax per worker, 26 workers over 2 days all paying full cold-start cost, compaction recovery is broken (missing pre-compact hook and artifact files), no worker reuse mechanism exists. Defender proposal not yet available — waiting for notification.
+
+## 09:18 - Defender proposal complete
+Wrote permanent team proposal to .cmux/journal/2026-02-21/artifacts/01-defender-proposal.md. Covers 4 permanent roles (frontend, backend, tester, infra), task ID assignment protocol, context reset mechanism, perm/ephemeral coexistence, tooling changes, and deletion protection.
+
+## 09:19 - Awaiting critic feedback on permanent team proposal
+Completed defender proposal for permanent worker team design. Proposal covers 4 permanent roles (perm-frontend, perm-backend, perm-tester, perm-infra), task ID-based assignment protocol, context reset mechanism preserving identity, perm/ephemeral coexistence via perm-* prefix and auto-maintenance protection, tooling changes (spawn-permanent, reset, assign commands), and deletion protection requiring mandatory reason. Notified critic-permteam via mailbox. Now idle awaiting critic's response.
+
+## 09:21 - Critique complete: permanent team proposal
+Finished Round 1 critique of the defender's permanent worker team proposal. 601-line document covering all 9 sections. Verdicts: ACCEPT 3 (task assignment, coexistence, startup sequence, tradeoffs), REVISE 5 (roles, context reset, tooling, deletion protection, impl priority). Zero REJECTs — the core concept is sound. Key revisions requested: (1) drop permanent tester (8% utilization doesn't justify always-on cost), (2) start with 2 workers not 4 to avoid premature scaling, (3) fix existing broken compaction pipeline before building workers reset on top of it, (4) address cleanup_stale() race condition that would remove crashed permanent workers from registry, (5) add break-even cost analysis. Notified defender via mailbox.
+
+## 09:21 - Reading critic's critique — 3 ACCEPT, 5 REVISE, 0 REJECT. Major revisions: drop tester, start with 2 workers, fix compaction first, use --permanent flag, specify reset impl, add cost analysis.
+
+## 09:24 - Defender rebuttal complete
+Addressed all 10 revision requests from critic. Conceded 15 points, defended 3 (sentry not permanent, start with 3 not 2 workers to include infra, keep audit log). Major revisions: drop permanent tester, fix compaction pipeline as prerequisite, use --permanent flag on existing spawn, full workers reset implementation, cleanup_stale race fix, --force instead of retire, cost analysis with quiet hours proposal, proactive reset policy (5 tasks or 3 hours).
+
+## 09:26 - Debate converged: permanent team design
+Round 2 complete — accepted the defender's revised plan after they conceded 15 of 18 critique points and successfully defended 3 (sentry is not a permanent worker, start with 3 including infra for safety, keep audit log). All 9 sections now at ACCEPT. The debate produced a significantly stronger plan than the original proposal: compaction pipeline fix as prerequisite, concrete workers reset implementation, proactive reset policy, cost analysis with quiet hours, cleanup_stale race fix, TASK-CANCEL protocol. Artifacts: 01-defender-proposal.md, 02-critic-critique.md, 03-defender-rebuttal.md, 04-critic-convergence.md.
+
+## 09:26 - Resuming from compaction — debate converged, spawning bug fixes
+Session resumed after context compaction. Debate pair (defender-permteam, critic-permteam) converged on permanent team design: 3 roles (frontend, backend, infra), tester ephemeral with template, compaction fix prerequisite, --permanent flag, workers reset command, proactive reset policy. Now spawning parallel workers for thought stream bugs (doubled thoughts + assistant responses as thoughts) while preparing to execute the permanent team plan. User wants real names and personalities for permanent workers.
+
+## 09:28 - Fixed doubled thoughts bug — added server-side content dedup in thoughts.py
+
+## 09:28 - fix-thoughts-content: removed text block fallback from stream-thought.sh — only thinking blocks are now extracted as thoughts
+
+## 09:30 - Starting: implement permanent worker infrastructure in bash tooling. Changes: --permanent flag on spawn, cmd_reset, --force on kill, pre-compact hook, stop-gate update, help text, cmd_assign.
+
+## 09:30 - Starting: implement permanent worker support - backend model + registry + frontend types + UI indicators
+
+## 09:31 - Permanent worker backend+frontend
+Implementing permanent worker support: added permanent/role_context/reset_count/tasks_since_reset fields to Agent Pydantic model and TS interface. Updated _enrich_from_registry to populate new fields from registry metadata. Modified cleanup_stale to skip permanent workers. Updated AgentTreeItem with ShieldCheck icon and PERM badge for permanent workers in teal color scheme.
+
+## 09:31 - Permanent team implementation in progress
+Two implementation workers running: impl-perm-infra (adding --permanent flag, workers reset, --force kill protection, pre-compact hook, cmd_assign to tools/workers) and impl-perm-backend (Agent model fields, cleanup_stale fix, frontend badges and chat header for permanent workers). Role context files created for Mira (frontend), Kai (backend), and Sol (infra) with distinct personalities. Tester template also created for ephemeral fast-start. Thought stream bugs fixed and committed (1c09a09, ed4a60c). Debate pair killed after convergence.
+
+## 09:31 - Permanent worker infra progress
+Implementing permanent worker infrastructure in tools/workers. Completed: --permanent flag on spawn, permanent registry fields, --force on kill with audit log, cmd_reset full implementation, cmd_assign shorthand, updated help text. Still need: pre-compact hook, stop-gate update, auto-maintenance update, syntax verification.
+
+## 09:31 - Completed: permanent worker support. Commit 631d922. Typecheck, build, pytest all pass.
+
+## 09:31 - Reflection: impl-perm-backend — what worked: clear spec made implementation straightforward, all 6 files changed in one pass. What I'd do differently: nothing, clean task.
+
+## 09:32 - Completed permanent worker infra
+Implemented all 7 changes from the debate rebuttal plan: --permanent flag on spawn, cmd_reset with graceful Claude restart, --force on kill with audit log, pre-compact.sh hook for state capture, stop-gate.sh permanent worker bypass, auto-maintenance protection, cmd_assign shorthand, updated help text. All scripts pass bash -n syntax check. Commit cb2afff.
+
+## 09:33 - Reflection: perm-worker-infra — what worked: having the full spec from the debate rebuttal made implementation straightforward. All insertion points were clearly identified. What I'd do differently: nothing, clean task with well-defined requirements.
