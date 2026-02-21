@@ -17,8 +17,8 @@ tool_name=$(echo "$input" | jq -r '.tool_name // empty')
 tool_input=$(echo "$input" | jq -r '.tool_input // empty' | head -c 500)
 transcript_path=$(echo "$input" | jq -r '.transcript_path // empty')
 
-# Try to extract last assistant reasoning from transcript
-# Priority: thinking blocks (internal reasoning) > text blocks (visible response)
+# Try to extract last assistant reasoning (thinking blocks only)
+# We intentionally skip text blocks — those are visible responses, not internal reasoning
 thought=""
 if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
     # First try: extract thinking blocks (Claude's internal reasoning)
@@ -26,14 +26,6 @@ if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
         | jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="thinking") | .thinking' 2>/dev/null \
         | tail -1 \
         | head -c 500)
-
-    # Fallback: extract text blocks (visible assistant text)
-    if [[ -z "$thought" ]]; then
-        thought=$(tail -10 "$transcript_path" 2>/dev/null \
-            | jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="text") | .text' 2>/dev/null \
-            | tail -1 \
-            | head -c 500)
-    fi
 fi
 
 # POST thought event (fail silently)
