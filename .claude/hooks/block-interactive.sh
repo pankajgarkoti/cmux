@@ -6,7 +6,11 @@
 # forever waiting for input that will never come. This hook intercepts
 # those calls and directs agents to use mailbox or text output instead.
 #
-# Receives JSON on stdin: {tool_name, tool_input, ...}
+# When blocking, this hook also rescues the assistant's text output from the
+# current turn. Without this, the text is lost because the turn aborts before
+# the Stop event fires (which is what normally delivers the message).
+#
+# Receives JSON on stdin: {tool_name, tool_input, transcript_path, ...}
 # Exit 0 = allow, Exit 2 + stderr = block with message
 
 set -euo pipefail
@@ -26,6 +30,44 @@ esac
 # Non-CMUX agents (local dev, no CMUX_AGENT_NAME set) are allowed through.
 if [[ -z "${CMUX_AGENT_NAME:-}" ]]; then
     exit 0
+fi
+
+# --- Rescue lost message text before blocking ---
+# When we block, the turn aborts and the Stop event never fires, so any text
+# the assistant produced this turn would be silently dropped. Extract it from
+# the transcript and POST it so it reaches the dashboard.
+transcript_path=$(echo "$input" | jq -r '.transcript_path // empty')
+if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
+    # Extract text blocks from the last assistant message in the transcript
+    rescued_text=$(tail -20 "$transcript_path" 2>/dev/null \
+        | jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="text") | .text' 2>/dev/null \
+        | tail -1)
+
+    if [[ -n "$rescued_text" ]]; then
+        MESSAGES_URL="${CMUX_MESSAGES_URL:-http://localhost:8000/api/messages/internal}"
+        agent_name="${CMUX_AGENT_NAME}"
+
+        # Detect [SYS] prefix — match the logic in agent_events.py
+        msg_type="response"
+        trimmed="${rescued_text#"${rescued_text%%[![:space:]]*}"}"
+        if [[ "$trimmed" == "[SYS]"* ]]; then
+            msg_type="system"
+            rescued_text="${trimmed#\[SYS\]}"
+            rescued_text="${rescued_text#"${rescued_text%%[![:space:]]*}"}"
+        fi
+
+        # Fire-and-forget POST (don't let failures block the hook)
+        curl -sf -X POST "$MESSAGES_URL" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+                --arg from_agent "$agent_name" \
+                --arg to_agent "user" \
+                --arg content "$rescued_text" \
+                --arg type "$msg_type" \
+                '{from_agent: $from_agent, to_agent: $to_agent, content: $content, type: $type}')" \
+            --max-time 3 \
+            >/dev/null 2>&1 || true
+    fi
 fi
 
 # Block the tool call — tailor the message to agent role
