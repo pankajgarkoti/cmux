@@ -12,17 +12,17 @@ A self-contained team with all skills needed to deliver a feature end-to-end.
 ## Org Chart
 
 ```
-         ┌─────────────┐
-         │ Squad Lead  │ ← Reports to main supervisor
-         │ (supervisor)│
-         └──────┬──────┘
-                │
-    ┌───────────┼───────────┐
-    │           │           │
-┌───▼───┐  ┌────▼────┐  ┌───▼───┐
-│Backend│  │Frontend │  │Tester │
-│Worker │  │ Worker  │  │Worker │
-└───────┘  └─────────┘  └───────┘
+            ┌─────────────┐
+            │ Squad Lead  │ ← Reports to main supervisor
+            │ (supervisor)│
+            └──────┬──────┘
+                   │
+    ┌──────────┬───┴───┬──────────┐
+    │          │       │          │
+┌───▼───┐ ┌───▼───┐ ┌──▼──┐ ┌────▼─────┐
+│Backend│ │Front- │ │Test-│ │Researcher│
+│Worker │ │end    │ │er   │ │          │
+└───────┘ └───────┘ └─────┘ └──────────┘
 ```
 
 ## Roles
@@ -33,6 +33,7 @@ A self-contained team with all skills needed to deliver a feature end-to-end.
 | Backend | Squad Lead | `docs/templates/roles/FEATURE_BACKEND.md` |
 | Frontend | Squad Lead | `docs/templates/roles/FEATURE_FRONTEND.md` |
 | Tester | Squad Lead | `docs/templates/roles/TESTER.md` |
+| Researcher | Squad Lead | `docs/templates/roles/RESEARCHER.md` |
 
 ## Communication Graph
 
@@ -42,15 +43,15 @@ A self-contained team with all skills needed to deliver a feature end-to-end.
                           │ (status, completion)
                           │
                     Squad Lead
-                    ▲    ▲    ▲
-       (tasks,      │    │    │      (tasks,
-        reviews)────┘    │    └────── reviews)
-                         │
-    Backend ◄───────────►│◄──────────► Frontend
-           (coordinate)  │  (coordinate)
-                         │
-                     Tester
-                (receives from both)
+               ▲    ▲    ▲    ▲
+  (tasks,      │    │    │    │      (tasks,
+   reviews)────┘    │    │    └────── reviews)
+                    │    │
+    Backend ◄──────►│    │◄────────► Frontend
+          (coord)   │    │  (coord)
+                    │    │
+                Tester  Researcher
+           (from both)  (shares findings)
 ```
 
 **Who can message who:**
@@ -59,6 +60,8 @@ A self-contained team with all skills needed to deliver a feature end-to-end.
 - Backend → Tester (notify when ready)
 - Frontend → Tester (notify when ready)
 - Tester → Backend/Frontend (bug reports)
+- Researcher → All workers (share findings and recommendations)
+- All workers → Researcher (ask questions, request investigation)
 - Squad Lead → Main Supervisor (status, completion)
 
 ## Decision Authority
@@ -114,12 +117,13 @@ Evidence: .cmux/journal/.../screenshots/
 
 ```bash
 # Main supervisor spawns squad
-./tools/workers spawn "squad-lead" "Read docs/templates/roles/SQUAD_LEAD.md. Your task: [FEATURE]. Spawn backend, frontend, tester workers."
+./tools/workers spawn "squad-lead" "Read docs/templates/roles/SQUAD_LEAD.md. Your task: [FEATURE]. Spawn backend, frontend, tester, researcher workers."
 
 # Squad lead spawns team
 ./tools/workers spawn "backend-XXXX" "Read docs/templates/roles/FEATURE_BACKEND.md. Your task: [BACKEND SCOPE]"
 ./tools/workers spawn "frontend-XXXX" "Read docs/templates/roles/FEATURE_FRONTEND.md. Your task: [FRONTEND SCOPE]. Wait for API contract from backend."
 ./tools/workers spawn "tester-XXXX" "Read docs/templates/roles/TESTER.md. Your task: Test [FEATURE] when backend and frontend signal ready."
+./tools/workers spawn "researcher-XXXX" "Read docs/templates/roles/RESEARCHER.md. Your task: Research [TOPIC] and produce a report for the team."
 ```
 
 ## Cross-Team Coordination (Frontend + Backend)

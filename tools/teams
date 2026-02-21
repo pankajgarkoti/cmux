@@ -83,6 +83,7 @@ get_template_roles() {
             echo "backend docs/templates/roles/FEATURE_BACKEND.md Backend"
             echo "frontend docs/templates/roles/FEATURE_FRONTEND.md Frontend"
             echo "tester docs/templates/roles/TESTER.md Tester"
+            echo "researcher docs/templates/roles/RESEARCHER.md Researcher"
             ;;
         FEATURE_TEAM)
             echo "tech-lead docs/templates/roles/TECH_LEAD.md Tech_Lead"
@@ -476,7 +477,7 @@ cmd_templates() {
     echo -e "${BOLD}Available Team Templates${NC}"
     echo ""
     echo -e "  ${CYAN}SOLO_WORKER${NC}     1 worker       Simple, focused tasks and bug fixes"
-    echo -e "  ${CYAN}SQUAD_MODEL${NC}     4 workers      Cross-functional: lead + backend + frontend + tester"
+    echo -e "  ${CYAN}SQUAD_MODEL${NC}     5 workers      Cross-functional: lead + backend + frontend + tester + researcher"
     echo -e "  ${CYAN}FEATURE_TEAM${NC}    3 workers      Hierarchical: tech lead + backend + frontend"
     echo -e "  ${CYAN}PLATFORM_TEAM${NC}   3 workers      Infrastructure: platform lead + infra + devops"
     echo -e "  ${CYAN}TIGER_TEAM${NC}      3 workers      Flat peers for urgent fixes (no lead)"
@@ -504,6 +505,7 @@ get_permanent_roles() {
             echo "backend|backend|Backend Specialist|Methodical and data-driven. You think in API contracts, data flows, and edge cases. You write endpoints that are easy for the frontend to consume and hard to misuse. You test before you commit.|Terse and technical. You share API contracts, error codes, and test results. No fluff."
             echo "frontend|frontend|Frontend Specialist|Detail-oriented and user-focused. You care about pixel-perfect layouts, smooth interactions, and consistent styling. You spot visual inconsistencies others miss.|Concise but precise. You describe changes in terms of what the user sees and feels."
             echo "tester|qa|QA Engineer|Thorough and skeptical. You assume code is broken until proven working. You find the edge cases nobody thought of: empty inputs, concurrent requests, boundary conditions.|Structured test reports. Pass/fail counts, reproduction steps, confidence assessments."
+            echo "researcher|research|Researcher|Relentlessly curious and thorough. You follow threads to their end, read primary sources, and connect dots others miss. You ask the questions nobody thought to ask and dig until you find real answers. You save everything worth keeping as artifacts.|Structured research reports. You lead with the conclusion, then provide evidence. You cite sources and distinguish between confirmed facts, likely inferences, and open questions."
             ;;
         FEATURE_TEAM)
             echo "tech-lead|fullstack|Tech Lead|Architecturally sharp. You own the technical design and review all implementations. You guide workers toward clean solutions and catch design flaws early.|Technical and specific. You describe patterns, trade-offs, and review feedback with precision."
@@ -950,7 +952,7 @@ SETUP-PERMANENT OPTIONS:
 
 TEMPLATES:
     SOLO_WORKER      1 worker — simple tasks
-    SQUAD_MODEL      4 workers — lead + backend + frontend + tester
+    SQUAD_MODEL      5 workers — lead + backend + frontend + tester + researcher
     FEATURE_TEAM     3 workers — tech lead + backend + frontend
     PLATFORM_TEAM    3 workers — platform lead + infra + devops
     TIGER_TEAM       3 workers — flat peers, no lead (ephemeral only)
