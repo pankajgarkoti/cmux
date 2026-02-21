@@ -391,3 +391,22 @@ Completed both sub-tasks. (1) Added parseMessagePrefix() to utils.ts that parses
 
 ## 10:15 - Move prefix badges inline
 Moved message prefix badges (TASK, DONE, STATUS, UPDATE, etc.) from a separate div above message content into the header row, inline alongside agent name, role badge (SUP/PERM/WRK), and timestamp. Reduced badge height from h-5 to h-4 to match the role badge sizing. Commit a8ba40f.
+
+## 10:44 - Nova (perm-research) initialized. Read role definition and worker guidelines. Ready for research tasks.
+
+## 10:45 - Sage (perm-ui-review) initialized. Ready for review tasks.
+
+## 10:45 - Flint (perm-api-review) online. Permanent adversarial backend/API reviewer initialized. Awaiting review tasks.
+
+## 10:45 - Bolt (perm-devops) online. Permanent DevOps engineer ready for tasks.
+
+## 10:45 - Echo (perm-qa) initialized. Read role file and worker guidelines. Ready for test tasks.
+
+## 10:46 - Deployed 5 new permanent workers
+Spawned Nova (research), Sage (UI reviewer), Flint (API reviewer), Bolt (DevOps), and Echo (QA) as permanent workers. All role context files were created in previous session. Set display names in registry. All 8 permanent workers now online. Committed as 4236105.
+
+## 10:56 - Team architecture documented
+Created docs/TEAM.md as a living reference for the permanent worker team. Documents all 8 workers (Mira, Kai, Sol, Nova, Sage, Flint, Bolt, Echo), team topology diagram, lifecycle mechanics (--permanent flag, context reset, deletion protection), review workflow (builder -> adversarial reviewer -> QA), communication protocol, and design rationale from the debate. Linked from journal. File is meant to be updated in-place as the team evolves — not a snapshot. Commit 8ad660a.
+
+## 11:35 - Starting inbox redesign
+Claimed backlog item c866351b — redesign worker chat as inbox view. Analyzed current architecture: backend already supports agent_id filtering via conversation_store.get_messages(). Frontend does client-side filtering in ChatPanel. Plan: Kai adds a pinned-task endpoint and inbox-style query, Mira rebuilds the chat panel layout with pinned task header and grouped messages. Reading all relevant files now.
