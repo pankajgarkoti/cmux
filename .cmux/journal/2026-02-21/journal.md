@@ -647,3 +647,30 @@ Research task fully complete. Comprehensive report delivered to .cmux/journal/20
 
 ## 16:39 - Named all squad members
 Gave human names to all hero and heroweb squad members. Hero: Ash (lead), Rune (backend), Piper (frontend), Cleo (tester), Iris (research). Heroweb: Zara (lead), Finn (backend), Luna (frontend), Juno (tester), Wren (research). Both researchers also proactively completed codebase research reports — Iris on hero, Wren on heroweb.
+
+## 16:54 - Budget cost dashboard
+Built BudgetPanel.tsx as a new Budget tab in the activity panel. Shows per-agent token usage table (input, output, cache read, cache write) with formatted counts (12.4k/1.2M) and estimated costs using Claude Opus pricing (/M input, /M output, .50/M cache read, .75/M cache write). Sorted by cost descending, total summary card at top, total row in table footer. Uses existing getBudget() API and agent store for display names. Moved formatTokenCount to shared utils.ts. Verified in browser — all 19 agents rendering with real data, total .03. Commit 2e4b356.
+
+## 16:54 - Session summary - 3 tasks completed
+Completed three frontend tasks this session: (1) Clone sidebar display (a443668) - added clone_of to Agent type, clone grouping in Explorer, split-styled clone names in AgentTreeItem with indent and dimmed indicators. (2) Budget token indicator in sidebar (034ea1d) - compact token count next to agent names, fetched via React Query. (3) Budget cost dashboard (2e4b356) - full BudgetPanel as new tab in activity panel with per-agent token table, Opus pricing calculations, sorted by cost. Also moved formatTokenCount to shared utils.ts. All verified in browser via Chrome MCP.
+
+## 16:54 - [heroweb] heroweb-backend: [TASK] Integrate Laminar observability into heroweb Next.js project. Reading codebase first.
+
+## 16:55 - Starting task: comprehensive CMUX system report. 10 sections covering architecture, orchestration, agent lifecycle, communication, memory, self-improvement, hooks, templates, frontend, safety.
+
+## 16:55 - [heroweb] Laminar integration
+Reading heroweb codebase to integrate Laminar LLM observability. Examined: next.config.ts, lib/ai/gemini.ts, app/api/chat/route.ts, app/api/chat/app/route.ts, payment routes. Next: fetch Laminar API docs for trace context setup.
+
+## 16:57 - System report: reading source files
+Reading all CMUX source files for comprehensive system report (Task 4). Completed: monitor.sh (full), main.py, tools/workers (1031 lines), tools/teams (999 lines), all 9 hooks, compact.sh, mailbox.py, websocket/manager.py, frontend stores + WebSocket hook. Ready to write the report.
+
+## 16:57 - Implementing Laminar integration: lmnr installed, Laminar.initialize in main.py, trace metadata on agent events, .env.example and CLAUDE.md updated. Committing next.
+
+## 16:57 - Laminar observability integration
+Integrated lmnr (Laminar) for LLM observability. Laminar.initialize() runs at module level in main.py before FastAPI app creation, patching the Anthropic SDK for auto-instrumentation. Only activates when LMNR_PROJECT_API_KEY env var is set — graceful noop otherwise. Agent events route sets trace metadata (agent_id, event_type, session_id) so traces group per agent in the Laminar dashboard. Key decision: used os.getenv directly for the API key instead of adding to pydantic Settings, since LMNR_PROJECT_API_KEY is a third-party standard env var that doesn't fit the CMUX_ prefix convention. All 55 tests pass. Commit bd8b1d8.
+
+## 17:00 - [heroweb] Laminar integration complete
+Integrated @lmnr-ai/lmnr into heroweb. Changes: (1) next.config.ts — added @lmnr-ai/lmnr to serverExternalPackages, (2) instrumentation.ts — Laminar.initialize() on Node.js runtime, (3) app/api/chat/route.ts — wrapped Gemini streaming call with observe() setting userId + sessionId, (4) app/api/chat/app/route.ts — same for app chat route, (5) .env.example — LMNR_PROJECT_API_KEY placeholder, (6) .gitignore — added !.env.example exception. Build passes. Commit e47b88e.
+
+## 17:01 - CMUX system report complete
+Wrote comprehensive 961-line technical report covering all 10 sections: architecture, orchestration (cmux.sh/monitor.sh/daemons), agent lifecycle (spawn/kill/reset/clone), communication (mailbox/router/WebSocket), memory (6 tiers), self-improvement (health/heartbeat/sentry/compact/autonomy), hook system (9 hooks), team templates (6 templates + permanent teams), frontend dashboard (13 stores, 60+ components), and safety model (5-level recovery hierarchy). Verified every claim against source code. Committed as 8c0a8cb.
