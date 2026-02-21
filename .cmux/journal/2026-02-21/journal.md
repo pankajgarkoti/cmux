@@ -239,3 +239,8 @@ Built full heartbeat display for the CMUX dashboard. Three parts: (1) Backend ro
 
 ## 07:59 - Heartbeat UI shipped
 Completed the full heartbeat display feature for the CMUX frontend dashboard. Created backend route (heartbeat.py) with POST/GET endpoints that store latest scan in memory and broadcast via WebSocket. Integrated monitor.sh to parse autonomy-check --summary output into a JSON sections dict and POST it to the API after each idle scan. Built HeartbeatIndicator component using shadcn DropdownMenu — shows pulsing colored dot (green=all clear, yellow=items found, red=health/critical) and expands to show each scan section with a live-updating 'Last scan: Xs ago' timer. Used Zustand store for state, wired into useWebSocket.ts. All verified with typecheck, build, API curl tests, and browser testing via Chrome MCP.
+
+## 08:01 - Tasks panel UI polish complete
+Fixed two issues in TasksPanel.tsx: (1) Removed project-scoped filtering — the panel was deriving a projectFilter from the selected agent's project_id, causing 'No tasks for this project' when an agent was selected. Now always fetches all tasks globally. (2) Polished spacing — bumped card padding from p-2.5 to p-3, list gap from space-y-1.5 to space-y-2.5, search input height from h-6 to h-7, used rounded-lg cards, added subtle border under stats summary, wider meta row gaps. Typecheck and build both pass. Commit: 1f45344.
+
+## 08:02 - Reflection: tasks-panel-polish — what worked: clean surgical edits, one file changed. The project filter was the root cause of the 'no tasks' issue, straightforward to remove. What I'd do differently: would have liked to test in browser via Chrome MCP but it had a session conflict.
