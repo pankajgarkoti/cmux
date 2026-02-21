@@ -289,3 +289,6 @@ Worker unify-backlog is completing the full backlog→tasks.db migration. tools/
 
 ## 08:58 - Unified backlog into tasks.db
 Rewrote tools/backlog CLI to use sqlite3 against .cmux/tasks.db instead of .cmux/backlog.json. Backlog is now a status field on tasks. Updated tools/autonomy-check section 3 to query tasks.db. Cleaned up tools/tasks (removed BACKLOG_FILE var, deprecated import-backlog command, added backlog to validate_status and status_color). Deleted .cmux/backlog.json. All 5 migrated items preserved. Tested: list, add, next, done, skip, prioritize, show, legacy add format with descriptions, autonomy-check backlog section.
+
+## 09:01 - Show more 0 chars bug fix
+Fixed the 'Show more (0 more chars)' bug in chat messages. Root cause: COLLAPSE_THRESHOLD (500) was lower than PREVIEW_LENGTH (1200), so messages between 500-1200 chars triggered the collapse button but getPreviewContent returned the full text. Fix: set COLLAPSE_THRESHOLD = PREVIEW_LENGTH + 200, and added a guard that only shows the button when the preview is actually shorter than the original content. Commit 73ca22a.
