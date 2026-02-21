@@ -2,7 +2,9 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from typing import Optional
+import hashlib
 import logging
+import time
 import uuid
 
 from ..websocket.manager import ws_manager
@@ -11,6 +13,12 @@ from ..services.conversation_store import conversation_store
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Content-based dedup cache: hash(agent_name + content) -> (thought_id, timestamp)
+_recent_thoughts: dict[str, tuple[str, float]] = {}
+_dedup_request_count = 0
+_DEDUP_WINDOW_SECONDS = 30
+_DEDUP_CLEANUP_INTERVAL = 100
 
 
 class ThoughtEvent(BaseModel):
@@ -23,14 +31,45 @@ class ThoughtEvent(BaseModel):
     timestamp: Optional[str] = None
 
 
+def _dedup_key(agent_name: str, content: Optional[str]) -> str:
+    raw = f"{agent_name}:{content or ''}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _cleanup_expired():
+    global _recent_thoughts
+    now = time.monotonic()
+    _recent_thoughts = {
+        k: v for k, v in _recent_thoughts.items()
+        if now - v[1] < _DEDUP_WINDOW_SECONDS
+    }
+
+
 @router.post("")
 async def receive_thought(event: ThoughtEvent):
     """
     Receive a live thought/reasoning event from a Claude Code hook.
 
     Persists to SQLite and broadcasts via WebSocket.
+    Deduplicates identical thoughts from the same agent within a 30s window.
     """
+    global _dedup_request_count
+
+    _dedup_request_count += 1
+    if _dedup_request_count % _DEDUP_CLEANUP_INTERVAL == 0:
+        _cleanup_expired()
+
+    now = time.monotonic()
+    key = _dedup_key(event.agent_name, event.content)
+
+    if key in _recent_thoughts:
+        existing_id, ts = _recent_thoughts[key]
+        if now - ts < _DEDUP_WINDOW_SECONDS:
+            return {"success": True, "thought_id": existing_id, "deduplicated": True}
+
     thought_id = str(uuid.uuid4())[:8]
+    _recent_thoughts[key] = (thought_id, now)
+
     thought_data = {
         "id": thought_id,
         "agent_name": event.agent_name,
