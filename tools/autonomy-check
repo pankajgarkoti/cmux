@@ -80,14 +80,15 @@ if [[ -f "$CMUX_MAILBOX" ]] && [[ -s "$CMUX_MAILBOX" ]]; then
             fi
             [[ -n "$sender" ]] && senders+=("$sender")
 
-            # Extract message type tag
-            if echo "$line" | grep -q '\[BLOCKED\]'; then
+            # Extract message type tag — match as standalone prefix (not embedded in other text)
+            # Use word-boundary-like anchoring: tag at start of subject or after whitespace/quote
+            if echo "$line" | grep -qE '(^|[" ])\[BLOCKED\]'; then
                 ((blocked_count++))
-            elif echo "$line" | grep -q '\[DONE\]'; then
+            elif echo "$line" | grep -qE '(^|[" ])\[DONE\]'; then
                 ((done_count++))
-            elif echo "$line" | grep -q '\[STATUS\]'; then
+            elif echo "$line" | grep -qE '(^|[" ])\[STATUS\]'; then
                 ((status_count++))
-            elif echo "$line" | grep -q '\[QUESTION\]'; then
+            elif echo "$line" | grep -qE '(^|[" ])\[QUESTION\]'; then
                 ((question_count++))
             else
                 ((other_count++))
