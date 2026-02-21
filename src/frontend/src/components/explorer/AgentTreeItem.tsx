@@ -13,6 +13,7 @@ interface AgentTreeItemProps {
   agent: Agent;
   isSelected: boolean;
   onClick: () => void;
+  totalTokens?: number;
 }
 
 const statusColors: Record<AgentStatus, string> = {
@@ -25,7 +26,13 @@ const statusColors: Record<AgentStatus, string> = {
   IDLE: 'bg-gray-300',
 };
 
-export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps) {
+function formatTokenCount(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 1_000_000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+}
+
+export function AgentTreeItem({ agent, isSelected, onClick, totalTokens }: AgentTreeItemProps) {
   const isSupervisor = agent.type === 'supervisor' || agent.role === 'project-supervisor';
   const isProjectSupervisor = agent.role === 'project-supervisor';
 
@@ -105,6 +112,13 @@ export function AgentTreeItem({ agent, isSelected, onClick }: AgentTreeItemProps
         </span>
       ) : (
         <span className="truncate flex-1">{displayName}</span>
+      )}
+
+      {/* Token usage indicator */}
+      {totalTokens && totalTokens > 0 && (
+        <span className="text-[10px] text-muted-foreground/60 flex-shrink-0">
+          {formatTokenCount(totalTokens)}
+        </span>
       )}
 
       {/* Working indicator - animated spinner */}

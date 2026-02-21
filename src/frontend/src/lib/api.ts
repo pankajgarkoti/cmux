@@ -8,6 +8,19 @@ import type { ProjectList, Project, ProjectCreate, ProjectAgentsResponse } from 
 import type { TaskListResponse, TaskTreeResponse, TaskStatsResponse, Task } from '../types/task';
 import { API_BASE } from './constants';
 
+export interface BudgetAgentUsage {
+  agent_id: string;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_creation_tokens: number;
+  event_count: number;
+}
+
+export interface BudgetResponse {
+  agents: BudgetAgentUsage[];
+}
+
 export const api = {
   async getAgents(): Promise<AgentListResponse> {
     const res = await fetch(`${API_BASE}/api/agents`);
@@ -345,6 +358,12 @@ export const api = {
   async getTaskStats(): Promise<TaskStatsResponse> {
     const res = await fetch(`${API_BASE}/api/tasks/stats`);
     if (!res.ok) throw new Error('Failed to fetch task stats');
+    return res.json();
+  },
+
+  async getBudget(): Promise<BudgetResponse> {
+    const res = await fetch(`${API_BASE}/api/budget`);
+    if (!res.ok) throw new Error('Failed to fetch budget');
     return res.json();
   },
 };

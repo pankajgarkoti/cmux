@@ -63,6 +63,26 @@ export function Explorer() {
     queryFn: () => api.getArchivedAgents(),
   });
 
+  // Fetch budget/token usage per agent
+  const { data: budgetData } = useQuery({
+    queryKey: ['budget'],
+    queryFn: () => api.getBudget(),
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Build a map of agent_id -> total tokens for quick lookup
+  const tokensByAgent = useMemo(() => {
+    const map = new Map<string, number>();
+    if (budgetData?.agents) {
+      for (const a of budgetData.agents) {
+        const total = a.input_tokens + a.output_tokens;
+        if (total > 0) map.set(a.agent_id, total);
+      }
+    }
+    return map;
+  }, [budgetData]);
+
   // Sync archived agents to store
   useEffect(() => {
     if (archivedData) {
@@ -280,6 +300,7 @@ export function Explorer() {
                       group={group}
                       selectedAgentId={selectedAgentId}
                       onSelectAgent={selectAgent}
+                      tokensByAgent={tokensByAgent}
                     />
                   ))}
                 </div>
@@ -459,10 +480,12 @@ function ProjectAgentGroup({
   group,
   selectedAgentId,
   onSelectAgent,
+  tokensByAgent,
 }: {
   group: ProjectGroup;
   selectedAgentId: string | null;
   onSelectAgent: (id: string) => void;
+  tokensByAgent: Map<string, number>;
 }) {
   const [isOpen, setIsOpen] = useState(true);
 
@@ -519,6 +542,7 @@ function ProjectAgentGroup({
               agent={agent}
               isSelected={selectedAgentId === agent.id}
               onClick={() => onSelectAgent(agent.id)}
+              totalTokens={tokensByAgent.get(agent.id) || tokensByAgent.get(agent.name)}
             />
           ))
         )}
